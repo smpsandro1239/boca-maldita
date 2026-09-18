@@ -8,9 +8,9 @@ await build({
   bundle: true,
   platform: 'node',
   target: 'node20',
-  format: 'cjs',
+  format: 'esm',
   packages: 'external',
-  outfile: 'api/index.cjs',
+  outfile: 'api/index.js',
   banner: { js: '/* gerado por scripts/build-api.mjs — não editar manualmente */' },
   logLevel: 'info',
 });

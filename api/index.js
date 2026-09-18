@@ -1,48 +1,14 @@
 /* gerado por scripts/build-api.mjs — não editar manualmente */
-var __create = Object.create;
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-
-// scripts/api-entry.ts
-var api_entry_exports = {};
-__export(api_entry_exports, {
-  default: () => handler
-});
-module.exports = __toCommonJS(api_entry_exports);
 
 // api/lib/app.ts
-var import_config = require("dotenv/config");
-var import_express = __toESM(require("express"), 1);
-var import_node_fs2 = require("node:fs");
-var import_node_path2 = __toESM(require("node:path"), 1);
+import "dotenv/config";
+import express from "express";
+import { existsSync } from "node:fs";
+import path2 from "node:path";
 
 // api/lib/storage.ts
-var import_node_fs = require("node:fs");
-var import_node_path = __toESM(require("node:path"), 1);
+import { mkdirSync } from "node:fs";
+import path from "node:path";
 var TABLE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS reservations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,7 +55,7 @@ function toReference(count) {
 async function createSqliteStorage() {
   const { DatabaseSync } = await import("node:sqlite");
   const dbPath = process.env.DB_PATH ?? "data/boca-maldita.db";
-  (0, import_node_fs.mkdirSync)(import_node_path.default.dirname(dbPath), { recursive: true });
+  mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec(`PRAGMA journal_mode = WAL;
 ${TABLE_SCHEMA}`);
@@ -263,7 +229,7 @@ async function createStorage() {
 }
 
 // api/lib/validation.ts
-var import_zod = require("zod");
+import { z } from "zod";
 var AVAILABLE_TIMES = [
   "12:30",
   "13:00",
@@ -276,14 +242,14 @@ var AVAILABLE_TIMES = [
   "21:30",
   "22:00"
 ];
-var nameField = import_zod.z.string().trim().min(2, "O nome \xE9 obrigat\xF3rio (m\xEDnimo de 2 caracteres).").max(120, "O nome \xE9 demasiado longo.");
-var emailField = import_zod.z.string().trim().email("Endere\xE7o de email inv\xE1lido.").max(200, "Endere\xE7o de email demasiado longo.");
-var phoneField = import_zod.z.string().trim().regex(/^\+?[0-9\s-]{6,20}$/, "N\xFAmero de telefone inv\xE1lido.");
-var reservationSchema = import_zod.z.object({
+var nameField = z.string().trim().min(2, "O nome \xE9 obrigat\xF3rio (m\xEDnimo de 2 caracteres).").max(120, "O nome \xE9 demasiado longo.");
+var emailField = z.string().trim().email("Endere\xE7o de email inv\xE1lido.").max(200, "Endere\xE7o de email demasiado longo.");
+var phoneField = z.string().trim().regex(/^\+?[0-9\s-]{6,20}$/, "N\xFAmero de telefone inv\xE1lido.");
+var reservationSchema = z.object({
   name: nameField,
   email: emailField,
   phone: phoneField,
-  date: import_zod.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inv\xE1lida.").refine((value) => {
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inv\xE1lida.").refine((value) => {
     const [year, month, day] = value.split("-").map(Number);
     const date = new Date(year, month - 1, day);
     return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
@@ -293,29 +259,29 @@ var reservationSchema = import_zod.z.object({
     today.setHours(0, 0, 0, 0);
     return new Date(year, month - 1, day) >= today;
   }, "A data tem de ser hoje ou uma data futura."),
-  time: import_zod.z.enum(AVAILABLE_TIMES, { message: "Hora n\xE3o dispon\xEDvel para reserva." }),
-  guests: import_zod.z.number().int("N\xFAmero de convidados inv\xE1lido.").min(1).max(16, "M\xE1ximo de 16 convidados por reserva."),
-  area: import_zod.z.string().trim().min(2, "Selecione uma \xE1rea do restaurante.").max(120),
-  occasion: import_zod.z.string().trim().min(1, "A ocasi\xE3o \xE9 obrigat\xF3ria.").max(120),
-  notes: import_zod.z.string().trim().max(1e3, "Notas demasiado longas.").optional().default("")
+  time: z.enum(AVAILABLE_TIMES, { message: "Hora n\xE3o dispon\xEDvel para reserva." }),
+  guests: z.number().int("N\xFAmero de convidados inv\xE1lido.").min(1).max(16, "M\xE1ximo de 16 convidados por reserva."),
+  area: z.string().trim().min(2, "Selecione uma \xE1rea do restaurante.").max(120),
+  occasion: z.string().trim().min(1, "A ocasi\xE3o \xE9 obrigat\xF3ria.").max(120),
+  notes: z.string().trim().max(1e3, "Notas demasiado longas.").optional().default("")
 }).strict();
-var contactSchema = import_zod.z.object({
+var contactSchema = z.object({
   nome: nameField,
   email: emailField,
-  assunto: import_zod.z.string().trim().min(1, "O assunto \xE9 obrigat\xF3rio.").max(120),
-  mensagem: import_zod.z.string().trim().min(5, "A mensagem \xE9 demasiado curta.").max(5e3, "A mensagem \xE9 demasiado longa.")
+  assunto: z.string().trim().min(1, "O assunto \xE9 obrigat\xF3rio.").max(120),
+  mensagem: z.string().trim().min(5, "A mensagem \xE9 demasiado curta.").max(5e3, "A mensagem \xE9 demasiado longa.")
 }).strict();
-var newsletterSchema = import_zod.z.object({
+var newsletterSchema = z.object({
   email: emailField
 }).strict();
-var siteSettingsSchema = import_zod.z.object({
+var siteSettingsSchema = z.object({
   contactEmail: emailField
 }).strict();
-var assetUrlField = import_zod.z.string().trim().min(1, "O link da imagem \xE9 obrigat\xF3rio.").max(2e3, "O link da imagem \xE9 demasiado longo.").refine((value) => /^https?:\/\//i.test(value), "O link tem de come\xE7ar por http:// ou https://.");
-var assetOverridesSchema = import_zod.z.object({
-  overrides: import_zod.z.array(
-    import_zod.z.object({
-      id: import_zod.z.string().trim().min(1).max(80),
+var assetUrlField = z.string().trim().min(1, "O link da imagem \xE9 obrigat\xF3rio.").max(2e3, "O link da imagem \xE9 demasiado longo.").refine((value) => /^https?:\/\//i.test(value), "O link tem de come\xE7ar por http:// ou https://.");
+var assetOverridesSchema = z.object({
+  overrides: z.array(
+    z.object({
+      id: z.string().trim().min(1).max(80),
       url: assetUrlField
     })
   ).max(100, "Demasiadas substitui\xE7\xF5es.")
@@ -387,7 +353,7 @@ async function sendReservationConfirmation(payload) {
 // api/lib/app.ts
 var distDir = "";
 if (!process.env.VERCEL) {
-  distDir = import_node_path2.default.resolve(process.cwd(), "dist");
+  distDir = path2.resolve(process.cwd(), "dist");
 }
 var IMAGE_OVERRIDES_KEY = "image_asset_overrides";
 var SITE_CONTACT_EMAIL_KEY = "site_contact_email";
@@ -411,9 +377,9 @@ async function createApp() {
     console.error("[app] Falha ao inicializar armazenamento \u2014 a usar mem\xF3ria:", err);
     storage = createMemoryStorage();
   }
-  const app = (0, import_express.default)();
+  const app = express();
   app.disable("x-powered-by");
-  app.use(import_express.default.json({ limit: "200kb" }));
+  app.use(express.json({ limit: "200kb" }));
   app.use((req, res, next) => {
     const allowed = process.env.APP_URL ?? "http://localhost:3000";
     const origin = req.headers.origin;
@@ -536,10 +502,10 @@ async function createApp() {
       next(err);
     }
   });
-  if (!process.env.VERCEL && (0, import_node_fs2.existsSync)(distDir)) {
-    app.use(import_express.default.static(distDir));
+  if (!process.env.VERCEL && existsSync(distDir)) {
+    app.use(express.static(distDir));
     app.get(/^\/(?!api(?:\/|$)).*/, (_req, res) => {
-      res.sendFile(import_node_path2.default.join(distDir, "index.html"));
+      res.sendFile(path2.join(distDir, "index.html"));
     });
   }
   app.use((err, _req, res, _next) => {
@@ -566,3 +532,6 @@ async function handler(req, res, next) {
     }
   }
 }
+export {
+  handler as default
+};

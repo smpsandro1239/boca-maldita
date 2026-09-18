@@ -46,7 +46,7 @@ Pré-requisitos: Node.js >= 20.
 | `npm run dev`      | Arranca API e frontend em paralelo (Vite + tsx watch) |
 | `npm run dev:web`  | Apenas frontend (Vite)                             |
 | `npm run dev:api`  | Apenas API (tsx watch)                             |
-| `npm run build`    | Gera `api/index.cjs` (API serverless num ficheiro único) e compila o frontend para `dist/` |
+| `npm run build`    | Gera `api/index.js` (API serverless num ficheiro único) e compila o frontend para `dist/` |
 | `npm start`        | Serve a API (e o `dist/` se existir) em produção     |
 | `npm run lint`     | Verificação de tipos (tsc --noEmit)               |
 | `npm run typecheck`| Alias de `lint`                                    |
@@ -55,7 +55,7 @@ Pré-requisitos: Node.js >= 20.
 ## Estrutura
 
 ```
-api/index.cjs   # Função serverless (Vercel) — gerada por scripts/build-api.mjs (não editar)
+api/index.js   # Função serverless (Vercel) — gerada por scripts/build-api.mjs (não editar)
 api/lib/        # Backend Express + armazenamento (partilhado com o servidor local)
   app.ts       # Fábrica da aplicação (rotas, admin, email) — usada em local e Vercel
   storage.ts   # Camada de dados: SQLite local ou Turso (automático por variáveis)
@@ -115,7 +115,7 @@ O projeto está ligado ao repositório GitHub: cada push para `main` é publicad
 
    Colar os valores em `TURSO_URL` e `TURSO_AUTH_TOKEN` na Vercel.
 
-3. `npm run build` gera `api/index.cjs` (API serverless num ficheiro único) e compila o frontend para `dist/`; `vercel.json` reencaminha `/api/*` para essa função e o restante é servido como SPA (`/index.html`).
+3. `npm run build` gera `api/index.js` (API serverless num ficheiro único) e compila o frontend para `dist/`; `vercel.json` reencaminha `/api/*` para essa função e o restante é servido como SPA (`/index.html`).
 
 ## Email de confirmação
 
