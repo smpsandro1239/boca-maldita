@@ -1,0 +1,6 @@
+{
+  "name": "Boca Maldita - Fine Dining & Grill",
+  "description": "Teatro culinário com mestria no fogo nobre, carnes maturadas seletas e alta hospitalidade no coração do Minho, em Vila de Prado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Bodoni Moda", Georgia, serif;
+  --font-sans: "Hanken Grotesk", system-ui, -apple-system, sans-serif;
+  --color-obsidian: #0C0D0E;
+  --color-charcoal: #141518;
+  --color-elevated: #1C1E22;
+  --color-caramel: #D4A373;
+  --color-gold: #C59D5F;
+  --color-hairline: #282A30;
+  --color-cream: #F7F5F0;
+  --color-stone: #A6A8AD;
+  --color-muted: #686B73;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: var(--font-sans);
+    background-color: #0C0D0E;
+    color: #F7F5F0;
+  }
+}
+
+.font-serif {
+  font-family: "Bodoni Moda", serif;
+}
+
+.font-sans {
+  font-family: "Hanken Grotesk", sans-serif;
+}
+

@@ -1,0 +1,368 @@
+import { useState, type FormEvent } from 'react';
+import { ReservationData } from '../types';
+import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
+
+export default function ReservationScreen() {
+  const [formData, setFormData] = useState<ReservationData>({
+    name: '',
+    email: '',
+    phone: '',
+    date: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
+    time: '20:00',
+    guests: 2,
+    area: 'Salão Nobre da Brasa',
+    occasion: 'Jantar Gastronómico',
+    notes: ''
+  });
+
+  const [confirmedReservation, setConfirmedReservation] = useState<{
+    id: string;
+    data: ReservationData;
+  } | null>(null);
+
+  const availableTimes = [
+    // Almoço (Sábado e Domingo)
+    '12:30', '13:00', '13:30', '14:00',
+    // Jantar (Terça a Sábado)
+    '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'
+  ];
+
+  const areas = [
+    { id: 'Salão Nobre da Brasa', desc: 'Ambiente acolhedor com vista para a adega e iluminação intimista' },
+    { id: 'Balcão do Assador (Chef)', desc: 'Experiência exclusiva para ver a arte do fogo em primeira fila' },
+    { id: 'Terraço do Cávado', desc: 'Espaço climatizado com vista serena para o vale do rio' },
+    { id: 'Sala Privada Garrafeira', desc: 'Reserva exclusiva para grupos a partir de 6 pessoas' }
+  ];
+
+  const handleSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const reference = 'BM-' + Math.floor(1000 + Math.random() * 9000);
+    setConfirmedReservation({
+      id: reference,
+      data: { ...formData }
+    });
+    window.scrollTo({ top: 120, behavior: 'smooth' });
+  };
+
+  const resetForm = () => {
+    setConfirmedReservation(null);
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+      time: '20:00',
+      guests: 2,
+      area: 'Salão Nobre da Brasa',
+      occasion: 'Jantar Gastronómico',
+      notes: ''
+    });
+  };
+
+  return (
+    <div className="w-full bg-[#0C0D0E] py-12 lg:py-20">
+      <div className="max-w-5xl mx-auto px-5 lg:px-12 space-y-12">
+        
+        {/* Header */}
+        <div className="text-center max-w-2xl mx-auto space-y-4">
+          <div className="flex items-center justify-center gap-3">
+            <span className="h-[1.5px] w-10 bg-[#D4A373]"></span>
+            <span className="text-xs uppercase tracking-[0.25em] text-[#D4A373] font-sans font-semibold">
+              Reserva de Mesa
+            </span>
+            <span className="h-[1.5px] w-10 bg-[#D4A373]"></span>
+          </div>
+          <h1 className="font-serif text-4xl sm:text-5xl text-[#F7F5F0]">
+            Garanta a Sua Experiência
+          </h1>
+          <p className="text-sm text-[#A6A8AD]">
+            Recomendamos a reserva antecipada para garantir a disponibilidade dos nossos cortes nobres de maturação prolongada.
+          </p>
+        </div>
+
+        {/* Confirmed State Voucher */}
+        {confirmedReservation ? (
+          <div className="bg-[#141518] border border-[#D4A373] p-8 lg:p-12 shadow-2xl relative space-y-8 animate-fadeIn">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#282A30] pb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-[#D4A373] text-[#0C0D0E] flex items-center justify-center font-bold">
+                  <Check className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-xs uppercase text-[#D4A373] tracking-widest font-mono">
+                    PEDIDO DE RESERVA CONFIRMADO
+                  </span>
+                  <h2 className="font-serif text-2xl text-[#F7F5F0]">
+                    Esperamos por si no Boca Maldita
+                  </h2>
+                </div>
+              </div>
+
+              <div className="text-right">
+                <span className="text-xs text-[#A6A8AD] block font-mono uppercase">Referência</span>
+                <span className="font-mono text-xl text-[#D4A373] font-bold">
+                  {confirmedReservation.id}
+                </span>
+              </div>
+            </div>
+
+            {/* Voucher Details Table */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 bg-[#1C1E22] p-6 border border-[#282A30]">
+              <div>
+                <span className="text-xs text-[#A6A8AD] uppercase tracking-wider block font-sans">Data</span>
+                <span className="font-serif text-lg text-[#F7F5F0] font-medium">{confirmedReservation.data.date}</span>
+              </div>
+              <div>
+                <span className="text-xs text-[#A6A8AD] uppercase tracking-wider block font-sans">Hora da Mesa</span>
+                <span className="font-serif text-lg text-[#D4A373] font-medium">{confirmedReservation.data.time}</span>
+              </div>
+              <div>
+                <span className="text-xs text-[#A6A8AD] uppercase tracking-wider block font-sans">Convidados</span>
+                <span className="font-serif text-lg text-[#F7F5F0] font-medium">{confirmedReservation.data.guests} Pessoas</span>
+              </div>
+              <div>
+                <span className="text-xs text-[#A6A8AD] uppercase tracking-wider block font-sans">Espaço</span>
+                <span className="font-serif text-base text-[#F7F5F0] font-medium truncate block">{confirmedReservation.data.area}</span>
+              </div>
+            </div>
+
+            <div className="text-xs text-[#A6A8AD] space-y-2 bg-[#1C1E22]/50 p-4 border border-[#282A30]">
+              <p>
+                • Enviamos os detalhes e voucher para <strong className="text-[#F7F5F0]">{confirmedReservation.data.email}</strong> e via SMS para <strong className="text-[#F7F5F0]">{confirmedReservation.data.phone}</strong>.
+              </p>
+              <p>
+                • Tolerância de mesa: 15 minutos. Em caso de atraso ou alteração, contacte diretamente a nossa recepção através do número <a href="tel:+351253031890" className="text-[#D4A373] underline">+351 253 031 890</a>.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#282A30]">
+              <div className="text-xs text-[#686B73]">
+                Avenida do Cávado, Vila de Prado, Vila Verde • Estacionamento reservado no local
+              </div>
+              <button
+                onClick={resetForm}
+                className="bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] text-xs uppercase font-sans font-semibold px-6 py-2.5 tracking-wider transition-colors"
+              >
+                Fazer Nova Reserva
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Interactive Reservation Form */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            {/* Form */}
+            <div className="lg:col-span-8 bg-[#141518] border border-[#282A30] p-6 sm:p-10 shadow-2xl">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                
+                {/* Step 1: Mesa & Espaço */}
+                <div className="space-y-4">
+                  <h3 className="font-serif text-lg text-[#F7F5F0] flex items-center gap-2 border-b border-[#282A30] pb-2">
+                    <Calendar className="w-4 h-4 text-[#D4A373]" />
+                    <span>1. Data, Hora &amp; Espaço da Sala</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                        Data Pretendida
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={formData.date}
+                        onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                        className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                        Hora do Serviço
+                      </label>
+                      <select
+                        value={formData.time}
+                        onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                        className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                      >
+                        {availableTimes.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                        Número de Pessoas
+                      </label>
+                      <select
+                        value={formData.guests}
+                        onChange={(e) => setFormData({ ...formData, guests: Number(e.target.value) })}
+                        className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                      >
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16].map(n => (
+                          <option key={n} value={n}>{n} {n === 1 ? 'Pessoa' : 'Pessoas'}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Area selection */}
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-2">
+                      Seleção da Área do Restaurante
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {areas.map(ar => (
+                        <div
+                          key={ar.id}
+                          onClick={() => setFormData({ ...formData, area: ar.id })}
+                          className={`p-3.5 border cursor-pointer transition-all ${
+                            formData.area === ar.id
+                              ? 'bg-[#1C1E22] border-[#D4A373] text-[#F7F5F0]'
+                              : 'bg-[#141518] border-[#282A30] text-[#A6A8AD] hover:border-[#686B73]'
+                          }`}
+                        >
+                          <div className="text-xs font-semibold text-[#F7F5F0] flex items-center justify-between">
+                            <span>{ar.id}</span>
+                            {formData.area === ar.id && (
+                              <span className="w-2 h-2 rounded-full bg-[#D4A373]"></span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#A6A8AD] mt-1 leading-snug">
+                            {ar.desc}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 2: Contactos do Titular */}
+                <div className="space-y-4 pt-4">
+                  <h3 className="font-serif text-lg text-[#F7F5F0] flex items-center gap-2 border-b border-[#282A30] pb-2">
+                    <Users className="w-4 h-4 text-[#D4A373]" />
+                    <span>2. Titular da Reserva</span>
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                        Nome Completo *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Ex.: Dr. António Ribeiro"
+                        className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                        Telemóvel / Telefone *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        placeholder="+351 9xx xxx xxx"
+                        className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                        Email de Confirmação *
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="nome@exemplo.pt"
+                        className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                      Preferências ou Cortes Especiais Desejados (Opcional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formData.notes}
+                      onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                      placeholder="Ex.: Reservar Tomahawk Maturado 60 dias, aniversário de casamento, alergias..."
+                      className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none resize-none"
+                    ></textarea>
+                  </div>
+                </div>
+
+                {/* Submit Action */}
+                <button
+                  type="submit"
+                  className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] font-sans text-xs uppercase font-semibold py-4 tracking-[0.2em] transition-colors shadow-lg"
+                >
+                  Confirmar Pedido de Reserva
+                </button>
+              </form>
+            </div>
+
+            {/* Sidebar with Guidelines and Direct Phone */}
+            <div className="lg:col-span-4 space-y-6">
+              
+              <div className="bg-[#141518] border border-[#282A30] p-6 space-y-4">
+                <div className="flex items-center gap-2 text-[#D4A373]">
+                  <Phone className="w-5 h-5" />
+                  <h4 className="text-xs uppercase font-mono tracking-widest">
+                    RESERVA IMEDIATA POR TELEFONE
+                  </h4>
+                </div>
+                <p className="text-xs text-[#A6A8AD] leading-relaxed">
+                  Para mesas de grupos com mais de 8 pessoas ou pedidos com menos de 2 horas de antecedência, ligue diretamente:
+                </p>
+                <a
+                  href="tel:+351253031890"
+                  className="block font-serif text-2xl text-[#F7F5F0] hover:text-[#D4A373] transition-colors font-semibold"
+                >
+                  +351 253 031 890
+                </a>
+                <span className="text-[11px] text-[#686B73] block">
+                  Linha de reservas aberta das 11h00 às 23h30
+                </span>
+              </div>
+
+              <div className="bg-[#141518] border border-[#282A30] p-6 space-y-3">
+                <h4 className="text-xs uppercase tracking-wider text-[#D4A373] font-semibold">
+                  Política de Reserva &amp; Dress Code
+                </h4>
+                <ul className="text-xs text-[#A6A8AD] space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#D4A373]">•</span>
+                    <span>Tolerância de chegada de 15 minutos.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#D4A373]">•</span>
+                    <span>Traje casual elegante (smart casual).</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#D4A373]">•</span>
+                    <span>Estacionamento privativo gratuito com carregador elétrico.</span>
+                  </li>
+                </ul>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
