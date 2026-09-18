@@ -1,4 +1,3 @@
-import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@libsql/client';
@@ -59,28 +58,26 @@ const TABLE_SCHEMA = `
   );
 `;
 
-function toReference(count: number): string {
-  return `BM-${String(count + 1).padStart(4, '0')}`;
-}
-
 const UPSERT_SETTING_SQL = `
   INSERT INTO settings (key, value) VALUES (?, ?)
   ON CONFLICT(key) DO UPDATE SET value = excluded.value
 `;
 
-function createSqliteStorage(): Storage {
+function toReference(count: number): string {
+  return `BM-${String(count + 1).padStart(4, '0')}`;
+}
+
+async function createSqliteStorage(): Promise<Storage> {
+  const { DatabaseSync } = await import('node:sqlite');
   const dbPath = process.env.DB_PATH ?? 'data/boca-maldita.db';
   mkdirSync(path.dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
-
-  const countReservationsStmt = () => db.prepare('SELECT COUNT(*) AS count FROM reservations');
+  db.exec(`PRAGMA journal_mode = WAL;\n${TABLE_SCHEMA}`);
 
   return {
-    async init() {
-      db.exec(`PRAGMA journal_mode = WAL;\n${TABLE_SCHEMA}`);
-    },
+    async init() {},
     async createReservation(input) {
-      const { count } = countReservationsStmt().get() as { count: number };
+      const { count } = db.prepare('SELECT COUNT(*) AS count FROM reservations').get() as { count: number };
       const reference = toReference(count);
       const info = db
         .prepare(
@@ -187,8 +184,67 @@ function createTursoStorage(): Storage {
   };
 }
 
-export function createStorage(): Storage {
+function createMemoryStorage(): Storage {
+  const reservations: Array<{ reference: string; input: ReservationInput }> = [];
+  const contacts: Array<{ id: number }> = [];
+  const newsletters: string[] = [];
+  const settings = new Map<string, string>();
+
+  return {
+    async init() {},
+    async createReservation(input) {
+      const reference = toReference(reservations.length);
+      reservations.push({ reference, input });
+      return { id: reservations.length, reference };
+    },
+    async createContact(input) {
+      const id = contacts.length + 1;
+      contacts.push({ id });
+      void input;
+      return { id };
+    },
+    async hasNewsletter(email) {
+      return newsletters.includes(email);
+    },
+    async createNewsletter(input) {
+      const id = newsletters.length + 1;
+      newsletters.push(input.email);
+      void id;
+      return { id };
+    },
+    async getSetting(key) {
+      return settings.get(key) ?? null;
+    },
+    async setSetting(key, value) {
+      settings.set(key, value);
+    },
+    async deleteSetting(key) {
+      settings.delete(key);
+    },
+    isOpen() {
+      return true;
+    },
+    async close() {},
+  };
+}
+
+export async function createStorage(): Promise<Storage> {
   const tursoUrl = (process.env.TURSO_URL ?? '').trim();
   const tursoToken = (process.env.TURSO_AUTH_TOKEN ?? '').trim();
-  return tursoUrl && tursoToken ? createTursoStorage() : createSqliteStorage();
+
+  if (tursoUrl && tursoToken) {
+    return createTursoStorage();
+  }
+
+  if (process.env.VERCEL) {
+    console.warn('[storage] VERCEL sem Turso configurado — a usar armazenamento em memória (não persistente).');
+    return createMemoryStorage();
+  }
+
+  try {
+    return await createSqliteStorage();
+  } catch (err) {
+    console.warn('[storage] SQLite local indisponível — a usar armazenamento em memória:', err);
+    return createMemoryStorage();
+  }
 }

@@ -31,7 +31,7 @@ function adminUnauthorized(res: Response): void {
 }
 
 export async function createApp(): Promise<AppInstance> {
-  const storage = createStorage();
+  const storage = await createStorage();
   await storage.init();
 
   const app = express();
@@ -66,7 +66,9 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(400).json({ error: parsed.error.issues[0].message });
       }
       const { id, reference } = await storage.createReservation(parsed.data);
-      void sendReservationConfirmation({ ...parsed.data, reference });
+      sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
+        console.error('[email] Falha no envio de confirmação:', err);
+      });
       res.status(201).json({ id, reference });
     } catch (err) {
       next(err);
