@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ScreenType, MenuItem } from '../types';
-import { MENU_ITEMS } from '../data/menuData';
+import { useSite } from '../context/SiteContext';
+import AssetImage from '../components/AssetImage';
 import { createReservation } from '../lib/api';
 import { 
   Play, 
@@ -54,10 +55,11 @@ export default function HomeScreen({
     convidados: '2 Pessoas',
     telefone: ''
   });
+  const { menuItems } = useSite();
 
   const featuredDishes = activeMenuTab === 'carnes'
-    ? MENU_ITEMS.filter(i => i.category === 'carnes').slice(0, 4)
-    : MENU_ITEMS.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
+    ? menuItems.filter(i => i.category === 'carnes').slice(0, 4)
+    : menuItems.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
 
   const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
@@ -106,7 +108,7 @@ export default function HomeScreen({
             <div className="lg:col-span-6 relative w-full group">
               <div className="relative w-full h-[460px] sm:h-[540px] lg:h-[620px] bg-[#141518] border border-[#282A30] overflow-hidden shadow-2xl">
                 {heroChefUrl ? (
-                  <img
+                  <AssetImage
                     src={heroChefUrl}
                     alt="Mestre assador a finalizar prato de carne nobre grelhada com pinça no Boca Maldita"
                     className="w-full h-full object-cover object-center transform group-hover:scale-105 transition-transform duration-700 ease-out"
@@ -141,7 +143,7 @@ export default function HomeScreen({
                     <div className="flex items-center gap-2.5">
                       <div className="w-10 h-10 overflow-hidden bg-[#1C1E22] border border-[#282A30] shrink-0">
                         {reviewerUrl ? (
-                          <img
+                          <AssetImage
                             src={reviewerUrl}
                             alt="Gonçalo Vilar"
                             className="w-full h-full object-cover"
@@ -334,7 +336,7 @@ export default function HomeScreen({
               <div className="space-y-4">
                 <div className="h-64 sm:h-80 bg-[#1C1E22] border border-[#282A30] overflow-hidden relative group">
                   {diningRoomUrl ? (
-                    <img
+                    <AssetImage
                       src={diningRoomUrl}
                       alt="Salão nobre do Boca Maldita em Vila de Prado"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -367,7 +369,7 @@ export default function HomeScreen({
                 </div>
                 <div className="h-64 sm:h-80 bg-[#1C1E22] border border-[#282A30] overflow-hidden relative group">
                   {dryAgingUrl ? (
-                    <img
+                    <AssetImage
                       src={dryAgingUrl}
                       alt="Câmara de maturação dry-aged"
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -447,7 +449,7 @@ export default function HomeScreen({
                 <div>
                   <div className="h-60 overflow-hidden relative bg-[#0C0D0E]">
                     {dish.imageUrl ? (
-                      <img
+                      <AssetImage
                         src={dish.imageUrl}
                         alt={dish.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
@@ -696,7 +698,7 @@ export default function HomeScreen({
               {/* Map Preview Container */}
               <div className="w-full h-80 lg:h-96 bg-[#141518] border border-[#282A30] shadow-2xl relative overflow-hidden group">
                 {mapUrl ? (
-                  <img
+                  <AssetImage
                     src={mapUrl}
                     alt="Mapa de localização do Boca Maldita em Vila de Prado"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"

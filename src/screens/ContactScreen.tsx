@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { createContact } from '../lib/api';
 import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Copy, AlertCircle } from 'lucide-react';
+import AssetImage from '../components/AssetImage';
 
 interface ContactScreenProps {
   mapUrl: string;
@@ -140,7 +141,7 @@ export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: 
           <div className="lg:col-span-6 space-y-4">
             <div className="h-80 sm:h-96 bg-[#141518] border border-[#282A30] relative overflow-hidden group">
               {mapUrl ? (
-                <img
+                <AssetImage
                   src={mapUrl}
                   alt="Mapa Boca Maldita"
                   className="w-full h-full object-cover"

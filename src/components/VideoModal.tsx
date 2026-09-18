@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, Play, Pause, Volume2, VolumeX, Flame, Clock } from 'lucide-react';
+import AssetImage from './AssetImage';
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -52,7 +53,7 @@ export default function VideoModal({ isOpen, onClose, posterUrl, videoUrl }: Vid
         ) : (
         <div className="relative aspect-video w-full bg-[#0C0D0E] overflow-hidden group">
           {posterUrl ? (
-            <img
+            <AssetImage
               src={posterUrl}
               alt="Vídeo Boca Maldita"
               className={`w-full h-full object-cover transition-opacity duration-500 ${

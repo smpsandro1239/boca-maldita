@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ScreenType } from '../types';
 import { Phone, Calendar, Menu, X, Link as LinkIcon, Sparkles } from 'lucide-react';
+import AssetImage from './AssetImage';
 
 interface HeaderProps {
   currentScreen: ScreenType;
@@ -42,7 +43,7 @@ export default function Header({
         >
           <div className="w-10 h-10 bg-[#141518] border border-[#282A30] flex items-center justify-center overflow-hidden shrink-0 group-hover:border-[#D4A373] transition-colors">
             {logoUrl ? (
-              <img
+              <AssetImage
                 src={logoUrl}
                 alt="Boca Maldita Logo"
                 className="h-8 w-auto object-contain"

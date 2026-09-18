@@ -1,3 +1,5 @@
+import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, ReservationAdminRow, SiteContent } from '../types';
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
 
@@ -74,12 +76,7 @@ export function saveSiteSettings(contactEmail: string, token: string): Promise<{
 
 export interface AdminAssetsStatus {
   enabled: boolean;
-  overrides: Record<string, string>;
-}
-
-export interface AssetOverride {
-  id: string;
-  url: string;
+  overrides: Record<string, { url: string; scale?: number; px?: number; py?: number }>;
 }
 
 export function getAdminAssets(): Promise<AdminAssetsStatus> {
@@ -96,6 +93,76 @@ export function saveAdminAssets(overrides: AssetOverride[], token: string): Prom
 
 export function resetAdminAssets(token: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/assets', {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function getMenus(): Promise<{ items: MenuItem[] | null }> {
+  return request<{ items: MenuItem[] | null }>('/menus');
+}
+
+export function saveAdminMenus(items: MenuItem[], token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/menus', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function resetAdminMenus(token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/menus', {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function getSiteContent(): Promise<SiteContent> {
+  return request<SiteContent>('/site-content');
+}
+
+export function saveSiteContent(content: SiteContent, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/site-content', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify(content),
+  });
+}
+
+export function getAdminReservations(token: string): Promise<{ items: ReservationAdminRow[] }> {
+  return request<{ items: ReservationAdminRow[] }>('/admin/reservations', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function deleteAdminReservation(id: number, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/reservations/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function getAdminContacts(token: string): Promise<{ items: ContactAdminRow[] }> {
+  return request<{ items: ContactAdminRow[] }>('/admin/contacts', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function deleteAdminContact(id: number, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/contacts/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function getAdminNewsletter(token: string): Promise<{ items: NewsletterAdminRow[] }> {
+  return request<{ items: NewsletterAdminRow[] }>('/admin/newsletter', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function deleteAdminNewsletter(id: number, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/newsletter/${id}`, {
     method: 'DELETE',
     headers: { 'X-Admin-Token': token },
   });

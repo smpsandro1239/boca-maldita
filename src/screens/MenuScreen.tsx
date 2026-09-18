@@ -1,6 +1,6 @@
 import { useState, type MouseEvent } from 'react';
 import { MenuItem } from '../types';
-import { MENU_ITEMS } from '../data/menuData';
+import { useSite } from '../context/SiteContext';
 import { Search, Flame, Wine, Clock, Award, ArrowRight, Copy, Check } from 'lucide-react';
 
 interface MenuScreenProps {
@@ -17,6 +17,7 @@ export default function MenuScreen({
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const { menuItems } = useSite();
 
   const categories = [
     { id: 'todas', label: 'Toda a Carta' },
@@ -27,7 +28,8 @@ export default function MenuScreen({
     { id: 'sobremesas', label: 'Sobremesas' }
   ];
 
-  const filteredItems = MENU_ITEMS.filter(item => {
+  const filteredItems = menuItems.filter(item => {
+    if (item.visible === false) return false;
     const matchesCat = selectedCategory === 'todas' || item.category === selectedCategory;
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||

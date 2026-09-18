@@ -71,9 +71,28 @@ ${TABLE_SCHEMA}`);
       ).run(reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "");
       return { id: Number(info.lastInsertRowid), reference };
     },
+    async listReservations() {
+      const rows = db.prepare(
+        `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, created_at
+           FROM reservations ORDER BY id DESC`
+      ).all();
+      return rows;
+    },
+    async deleteReservation(id) {
+      const info = db.prepare("DELETE FROM reservations WHERE id = ?").run(id);
+      return Number(info.changes) > 0;
+    },
     async createContact(input) {
       const info = db.prepare(`INSERT INTO contacts (name, email, subject, message) VALUES (?, ?, ?, ?)`).run(input.nome, input.email, input.assunto, input.mensagem);
       return { id: Number(info.lastInsertRowid) };
+    },
+    async listContacts() {
+      const rows = db.prepare(`SELECT id, name, email, subject, message, created_at FROM contacts ORDER BY id DESC`).all();
+      return rows;
+    },
+    async deleteContact(id) {
+      const info = db.prepare("DELETE FROM contacts WHERE id = ?").run(id);
+      return Number(info.changes) > 0;
     },
     async hasNewsletter(email) {
       return db.prepare("SELECT 1 FROM newsletter_subscriptions WHERE email = ?").get(email) !== void 0;
@@ -81,6 +100,14 @@ ${TABLE_SCHEMA}`);
     async createNewsletter(input) {
       const info = db.prepare("INSERT INTO newsletter_subscriptions (email) VALUES (?)").run(input.email);
       return { id: Number(info.lastInsertRowid) };
+    },
+    async listNewsletter() {
+      const rows = db.prepare(`SELECT id, email, created_at FROM newsletter_subscriptions ORDER BY id DESC`).all();
+      return rows;
+    },
+    async deleteNewsletter(id) {
+      const info = db.prepare("DELETE FROM newsletter_subscriptions WHERE id = ?").run(id);
+      return Number(info.changes) > 0;
     },
     async getSetting(key) {
       const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key);
@@ -116,12 +143,33 @@ function createTursoStorage(client) {
       });
       return { id: Number(result.lastInsertRowid), reference };
     },
+    async listReservations() {
+      const { rows } = await client.execute({
+        sql: `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, created_at
+              FROM reservations ORDER BY id DESC`
+      });
+      return rows;
+    },
+    async deleteReservation(id) {
+      await client.execute({ sql: "DELETE FROM reservations WHERE id = ?", args: [id] });
+      return true;
+    },
     async createContact(input) {
       const result = await client.execute({
         sql: `INSERT INTO contacts (name, email, subject, message) VALUES (?, ?, ?, ?)`,
         args: [input.nome, input.email, input.assunto, input.mensagem]
       });
       return { id: Number(result.lastInsertRowid) };
+    },
+    async listContacts() {
+      const { rows } = await client.execute({
+        sql: "SELECT id, name, email, subject, message, created_at FROM contacts ORDER BY id DESC"
+      });
+      return rows;
+    },
+    async deleteContact(id) {
+      await client.execute({ sql: "DELETE FROM contacts WHERE id = ?", args: [id] });
+      return true;
     },
     async hasNewsletter(email) {
       const { rows } = await client.execute({
@@ -136,6 +184,16 @@ function createTursoStorage(client) {
         args: [input.email]
       });
       return { id: Number(result.lastInsertRowid) };
+    },
+    async listNewsletter() {
+      const { rows } = await client.execute({
+        sql: "SELECT id, email, created_at FROM newsletter_subscriptions ORDER BY id DESC"
+      });
+      return rows;
+    },
+    async deleteNewsletter(id) {
+      await client.execute({ sql: "DELETE FROM newsletter_subscriptions WHERE id = ?", args: [id] });
+      return true;
     },
     async getSetting(key) {
       const { rows } = await client.execute({
@@ -160,32 +218,80 @@ function createTursoStorage(client) {
   };
 }
 function createMemoryStorage() {
+  const maxId = { reservations: 0, contacts: 0, newsletters: 0 };
   const reservations = [];
   const contacts = [];
   const newsletters = [];
+  const newsletterEmails = /* @__PURE__ */ new Set();
   const settings = /* @__PURE__ */ new Map();
+  const createdAt = () => (/* @__PURE__ */ new Date()).toISOString();
   return {
     async init() {
     },
     async createReservation(input) {
-      const reference = toReference(reservations.length);
-      reservations.push({ reference, input });
-      return { id: reservations.length, reference };
+      maxId.reservations += 1;
+      const reference = toReference(maxId.reservations - 1);
+      reservations.push({
+        id: maxId.reservations,
+        reference,
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        date: input.date,
+        time: input.time,
+        guests: input.guests,
+        area: input.area,
+        occasion: input.occasion,
+        notes: input.notes ?? "",
+        created_at: createdAt()
+      });
+      return { id: maxId.reservations, reference };
+    },
+    async listReservations() {
+      return reservations.map((r) => ({ ...r })).reverse();
+    },
+    async deleteReservation(id) {
+      const index = reservations.findIndex((r) => r.id === id);
+      if (index === -1) return false;
+      reservations.splice(index, 1);
+      return true;
     },
     async createContact(input) {
-      const id = contacts.length + 1;
-      contacts.push({ id });
-      void input;
+      maxId.contacts += 1;
+      const id = maxId.contacts;
+      contacts.push({ id, name: input.nome, email: input.email, subject: input.assunto, message: input.mensagem, created_at: createdAt() });
       return { id };
+    },
+    async listContacts() {
+      return contacts.map((c) => ({ ...c })).reverse();
+    },
+    async deleteContact(id) {
+      const index = contacts.findIndex((c) => c.id === id);
+      if (index === -1) return false;
+      contacts.splice(index, 1);
+      return true;
     },
     async hasNewsletter(email) {
-      return newsletters.includes(email);
+      return newsletterEmails.has(email);
     },
     async createNewsletter(input) {
-      const id = newsletters.length + 1;
-      newsletters.push(input.email);
-      void id;
+      const email = input.email.toLowerCase();
+      if (newsletterEmails.has(email)) return { id: -1 };
+      maxId.newsletters += 1;
+      const id = maxId.newsletters;
+      newsletterEmails.add(email);
+      newsletters.push({ id, email, created_at: createdAt() });
       return { id };
+    },
+    async listNewsletter() {
+      return newsletters.map((n) => ({ ...n })).reverse();
+    },
+    async deleteNewsletter(id) {
+      const index = newsletters.findIndex((n) => n.id === id);
+      if (index === -1) return false;
+      newsletterEmails.delete(newsletters[index].email.toLowerCase());
+      newsletters.splice(index, 1);
+      return true;
     },
     async getSetting(key) {
       return settings.get(key) ?? null;
@@ -278,14 +384,53 @@ var siteSettingsSchema = z.object({
   contactEmail: emailField
 }).strict();
 var assetUrlField = z.string().trim().min(1, "O link da imagem \xE9 obrigat\xF3rio.").max(2e3, "O link da imagem \xE9 demasiado longo.").refine((value) => /^https?:\/\//i.test(value), "O link tem de come\xE7ar por http:// ou https://.");
-var assetOverridesSchema = z.object({
-  overrides: z.array(
-    z.object({
-      id: z.string().trim().min(1).max(80),
-      url: assetUrlField
-    })
-  ).max(100, "Demasiadas substitui\xE7\xF5es.")
+var imageAssetOverrideSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  url: assetUrlField,
+  scale: z.number().min(1).max(3).optional(),
+  px: z.number().min(0).max(100).optional(),
+  py: z.number().min(0).max(100).optional()
 }).strict();
+var assetOverridesSchema = z.object({
+  overrides: z.array(imageAssetOverrideSchema).max(200, "Demasiadas substitui\xE7\xF5es.")
+}).strict();
+var MENU_CATEGORIES = ["carnes", "mar", "entradas", "acompanhamentos", "sobremesas", "vinhos"];
+var imageField = z.string().trim().max(2e3, "O link da imagem \xE9 demasiado longo.").optional().default("").refine((value) => value === "" || /^https?:\/\//i.test(value), "O link da imagem tem de come\xE7ar por http:// ou https://.");
+var menuItemSchema = z.object({
+  id: z.string().trim().min(1, "O identificador \xE9 obrigat\xF3rio.").max(80),
+  name: z.string().trim().min(1, "O nome do prato \xE9 obrigat\xF3rio.").max(120),
+  price: z.number({ invalid_type_error: "Pre\xE7o inv\xE1lido." }).nonnegative("Pre\xE7o inv\xE1lido.").max(1e4, "Pre\xE7o demasiado alto."),
+  currency: z.string().trim().min(1).max(10).default("\u20AC"),
+  category: z.enum(MENU_CATEGORIES, { message: "Categoria inv\xE1lida." }),
+  badge: z.string().trim().max(80).optional().default(""),
+  tagline: z.string().trim().max(160).optional().default(""),
+  description: z.string().trim().min(1, "A descri\xE7\xE3o \xE9 obrigat\xF3ria.").max(2e3),
+  imageUrl: imageField,
+  dryAgedDays: z.number().int().min(0).max(300).optional(),
+  servesCount: z.string().trim().max(80).optional().default(""),
+  origin: z.string().trim().max(200).optional().default(""),
+  pairingWine: z.string().trim().max(200).optional().default(""),
+  isChefSpecial: z.boolean().optional().default(false),
+  visible: z.boolean().optional().default(true),
+  order: z.number().int().min(0).optional()
+}).strict().nullable();
+var menuItemsSchema = z.object({
+  items: z.array(menuItemSchema).max(300, "Demasiados pratos.")
+}).strict();
+var siteContentSchema = z.object({
+  contactEmail: emailField,
+  phone: z.string().trim().max(40).optional().default(""),
+  address: z.string().trim().max(200).optional().default(""),
+  hours: z.string().trim().max(240).optional().default(""),
+  headline: z.string().trim().max(160).optional().default(""),
+  heroSubtitle: z.string().trim().max(240).optional().default(""),
+  aboutTitle: z.string().trim().max(160).optional().default(""),
+  aboutText: z.string().trim().max(4e3).optional().default(""),
+  instagram: z.string().trim().max(200).optional().default(""),
+  facebook: z.string().trim().max(200).optional().default(""),
+  videoUrl: z.string().trim().max(2e3).optional().default("")
+}).strict();
+var idParamSchema = z.coerce.number().int().positive();
 
 // api/lib/email.ts
 var transporterPromise = null;
@@ -357,7 +502,31 @@ if (!process.env.VERCEL) {
 }
 var IMAGE_OVERRIDES_KEY = "image_asset_overrides";
 var SITE_CONTACT_EMAIL_KEY = "site_contact_email";
+var MENU_ITEMS_KEY = "menu_items";
+var SITE_CONTENT_KEY = "site_content";
 var DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? "").trim() || "smpsandro1239@gmail.com";
+var DEFAULT_SITE_CONTENT = {
+  contactEmail: DEFAULT_CONTACT_EMAIL,
+  phone: "",
+  address: "",
+  hours: "",
+  headline: "",
+  heroSubtitle: "",
+  aboutTitle: "",
+  aboutText: "",
+  instagram: "",
+  facebook: "",
+  videoUrl: ""
+};
+function parseStoredJson(raw) {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
 var adminToken = (process.env.ADMIN_TOKEN ?? "").trim();
 function adminUnauthorized(res) {
   if (adminToken) {
@@ -467,7 +636,12 @@ async function createApp() {
   app.get("/api/admin/assets", async (_req, res, next) => {
     try {
       const raw = await storage.getSetting(IMAGE_OVERRIDES_KEY);
-      res.json({ enabled: adminToken !== "", overrides: raw ? JSON.parse(raw) : {} });
+      const stored = parseStoredJson(raw);
+      const overrides = {};
+      for (const [id, value] of Object.entries(stored)) {
+        overrides[id] = typeof value === "string" ? { url: value } : value;
+      }
+      res.json({ enabled: adminToken !== "", overrides });
     } catch (err) {
       next(err);
     }
@@ -483,7 +657,11 @@ async function createApp() {
       }
       const overrides = {};
       for (const item of parsed.data.overrides) {
-        overrides[item.id] = item.url;
+        const entry = { url: item.url };
+        if (item.scale != null) entry.scale = item.scale;
+        if (item.px != null) entry.px = item.px;
+        if (item.py != null) entry.py = item.py;
+        overrides[item.id] = entry;
       }
       await storage.setSetting(IMAGE_OVERRIDES_KEY, JSON.stringify(overrides));
       res.json({ ok: true });
@@ -498,6 +676,150 @@ async function createApp() {
       }
       await storage.deleteSetting(IMAGE_OVERRIDES_KEY);
       res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/menus", async (_req, res, next) => {
+    try {
+      const raw = await storage.getSetting(MENU_ITEMS_KEY);
+      const items = raw ? parseStoredJson(raw).items : null;
+      res.json({ items: Array.isArray(items) ? items : null });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/menus", async (_req, res, next) => {
+    try {
+      const raw = await storage.getSetting(MENU_ITEMS_KEY);
+      const items = raw ? parseStoredJson(raw).items : null;
+      res.json({ items: Array.isArray(items) ? items : null });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/menus", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = menuItemsSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      await storage.setSetting(
+        MENU_ITEMS_KEY,
+        JSON.stringify({ items: parsed.data.items.filter((item) => item !== null) })
+      );
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/menus", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      await storage.deleteSetting(MENU_ITEMS_KEY);
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/site-content", async (_req, res, next) => {
+    try {
+      const stored = await storage.getSetting(SITE_CONTENT_KEY);
+      const contactEmail = await storage.getSetting(SITE_CONTACT_EMAIL_KEY) ?? DEFAULT_CONTACT_EMAIL;
+      res.json({ ...DEFAULT_SITE_CONTENT, ...parseStoredJson(stored), contactEmail });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/site-content", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = siteContentSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      await storage.setSetting(SITE_CONTENT_KEY, JSON.stringify(parsed.data));
+      await storage.setSetting(SITE_CONTACT_EMAIL_KEY, parsed.data.contactEmail);
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/reservations", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      res.json({ items: await storage.listReservations() });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/reservations/:id", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      res.json({ ok: await storage.deleteReservation(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/contacts", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      res.json({ items: await storage.listContacts() });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/contacts/:id", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      res.json({ ok: await storage.deleteContact(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/newsletter", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      res.json({ items: await storage.listNewsletter() });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/newsletter/:id", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      res.json({ ok: await storage.deleteNewsletter(idResult.data) });
     } catch (err) {
       next(err);
     }

@@ -1,0 +1,1091 @@
+import { useEffect, useState } from 'react';
+import type { MouseEvent, WheelEvent } from 'react';
+import {
+  X,
+  LayoutDashboard,
+  Image as ImageIcon,
+  UtensilsCrossed,
+  CalendarDays,
+  Mail,
+  Rss,
+  Settings,
+  Save,
+  RotateCcw,
+  Trash2,
+  Pencil,
+  Plus,
+  Link as LinkIcon,
+  Copy,
+  Check,
+  AlertTriangle,
+} from 'lucide-react';
+import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, SiteContent } from '../types';
+import {
+  deleteAdminContact,
+  deleteAdminNewsletter,
+  deleteAdminReservation,
+  getAdminContacts,
+  getAdminNewsletter,
+  getAdminReservations,
+  resetAdminAssets,
+  resetAdminMenus,
+  saveAdminAssets,
+  saveAdminMenus,
+  saveSiteContent,
+} from '../lib/api';
+import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
+import { MENU_ITEMS } from '../data/menuData';
+
+const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
+
+type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'contactos' | 'newsletter' | 'conteudo';
+
+const CATEGORY_LABELS: Record<string, string> = {
+  logo: 'Logótipo',
+  hero: 'Herói',
+  ambiente: 'Ambiente / Restaurante',
+  carnes: 'Carnes',
+  mar: 'Mar',
+  entradas: 'Entradas',
+  mapa: 'Mapa',
+  pessoas: 'Pessoas',
+};
+
+const MENU_CATEGORY_LABELS: Record<string, string> = {
+  carnes: 'Carnes Nobres & Dry-Aged',
+  mar: 'Do Mar & Brasas',
+  entradas: 'Entradas de Assinatura',
+  acompanhamentos: 'Acompanhamentos',
+  sobremesas: 'Sobremesas',
+  vinhos: 'Vinhos',
+};
+
+const EMPTY_MENU_ITEM: MenuItem = {
+  id: '',
+  name: '',
+  price: 0,
+  currency: '€',
+  category: 'carnes',
+  badge: '',
+  tagline: '',
+  description: '',
+  imageUrl: '',
+  dryAgedDays: 0,
+  servesCount: '',
+  origin: '',
+  pairingWine: '',
+  isChefSpecial: false,
+  visible: true,
+};
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+export interface AdminPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  adminEnabled: boolean;
+  adminToken: string;
+  onAdminTokenChange: (token: string) => void;
+  assets: ImageAsset[];
+  onAssetsChange: (assets: ImageAsset[]) => void;
+  menus: MenuItem[];
+  onMenusChange: (items: MenuItem[]) => void;
+  content: SiteContent;
+  onContentChange: (content: SiteContent) => void;
+  showToast: (message: string) => void;
+}
+
+export default function AdminPanel({
+  isOpen,
+  onClose,
+  adminEnabled,
+  adminToken,
+  onAdminTokenChange,
+  assets,
+  onAssetsChange,
+  menus,
+  onMenusChange,
+  content,
+  onContentChange,
+  showToast,
+}: AdminPanelProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('geral');
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [imageDrafts, setImageDrafts] = useState<ImageAsset[]>(assets);
+
+  const [menuDrafts, setMenuDrafts] = useState<MenuItem[]>(menus);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [isItemEditorOpen, setIsItemEditorOpen] = useState(false);
+
+  const [contentDraft, setContentDraft] = useState<SiteContent>(content);
+
+  const [reservations, setReservations] = useState<ReservationAdminRow[]>([]);
+  const [contacts, setContacts] = useState<ContactAdminRow[]>([]);
+  const [newsletter, setNewsletter] = useState<NewsletterAdminRow[]>([]);
+
+  useEffect(() => {
+    if (isOpen) setImageDrafts(assets);
+  }, [assets, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) setMenuDrafts(menus);
+  }, [menus, isOpen]);
+
+  useEffect(() => {
+    if (isOpen) setContentDraft(content);
+  }, [content, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setError(null);
+
+    const token = adminToken.trim();
+    if (!token) return;
+
+    Promise.all([
+      getAdminReservations(token).catch(() => null),
+      getAdminContacts(token).catch(() => null),
+      getAdminNewsletter(token).catch(() => null),
+    ]).then(([r, c, n]) => {
+      if (r) setReservations(r.items);
+      if (c) setContacts(c.items);
+      if (n) setNewsletter(n.items);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, adminToken]);
+
+  if (!isOpen) return null;
+
+  const token = adminToken.trim();
+
+  async function run(action: string, fn: () => Promise<void>, successMessage: string) {
+    if (!token) {
+      setError('Introduza o token de administrador para poder guardar.');
+      return;
+    }
+    setBusy(action);
+    setError(null);
+    try {
+      await fn();
+      sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+      showToast(successMessage);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro inesperado.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const handlePublishImages = () => {
+    void run(
+      'imagens',
+      async () => {
+        const overrides: AssetOverride[] = imageDrafts
+          .filter((asset) => {
+            const def = DEFAULT_IMAGE_ASSETS.find((d) => d.id === asset.id);
+            const isDefaultVisual = (asset.scale ?? 1) === 1 && (asset.px ?? 50) === 50 && (asset.py ?? 50) === 50;
+            return !def || asset.url !== def.url || !isDefaultVisual;
+          })
+          .map((asset) => ({
+            id: asset.id,
+            url: asset.url,
+            scale: asset.scale && asset.scale !== 1 ? asset.scale : undefined,
+            px: asset.px && asset.px !== 50 ? asset.px : undefined,
+            py: asset.py && asset.py !== 50 ? asset.py : undefined,
+          }));
+        await saveAdminAssets(overrides, token);
+        onAssetsChange(imageDrafts);
+      },
+      'Imagens (e logótipo) publicadas para todos os visitantes.',
+    );
+  };
+
+  const handleResetImages = () => {
+    void run(
+      'imagens',
+      async () => {
+        await resetAdminAssets(token);
+        setImageDrafts(DEFAULT_IMAGE_ASSETS);
+        onAssetsChange(DEFAULT_IMAGE_ASSETS);
+      },
+      'Imagens restauradas para as originais em todo o site.',
+    );
+  };
+
+  const handlePublishMenus = () => {
+    void run(
+      'menu',
+      async () => {
+        await saveAdminMenus(menuDrafts, token);
+        onMenusChange(menuDrafts);
+      },
+      'Menu publicado para todos os visitantes.',
+    );
+  };
+
+  const handleResetMenus = () => {
+    void run(
+      'menu',
+      async () => {
+        await resetAdminMenus(token);
+        setMenuDrafts(MENU_ITEMS);
+        onMenusChange(MENU_ITEMS);
+      },
+      'Menu restaurado para a carta original.',
+    );
+  };
+
+  const handlePublishContent = () => {
+    void run(
+      'conteudo',
+      async () => {
+        await saveSiteContent(contentDraft, token);
+        onContentChange(contentDraft);
+      },
+      'Conteúdo do site publicado.',
+    );
+  };
+
+  const handleDeleteReservation = (id: number) => {
+    void run(
+      'reservas',
+      async () => {
+        await deleteAdminReservation(id, token);
+        setReservations((prev) => prev.filter((r) => r.id !== id));
+      },
+      'Reserva removida.',
+    );
+  };
+
+  const handleDeleteContact = (id: number) => {
+    void run(
+      'contactos',
+      async () => {
+        await deleteAdminContact(id, token);
+        setContacts((prev) => prev.filter((c) => c.id !== id));
+      },
+      'Contacto removido.',
+    );
+  };
+
+  const handleDeleteNewsletter = (id: number) => {
+    void run(
+      'newsletter',
+      async () => {
+        await deleteAdminNewsletter(id, token);
+        setNewsletter((prev) => prev.filter((n) => n.id !== id));
+      },
+      'Subscrição removida.',
+    );
+  };
+
+  const updateDraftAsset = (id: string, patch: Partial<ImageAsset>) => {
+    setImageDrafts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  };
+
+  const handleAssetDrag = (e: MouseEvent, asset: ImageAsset, container: HTMLDivElement) => {
+    const rect = container.getBoundingClientRect();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startPx = asset.px ?? 50;
+    const startPy = asset.py ?? 50;
+
+    const onMove = (ev: globalThis.MouseEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      const nextPx = clamp(startPx + (dx / rect.width) * 100, 0, 100);
+      const nextPy = clamp(startPy + (dy / rect.height) * 100, 0, 100);
+      updateDraftAsset(asset.id, { px: nextPx, py: nextPy });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
+
+  const handleAssetZoom = (e: WheelEvent, asset: ImageAsset) => {
+    const delta = e.deltaY < 0 ? 0.05 : -0.05;
+    const nextScale = clamp((asset.scale ?? 1) + delta, 1, 2.5);
+    updateDraftAsset(asset.id, { scale: nextScale });
+  };
+
+  const copySlug = (name: string) =>
+    name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'prato';
+
+  const openNewItem = () => {
+    const draft: MenuItem = { ...EMPTY_MENU_ITEM };
+    draft.name = '';
+    draft.visible = true;
+    setEditingItem(draft);
+    setIsItemEditorOpen(true);
+  };
+
+  const openEditItem = (item: MenuItem) => {
+    setEditingItem({ ...item });
+    setIsItemEditorOpen(true);
+  };
+
+  const saveEditingItem = () => {
+    if (!editingItem) return;
+    if (!editingItem.name.trim() || !editingItem.description.trim()) {
+      setError('Preencha pelo menos o nome e a descrição do prato.');
+      return;
+    }
+    const id = editingItem.id || `${copySlug(editingItem.name)}-${Date.now().toString(36)}`;
+    const exists = menuDrafts.some((m) => m.id === id);
+    const next = {
+      ...editingItem,
+      id,
+      price: Number(editingItem.price) || 0,
+      dryAgedDays: editingItem.dryAgedDays ? Number(editingItem.dryAgedDays) : undefined,
+    };
+    setMenuDrafts((prev) =>
+      exists ? prev.map((m) => (m.id === id ? next : m)) : [...prev, next],
+    );
+    setIsItemEditorOpen(false);
+    setEditingItem(null);
+    setError(null);
+    showToast(exists ? 'Prato atualizado na lista de rascunho.' : 'Prato adicionado à lista de rascunho.');
+  };
+
+  const removeMenuItem = (id: string) => {
+    setMenuDrafts((prev) => prev.filter((m) => m.id !== id));
+    setError(null);
+  };
+
+  const moveMenuItem = (index: number, direction: -1 | 1) => {
+    setMenuDrafts((prev) => {
+      const next = [...prev];
+      const target = index + direction;
+      if (target < 0 || target >= next.length) return prev;
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const setContentField = (key: keyof SiteContent, value: string) => {
+    setContentDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const tabs: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+    { id: 'geral', label: 'Estado', icon: LayoutDashboard },
+    { id: 'imagens', label: 'Imagens & Logótipo', icon: ImageIcon },
+    { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
+    { id: 'reservas', label: 'Reservas', icon: CalendarDays },
+    { id: 'contactos', label: 'Contactos', icon: Mail },
+    { id: 'newsletter', label: 'Newsletter', icon: Rss },
+    { id: 'conteudo', label: 'Conteúdo', icon: Settings },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-stretch justify-end bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-3xl bg-[#0C0D0E] border-l border-[#282A30] flex flex-col h-full shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[#282A30] bg-[#141518]">
+          <div>
+            <h2 className="font-serif text-2xl text-[#F7F5F0] leading-tight">Painel de Administração</h2>
+            <p className="text-xs text-[#F7F5F0]/60 mt-0.5 font-mono">Boca Maldita — gerir todo o site</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 text-[#F7F5F0]/70 hover:text-[#F7F5F0] hover:bg-[#282A30] transition-colors"
+            aria-label="Fechar painel"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Token bar */}
+        <div className="px-6 py-3 border-b border-[#282A30] bg-[#0C0D0E] flex flex-wrap items-center gap-3">
+          <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono shrink-0">
+            Token de administrador
+          </label>
+          <input
+            type="password"
+            value={adminToken}
+            onChange={(e) => onAdminTokenChange(e.target.value)}
+            placeholder="Introduza o token para publicar alterações"
+            className="flex-1 min-w-[220px] bg-[#141518] border border-[#282A30] px-3 py-2 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
+          />
+          {!adminEnabled && (
+            <span className="text-[11px] text-amber-400/90 flex items-center gap-1.5 font-mono">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              Admin desativado no servidor
+            </span>
+          )}
+        </div>
+
+        {error && (
+          <div className="px-6 py-3 bg-red-950/40 border-b border-red-900/50 text-red-300 text-sm flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+            <button type="button" className="ml-auto text-red-300 hover:text-white" onClick={() => setError(null)}>
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div className="px-6 pt-4 flex flex-wrap gap-2 border-b border-[#282A30]">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold transition-colors border ${
+                  isActive
+                    ? 'bg-[#D4A373] text-[#0C0D0E] border-[#D4A373]'
+                    : 'bg-[#141518] text-[#F7F5F0]/70 border-[#282A30] hover:border-[#D4A373]/50 hover:text-[#D4A373]'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+          {activeTab === 'geral' && (
+            <>
+              <div>
+                <h3 className="font-serif text-lg text-[#F7F5F0] mb-3">Visão geral</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-2xl font-serif text-[#D4A373]">{reservations.length}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Reservas</p>
+                  </div>
+                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-2xl font-serif text-[#D4A373]">{contacts.length}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Contactos</p>
+                  </div>
+                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-2xl font-serif text-[#D4A373]">{newsletter.length}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Newsletter</p>
+                  </div>
+                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-2xl font-serif text-[#D4A373]">{menus.length}</p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Pratos</p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-[#141518] border border-[#282A30] p-5 text-sm text-[#F7F5F0]/70 space-y-2">
+                <p className="text-[#D4A373] font-serif text-base">Como funciona</p>
+                <ul className="space-y-1.5 list-disc pl-5">
+                  <li>No separador <strong className="text-[#F7F5F0]">Imagens &amp; Logótipo</strong> pode mudar o logótipo e todas as imagens, com zoom e posição (arrastar) para o enquadramento perfeito.</li>
+                  <li>No <strong className="text-[#F7F5F0]">Menu</strong> edita pratos, preços, categorias e fotos; o site realça sempre a carta mais recente.</li>
+                  <li>As alterações só ficam visíveis para os visitantes depois de clicar em <strong className="text-[#F7F5F0]">Publicar</strong>.</li>
+                  <li>Reservas, contactos e subscrições ficam registadas aqui. No separador <strong className="text-[#F7F5F0]">Conteúdo</strong> edita o email de contacto, horários e textos.</li>
+                </ul>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'imagens' && (
+            <div className="space-y-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60">
+                  Arraste sobre a miniatura para posicionar e use a roda do rato para fazer zoom. O logótipo é a primeira imagem.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePublishImages}
+                    disabled={busy === 'imagens'}
+                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                  >
+                    {busy === 'imagens' ? 'A publicar…' : <Save className="w-4 h-4" />}
+                    <span>Publicar imagens</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetImages}
+                    disabled={busy === 'imagens'}
+                    className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Repor originais
+                  </button>
+                </div>
+              </div>
+
+              {Object.entries(CATEGORY_LABELS).map(([category, label]) => {
+                const group = imageDrafts.filter((a) => a.category === category);
+                if (group.length === 0) return null;
+                return (
+                  <div key={category}>
+                    <h4 className="text-[10px] uppercase tracking-[0.2em] text-[#D4A373] font-mono mb-3">
+                      {category === 'logo' ? '⭐ ' : ''}
+                      {label}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {group.map((asset) => (
+                        <ImageEditorCard
+                          key={asset.id}
+                          asset={asset}
+                          onChange={updateDraftAsset}
+                          onDrag={handleAssetDrag}
+                          onZoom={handleAssetZoom}
+                          onReset={() => {
+                            const def = DEFAULT_IMAGE_ASSETS.find((d) => d.id === asset.id);
+                            updateDraftAsset(asset.id, {
+                              url: def?.url ?? asset.url,
+                              scale: 1,
+                              px: 50,
+                              py: 50,
+                            });
+                          }}
+                          onCopy={() => {
+                            navigator.clipboard.writeText(asset.url);
+                            showToast('Link copiado para a área de transferência.');
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {activeTab === 'menu' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={openNewItem}
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold"
+                >
+                  <Plus className="w-4 h-4" />
+                  Novo prato
+                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePublishMenus}
+                    disabled={busy === 'menu'}
+                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                  >
+                    {busy === 'menu' ? 'A publicar…' : <Save className="w-4 h-4" />}
+                    <span>Publicar menu</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetMenus}
+                    disabled={busy === 'menu'}
+                    className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Repor carta original
+                  </button>
+                </div>
+              </div>
+
+              {menuDrafts.length === 0 ? (
+                <p className="text-sm text-[#F7F5F0]/50">Sem pratos ainda. Use "Novo prato" para começar.</p>
+              ) : (
+                <div className="space-y-2">
+                  {menuDrafts.map((item, index) => (
+                    <div
+                      key={item.id || index}
+                      className="flex items-center gap-3 bg-[#141518] border border-[#282A30] px-4 py-3"
+                    >
+                      <div className="flex flex-col">
+                        <button
+                          type="button"
+                          className="text-[#F7F5F0]/60 hover:text-[#D4A373] disabled:opacity-20"
+                          onClick={() => moveMenuItem(index, -1)}
+                          disabled={index === 0}
+                          aria-label="Subir"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          className="text-[#F7F5F0]/60 hover:text-[#D4A373] disabled:opacity-20"
+                          onClick={() => moveMenuItem(index, 1)}
+                          disabled={index === menuDrafts.length - 1}
+                          aria-label="Descer"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                      <div
+                        className="w-14 h-14 bg-[#0C0D0E] overflow-hidden shrink-0 border border-[#282A30]"
+                        style={{ aspectRatio: '1 / 1' }}
+                      >
+                        {item.imageUrl ? (
+                          <img
+                            src={item.imageUrl}
+                            alt={item.name}
+                            className="w-full h-full object-cover"
+                            style={{ objectPosition: '50% 50%' }}
+                            loading="lazy"
+                          />
+                        ) : null}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-serif text-base text-[#F7F5F0] truncate">{item.name}</span>
+                          <span className="text-xs text-[#D4A373] font-mono">
+                            {item.price.toFixed(2)} {item.currency}
+                          </span>
+                          {item.isChefSpecial && (
+                            <span className="text-[9px] uppercase tracking-widest text-amber-400 font-mono">Chef</span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[#F7F5F0]/50 font-mono uppercase tracking-wider mt-0.5">
+                          {MENU_CATEGORY_LABELS[item.category] ?? item.category}
+                          {item.visible === false ? ' · oculto' : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditItem(item)}
+                          className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
+                          aria-label={`Editar ${item.name}`}
+                          title={item.imageUrl}
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeMenuItem(item.id)}
+                          className="p-2 text-[#F7F5F0]/70 hover:text-red-400 hover:bg-[#282A30]"
+                          aria-label={`Remover ${item.name}`}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'reservas' && (
+            <div className="space-y-3">
+              <p className="text-xs text-[#F7F5F0]/60">
+                Reservas registadas no site. Remove reservas canceladas ou duplicadas.
+              </p>
+              {reservations.length === 0 ? (
+                <p className="text-sm text-[#F7F5F0]/50">Ainda não há reservas.</p>
+              ) : (
+                reservations.map((r) => (
+                  <div key={r.id} className="bg-[#141518] border border-[#282A30] p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div>
+                        <p className="font-serif text-base text-[#F7F5F0]">
+                          {r.name} <span className="text-[#D4A373]">· {r.reference}</span>
+                        </p>
+                        <p className="text-xs text-[#F7F5F0]/60 mt-1">
+                          {r.date.split('T')[0]} às {r.time} · {r.guests} convidados · {r.area} · {r.occasion}
+                        </p>
+                        <p className="text-xs text-[#F7F5F0]/60">
+                          {r.email} · {r.phone}
+                        </p>
+                        {r.notes ? <p className="text-xs text-[#F7F5F0]/40 mt-1 italic">"{r.notes}"</p> : null}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteReservation(r.id)}
+                        disabled={busy === 'reservas'}
+                        className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'contactos' && (
+            <div className="space-y-3">
+              <p className="text-xs text-[#F7F5F0]/60">Mensagens enviadas através do formulário de contactos.</p>
+              {contacts.length === 0 ? (
+                <p className="text-sm text-[#F7F5F0]/50">Ainda não há mensagens.</p>
+              ) : (
+                contacts.map((c) => (
+                  <div key={c.id} className="bg-[#141518] border border-[#282A30] p-4">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-serif text-base text-[#F7F5F0]">
+                          {c.name} <span className="text-[#D4A373]">· {c.subject}</span>
+                        </p>
+                        <p className="text-[11px] text-[#F7F5F0]/60 mt-0.5 font-mono">{c.email}</p>
+                        <p className="text-sm text-[#F7F5F0]/70 mt-2 whitespace-pre-wrap">{c.message}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteContact(c.id)}
+                        disabled={busy === 'contactos'}
+                        className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'newsletter' && (
+            <div className="space-y-3">
+              <p className="text-xs text-[#F7F5F0]/60">Subscrições do boletim de novidades.</p>
+              {newsletter.length === 0 ? (
+                <p className="text-sm text-[#F7F5F0]/50">Ainda não há subscrições.</p>
+              ) : (
+                newsletter.map((n) => (
+                  <div key={n.id} className="flex items-center justify-between gap-3 bg-[#141518] border border-[#282A30] p-4">
+                    <p className="font-mono text-sm text-[#F7F5F0]">{n.email}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteNewsletter(n.id)}
+                      disabled={busy === 'newsletter'}
+                      className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Remover
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+
+          {activeTab === 'conteudo' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60">
+                  Textos e contactos do site. Deixe o campo vazio para usar os textos originais.
+                </p>
+                <button
+                  type="button"
+                  onClick={handlePublishContent}
+                  disabled={busy === 'conteudo'}
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                >
+                  {busy === 'conteudo' ? 'A publicar…' : <Save className="w-4 h-4" />}
+                  <span>Publicar conteúdo</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <ContentField label="Email de contacto" value={contentDraft.contactEmail} onChange={(v) => setContentField('contactEmail', v)} />
+                <ContentField label="Telefone" value={contentDraft.phone} onChange={(v) => setContentField('phone', v)} />
+                <ContentField label="Morada" value={contentDraft.address} onChange={(v) => setContentField('address', v)} />
+                <ContentField label="Horário" value={contentDraft.hours} onChange={(v) => setContentField('hours', v)} />
+                <ContentField label="Título principal (hero)" value={contentDraft.headline} onChange={(v) => setContentField('headline', v)} />
+                <ContentField label="Subtítulo (hero)" value={contentDraft.heroSubtitle} onChange={(v) => setContentField('heroSubtitle', v)} />
+                <ContentField label="Título da secção sobre o restaurante" value={contentDraft.aboutTitle} onChange={(v) => setContentField('aboutTitle', v)} />
+                <ContentField label="Instagram" value={contentDraft.instagram} onChange={(v) => setContentField('instagram', v)} />
+                <ContentField label="Facebook" value={contentDraft.facebook} onChange={(v) => setContentField('facebook', v)} />
+                <ContentField label="Link do vídeo (mp4)" value={contentDraft.videoUrl} onChange={(v) => setContentField('videoUrl', v)} helper="Ativa o vídeo do documentário no site." />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Texto sobre o restaurante</label>
+                <textarea
+                  value={contentDraft.aboutText}
+                  onChange={(e) => setContentField('aboutText', e.target.value)}
+                  rows={6}
+                  className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isItemEditorOpen && editingItem && (
+        <MenuItemEditor
+          item={editingItem}
+          onChange={setEditingItem}
+          onCancel={() => {
+            setIsItemEditorOpen(false);
+            setEditingItem(null);
+          }}
+          onSave={saveEditingItem}
+        />
+      )}
+    </div>
+  );
+}
+
+interface ImageEditorCardProps {
+  key?: string;
+  asset: ImageAsset;
+  onChange: (id: string, patch: Partial<ImageAsset>) => void;
+  onDrag: (e: MouseEvent, asset: ImageAsset, container: HTMLDivElement) => void;
+  onZoom: (e: WheelEvent, asset: ImageAsset) => void;
+  onReset: () => void;
+  onCopy: () => void;
+}
+
+function ImageEditorCard({ asset, onChange, onDrag, onZoom, onReset, onCopy }: ImageEditorCardProps) {
+  const [copied, setCopied] = useState(false);
+  const scale = asset.scale ?? 1;
+  const px = asset.px ?? 50;
+  const py = asset.py ?? 50;
+
+  const handleCopy = () => {
+    onCopy();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="bg-[#141518] border border-[#282A30] p-4 space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-serif text-sm text-[#F7F5F0] truncate">{asset.name}</p>
+          <p className="text-[10px] text-[#F7F5F0]/40 font-mono truncate">{asset.id}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="shrink-0 p-1.5 text-[#F7F5F0]/50 hover:text-[#D4A373] hover:bg-[#282A30]"
+          title="Repor imagem original (sem zoom/posição)"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
+      </div>
+
+      <div
+        className="w-full h-40 bg-[#0C0D0E] border border-[#282A30] overflow-hidden relative cursor-grab active:cursor-grabbing touch-none"
+        onMouseDown={(e) => onDrag(e, asset, e.currentTarget)}
+        onWheel={(e) => onZoom(e, asset)}
+        title="Arraste para posicionar · roda do rato para zoom"
+      >
+        <img
+          src={asset.url}
+          alt={asset.name}
+          className="w-full h-full pointer-events-none select-none"
+          style={{
+            objectFit: 'cover',
+            objectPosition: `${px}% ${py}%`,
+            transform: scale !== 1 ? `scale(${scale})` : undefined,
+          }}
+          loading="lazy"
+        />
+        <div className="absolute bottom-2 left-2 bg-[#0C0D0E]/80 border border-[#282A30] text-[9px] font-mono text-[#F7F5F0]/70 px-2 py-1 pointer-events-none">
+          zoom {scale.toFixed(2)}× · {Math.round(px)}% / {Math.round(py)}%
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2">
+        <LinkIcon className="w-3.5 h-3.5 text-[#D4A373] shrink-0" />
+        <input
+          type="text"
+          value={asset.url}
+          onChange={(e) => onChange(asset.id, { url: e.target.value })}
+          className="flex-1 min-w-0 bg-[#0C0D0E] border border-[#282A30] px-2.5 py-2 text-xs text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] font-mono"
+          placeholder="https://…"
+        />
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="shrink-0 p-2 text-[#F7F5F0]/60 hover:text-[#D4A373] hover:bg-[#282A30]"
+          title="Copiar link"
+        >
+          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+        </button>
+      </label>
+
+      <div className="grid grid-cols-1 gap-2">
+        <Slider label={`Zoom ${scale.toFixed(2)}×`} min={1} max={2.5} step={0.01} value={scale} onChange={(v) => onChange(asset.id, { scale: v })} />
+        <Slider label={`Esquerda / Direita · ${Math.round(px)}%`} min={0} max={100} step={1} value={px} onChange={(v) => onChange(asset.id, { px: v })} />
+        <Slider label={`Cima / Baixo · ${Math.round(py)}%`} min={0} max={100} step={1} value={py} onChange={(v) => onChange(asset.id, { py: v })} />
+      </div>
+    </div>
+  );
+}
+
+interface SliderProps {
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+function Slider({ label, min, max, step, value, onChange }: SliderProps) {
+  return (
+    <label className="block">
+      <span className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 font-mono">{label}</span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full mt-1.5 accent-[#D4A373]"
+      />
+    </label>
+  );
+}
+
+interface ContentFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  helper?: string;
+}
+
+function ContentField({ label, value, onChange, helper }: ContentFieldProps) {
+  return (
+    <div>
+      <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
+      />
+      {helper ? <p className="text-[10px] text-[#F7F5F0]/40 mt-1">{helper}</p> : null}
+    </div>
+  );
+}
+
+interface MenuItemEditorProps {
+  item: MenuItem;
+  onChange: (item: MenuItem) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}
+
+const ITEM_FIELDS: { key: keyof MenuItem; label: string; type: string; desc?: string }[] = [
+  { key: 'name', label: 'Nome do prato', type: 'text' },
+  { key: 'price', label: 'Preço', type: 'number' },
+  { key: 'badge', label: 'Distintivo (ex.: "Recomendado")', type: 'text' },
+  { key: 'tagline', label: 'Frase curta', type: 'text' },
+  { key: 'imageUrl', label: 'Imagem (link)', type: 'text' },
+  { key: 'servesCount', label: 'Serve (ex.: "2 pessoas")', type: 'text' },
+  { key: 'dryAgedDays', label: 'Dias de maturação (opcional)', type: 'number' },
+  { key: 'origin', label: 'Origem / produtor', type: 'text' },
+  { key: 'pairingWine', label: 'Sugestão de vinho', type: 'text' },
+];
+
+function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProps) {
+  return (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-lg bg-[#0C0D0E] border border-[#282A30] max-h-[90vh] overflow-y-auto flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#282A30] bg-[#141518]">
+          <h3 className="font-serif text-lg text-[#F7F5F0]">{item.id ? 'Editar prato' : 'Novo prato'}</h3>
+          <button type="button" onClick={onCancel} className="p-1.5 text-[#F7F5F0]/70 hover:text-[#F7F5F0]" aria-label="Fechar">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {ITEM_FIELDS.map((field) => (
+            <div key={field.key as string}>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">{field.label}</label>
+              <input
+                type={field.type}
+                value={String(item[field.key] ?? '')}
+                onChange={(e) => {
+                  const value = field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value;
+                  onChange({ ...item, [field.key]: value as never });
+                }}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              />
+            </div>
+          ))}
+
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Categoria</label>
+            <select
+              value={item.category}
+              onChange={(e) => onChange({ ...item, category: e.target.value as MenuItem['category'] })}
+              className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+            >
+              {Object.entries(MENU_CATEGORY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Descrição</label>
+            <textarea
+              value={item.description}
+              onChange={(e) => onChange({ ...item, description: e.target.value })}
+              rows={4}
+              className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373] resize-y"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-xs text-[#F7F5F0]/80">
+              <input
+                type="checkbox"
+                checked={item.isChefSpecial === true}
+                onChange={(e) => onChange({ ...item, isChefSpecial: e.target.checked })}
+                className="accent-[#D4A373]"
+              />
+              Especial do chef
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[#F7F5F0]/80">
+              <input
+                type="checkbox"
+                checked={item.visible !== false}
+                onChange={(e) => onChange({ ...item, visible: e.target.checked })}
+                className="accent-[#D4A373]"
+              />
+              Visível no menu
+            </label>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-[#282A30] bg-[#141518]">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 bg-[#0C0D0E] border border-[#282A30] text-[#F7F5F0]/70 text-xs uppercase tracking-wider font-semibold hover:border-[#D4A373]/60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            className="px-4 py-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] text-xs uppercase tracking-wider font-semibold"
+          >
+            {item.id ? 'Guardar alterações' : 'Adicionar prato'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

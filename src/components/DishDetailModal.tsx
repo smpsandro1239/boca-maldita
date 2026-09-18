@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { MenuItem } from '../types';
 import { X, Wine, Flame, Clock, Award, Copy, Check, ExternalLink } from 'lucide-react';
+import AssetImage from './AssetImage';
 
 interface DishDetailModalProps {
   item: MenuItem | null;
@@ -33,7 +34,7 @@ export default function DishDetailModal({ item, onClose, onBookTable }: DishDeta
           {/* Dish Image */}
           <div className="relative h-64 md:h-full min-h-[300px] bg-[#0C0D0E] overflow-hidden">
             {item.imageUrl ? (
-              <img
+              <AssetImage
                 src={item.imageUrl}
                 alt={item.name}
                 className="w-full h-full object-cover"

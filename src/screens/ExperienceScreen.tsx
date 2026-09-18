@@ -1,5 +1,6 @@
 import { ScreenType } from '../types';
 import { Play, Flame, Wine, Sparkles, Clock, Compass, Shield, ArrowRight } from 'lucide-react';
+import AssetImage from '../components/AssetImage';
 
 interface ExperienceScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -62,7 +63,7 @@ export default function ExperienceScreen({
         <div className="relative bg-[#141518] border border-[#282A30] overflow-hidden shadow-2xl">
           <div className="relative h-[360px] sm:h-[460px] w-full">
             {heroChefUrl ? (
-              <img
+              <AssetImage
                 src={heroChefUrl}
                 alt="A Arte da Brasa"
                 className="w-full h-full object-cover"

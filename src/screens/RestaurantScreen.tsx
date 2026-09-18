@@ -1,5 +1,6 @@
 import { ScreenType } from '../types';
 import { Flame, Wine, ShieldCheck, Award, Users, ThermometerSnowflake, ArrowRight, Copy } from 'lucide-react';
+import AssetImage from '../components/AssetImage';
 
 interface RestaurantScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -67,7 +68,7 @@ export default function RestaurantScreen({
           <div className="lg:col-span-6">
             <div className="relative h-[400px] sm:h-[500px] bg-[#141518] border border-[#282A30] overflow-hidden group">
               {diningRoomUrl ? (
-                <img
+                <AssetImage
                   src={diningRoomUrl}
                   alt="Salão nobre do restaurante"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -96,7 +97,7 @@ export default function RestaurantScreen({
           <div className="lg:col-span-6 order-2 lg:order-1">
             <div className="relative h-[400px] sm:h-[500px] bg-[#141518] border border-[#282A30] overflow-hidden group">
               {dryAgingUrl ? (
-                <img
+                <AssetImage
                   src={dryAgingUrl}
                   alt="Câmara de maturação dry-aged"
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
@@ -159,7 +160,7 @@ export default function RestaurantScreen({
         <div className="bg-[#141518] border border-[#282A30] p-8 lg:p-12 grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
           <div className="lg:col-span-4 h-72 sm:h-80 bg-[#0C0D0E] border border-[#282A30] overflow-hidden relative group">
             {heroChefUrl ? (
-              <img
+              <AssetImage
                 src={heroChefUrl}
                 alt="Mestre da grelha"
                 className="w-full h-full object-cover"

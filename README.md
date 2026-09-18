@@ -62,8 +62,8 @@ api/lib/        # Backend Express + armazenamento (partilhado com o servidor loc
   email.ts     # Envio de confirmações de reserva (SMTP, opcional)
   validation.ts# Schemas Zod
 server/index.ts# Arranque do servidor Express local
-src/           # Frontend React
-scripts/       # Utilitários (build-api.mjs, clean.mjs, api-entry.ts)
+src/           # Frontend React (screens/, components/, context/, data/, lib/)
+scripts/       # Utilitários (build-api.mjs, clean.mjs, api-entry.ts, smoke-admin.mjs)
 vercel.json    # Configuração de deploy Vercel
 ```
 
@@ -79,21 +79,33 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 - `POST /api/reservations` — registar pedido de reserva (envia email de confirmação se SMTP configurado)
 - `POST /api/contacts` — registar mensagem de contacto
 - `POST /api/newsletter` — subscrever boletim exclusivo
-- `GET /api/admin/assets` — ler substituições de imagens publicadas
+- `GET /api/menus` — menu publicado (ou `null` se ainda não houver alterações)
+- `GET /api/site-content` — conteúdo público (email, contactos, textos, vídeo)
+- `GET /api/admin/assets` — ler substituições de imagens publicadas (inclui zoom/posição)
 - `PUT /api/admin/assets` — publicar imagens substituídas (requer `X-Admin-Token`)
 - `DELETE /api/admin/assets` — repor imagens originais (requer `X-Admin-Token`)
+- `GET /api/admin/menus` — ler o menu guardado (requer `X-Admin-Token`)
+- `PUT /api/admin/menus` — publicar a carta (requer `X-Admin-Token`)
+- `DELETE /api/admin/menus` — repor a carta original (requer `X-Admin-Token`)
+- `PUT /api/admin/site-content` — publicar conteúdo/contactos (requer `X-Admin-Token`)
+- `GET /api/admin/reservations`, `DELETE /api/admin/reservations/:id` (+ `contacts`, `newsletter`) — gestão de dados (requer `X-Admin-Token`)
 
-## Painel de administração (imagens)
+## Painel de administração
 
-As imagens atuais são placeholders trocáveis a qualquer momento, sem recompilar o site. Use o botão flutuante **“Painel de Imagens”** (canto inferior direito):
+O botão flutuante **“Administração”** (canto inferior direito) abre o painel completo de gestão do site. Separa-se em:
 
-1. Alterar o link de uma imagem aplica a mudança em tempo real.
-2. Para publicar para todos os visitantes, insira o `ADMIN_TOKEN` e clique em **Guardar no servidor** (o token fica guardado na sessão do navegador).
-3. As substituições persistem na base de dados (Turso em produção) e são devolvidas em `GET /api/admin/assets`.
+- **Estado** — contadores de reservas, contactos, newsletter e pratos, com explicação do fluxo.
+- **Imagens & Logótipo** — altera o **logótipo** e todas as imagens do site (plano de fundo, salão, pratos, mapa…).
+  - Arraste sobre a miniatura para **posicionar** (esquerda/direita/cima/baixo) e use a **roda do rato** (ou os cursores) para fazer **zoom**;
+  - O enquadramento aplica-se automaticamente em todo o site (objetos `cover` com `object-position` + `scale`);
+  - “Publicar imagens” guarda no servidor para todos os visitantes; “Repor originais” volta aos placeholders.
+- **Menu** — gestão completa da carta: adicionar, editar, duplicar posição, ocultar ou eliminar pratos; preço, categoria, foto, descrição, origem, sugestão de vinho e “especial do chef”. Publicar atualiza o site; repor restaura a carta de origem.
+- **Reservas / Contactos / Newsletter** — listas de todos os dados recebidos, com remoção.
+- **Conteúdo** — email de contacto (aplicado em todo o site), telefone, morada, horário, textos do hero, textos sobre o restaurante, redes sociais e link do vídeo (`.mp4`) do documentário.
 
-O painel permite ainda substituir o **email de contacto do site** (por omissão `smpsandro1239@gmail.com`), que é aplicado globalmente — rodapé, contactos e restantes secções.
+As alterações só são visíveis para os visitantes depois de clicar em **Publicar**, o que exige o `ADMIN_TOKEN` (fica guardado na sessão do navegador). Sem `ADMIN_TOKEN` no servidor, o painel mostra o estado “Admin desativado”.
 
-> Para disponibilizar um vídeo oficial do "documentário", defina `DOCUMENTARY_VIDEO_URL` em `src/data/assets.ts` com o link `.mp4` — o modal passa a usar um player nativo.
+> Para disponibilizar um vídeo oficial do "documentário" também pode colar o link `.mp4` no separador **Conteúdo** do painel (campo “Link do vídeo”).
 
 ## Deploy na Vercel
 
