@@ -7,10 +7,10 @@
   "scripts": {
     "dev": "concurrently -k -s first -n api,web -c auto \"npm:dev:api\" \"npm:dev:web\"",
     "dev:web": "vite",
-    "dev:api": "tsx watch server/index.ts",
+    "dev:api": "node --import tsx --disable-warning=ExperimentalWarning --watch server/index.ts",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "tsx server/index.ts",
+    "start": "node --import tsx --disable-warning=ExperimentalWarning server/index.ts",
     "clean": "node scripts/clean.mjs",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit"
