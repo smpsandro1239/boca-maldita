@@ -190,7 +190,7 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
   };
 }
 
-function createMemoryStorage(): Storage {
+export function createMemoryStorage(): Storage {
   const reservations: Array<{ reference: string; input: ReservationInput }> = [];
   const contacts: Array<{ id: number }> = [];
   const newsletters: string[] = [];

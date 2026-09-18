@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { createStorage, type Storage } from './storage';
+import { createMemoryStorage, createStorage, type Storage } from './storage';
 import { assetOverridesSchema, contactSchema, newsletterSchema, reservationSchema, siteSettingsSchema } from './validation';
 import { sendReservationConfirmation } from './email';
 import type { NextFunction, Request, Response } from 'express';
@@ -34,8 +34,14 @@ function adminUnauthorized(res: Response): void {
 }
 
 export async function createApp(): Promise<AppInstance> {
-  const storage = await createStorage();
-  await storage.init();
+  let storage: Storage;
+  try {
+    storage = await createStorage();
+    await storage.init();
+  } catch (err) {
+    console.error('[app] Falha ao inicializar armazenamento — a usar memória:', err);
+    storage = createMemoryStorage();
+  }
 
   const app = express();
   app.disable('x-powered-by');

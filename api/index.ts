@@ -4,8 +4,17 @@ import { createApp, type AppInstance } from '../server/app';
 let instance: AppInstance | null = null;
 
 export default async function handler(req: Request, res: Response, next: NextFunction): Promise<void> {
-  if (!instance) {
-    instance = await createApp();
+  try {
+    if (!instance) {
+      instance = await createApp();
+    }
+    instance.app(req, res, next);
+  } catch (err) {
+    console.error('[api] Erro na função:', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Erro interno do servidor.', detail: err instanceof Error ? err.message : String(err) });
+    } else {
+      next(err);
+    }
   }
-  instance.app(req, res, next);
 }
