@@ -55,13 +55,13 @@ Pré-requisitos: Node.js >= 20.
 ## Estrutura
 
 ```
-server/        # Backend Express + armazenamento
+api/lib/       # Backend Express + armazenamento (dentro de api/ para a função serverless ser autossuficiente)
   app.ts       # Fábrica da aplicação (rotas, admin, email) — usada em local e Vercel
-  index.ts     # Arranque do servidor local
   storage.ts   # Camada de dados: SQLite local ou Turso (automático por variáveis)
   email.ts     # Envio de confirmações de reserva (SMTP, opcional)
   validation.ts# Schemas Zod
-api/           # Função serverless (Vercel) — reutiliza server/app.ts
+api/index.ts   # Função serverless (Vercel)
+server/index.ts# Arranque do servidor Express local
 src/           # Frontend React
 scripts/       # Utilitários (clean)
 vercel.json    # Configuração de deploy Vercel

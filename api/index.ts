@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { createApp, type AppInstance } from '../server/app';
+import { createApp, type AppInstance } from './lib/app';
 
 let instance: AppInstance | null = null;
 
