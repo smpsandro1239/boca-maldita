@@ -67,6 +67,10 @@ scripts/       # Utilitários (build-api.mjs, clean.mjs, api-entry.ts)
 vercel.json    # Configuração de deploy Vercel
 ```
 
+## Credenciais de produção
+
+Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (palavra-passe de app do Gmail) e `TURSO_URL`/`TURSO_AUTH_TOKEN` (base de dados persistente) e colocá-los na Vercel.
+
 ## API
 
 - `GET /api/health` — estado do servidor
