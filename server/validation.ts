@@ -72,6 +72,12 @@ export const newsletterSchema = z
   })
   .strict();
 
+export const siteSettingsSchema = z
+  .object({
+    contactEmail: emailField,
+  })
+  .strict();
+
 const assetUrlField = z
   .string()
   .trim()
@@ -95,4 +101,5 @@ export const assetOverridesSchema = z
 export type ReservationInput = z.infer<typeof reservationSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
+export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export type AssetOverrideInput = z.infer<typeof assetOverridesSchema>['overrides'][number];

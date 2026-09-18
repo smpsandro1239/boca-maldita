@@ -6,9 +6,10 @@ import { Camera, Globe, Share2, Link as LinkIcon, Check, Flame, AlertCircle } fr
 interface FooterProps {
   onNavigate: (screen: ScreenType) => void;
   onOpenImageModal: () => void;
+  contactEmail: string;
 }
 
-export default function Footer({ onNavigate, onOpenImageModal }: FooterProps) {
+export default function Footer({ onNavigate, onOpenImageModal, contactEmail }: FooterProps) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -95,10 +96,10 @@ export default function Footer({ onNavigate, onOpenImageModal }: FooterProps) {
                 +351 253 031 890
               </a>
               <a
-                href="mailto:reservas@bocamaldita.pt"
+                href={`mailto:${contactEmail}`}
                 className="text-sm text-[#A6A8AD] hover:text-[#F7F5F0] block"
               >
-                reservas@bocamaldita.pt
+                {contactEmail}
               </a>
             </div>
           </div>

@@ -4,10 +4,11 @@ import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Cop
 
 interface ContactScreenProps {
   mapUrl: string;
+  contactEmail: string;
   onCopyImageUrl: (url: string) => void;
 }
 
-export default function ContactScreen({ mapUrl, onCopyImageUrl }: ContactScreenProps) {
+export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: ContactScreenProps) {
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -119,20 +120,14 @@ export default function ContactScreen({ mapUrl, onCopyImageUrl }: ContactScreenP
             </div>
             <h3 className="font-serif text-lg text-[#F7F5F0]">Correio Eletrónico</h3>
             <p className="text-xs text-[#A6A8AD] leading-relaxed">
-              Para eventos de empresa, celebrações ou parcerias:
+              Para reservas, eventos de empresa, celebrações ou parcerias:
             </p>
-            <div className="space-y-1 pt-1">
+            <div className="pt-1">
               <a
-                href="mailto:reservas@bocamaldita.pt"
+                href={`mailto:${contactEmail}`}
                 className="text-xs text-[#F7F5F0] hover:text-[#D4A373] block"
               >
-                reservas@bocamaldita.pt
-              </a>
-              <a
-                href="mailto:direcao@bocamaldita.pt"
-                className="text-xs text-[#A6A8AD] hover:text-[#F7F5F0] block"
-              >
-                direcao@bocamaldita.pt
+                {contactEmail}
               </a>
             </div>
           </div>

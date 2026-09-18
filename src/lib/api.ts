@@ -56,6 +56,22 @@ export function subscribeNewsletter(email: string): Promise<{ id: number }> {
   return post<{ id: number }>('/newsletter', { email });
 }
 
+export interface SiteSettings {
+  contactEmail: string;
+}
+
+export function getSite(): Promise<SiteSettings> {
+  return request<SiteSettings>('/site');
+}
+
+export function saveSiteSettings(contactEmail: string, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/site', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify({ contactEmail }),
+  });
+}
+
 export interface AdminAssetsStatus {
   enabled: boolean;
   overrides: Record<string, string>;

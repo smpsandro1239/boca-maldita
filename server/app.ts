@@ -2,16 +2,19 @@ import 'dotenv/config';
 import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createStorage, type Storage } from './storage';
-import { assetOverridesSchema, contactSchema, newsletterSchema, reservationSchema } from './validation';
+import { assetOverridesSchema, contactSchema, newsletterSchema, reservationSchema, siteSettingsSchema } from './validation';
 import { sendReservationConfirmation } from './email';
 import type { NextFunction, Request, Response } from 'express';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const distDir = path.resolve(__dirname, '../dist');
+let distDir = '';
+if (!process.env.VERCEL) {
+  distDir = path.resolve(process.cwd(), 'dist');
+}
 
 const IMAGE_OVERRIDES_KEY = 'image_asset_overrides';
+const SITE_CONTACT_EMAIL_KEY = 'site_contact_email';
+const DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? '').trim() || 'smpsandro1239@gmail.com';
 
 const adminToken = (process.env.ADMIN_TOKEN ?? '').trim();
 
@@ -99,6 +102,31 @@ export async function createApp(): Promise<AppInstance> {
       }
       const { id } = await storage.createNewsletter(parsed.data);
       res.status(201).json({ id });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/site', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const contactEmail = (await storage.getSetting(SITE_CONTACT_EMAIL_KEY)) ?? DEFAULT_CONTACT_EMAIL;
+      res.json({ contactEmail });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/site', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = siteSettingsSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      await storage.setSetting(SITE_CONTACT_EMAIL_KEY, parsed.data.contactEmail);
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }

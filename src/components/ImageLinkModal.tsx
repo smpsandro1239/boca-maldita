@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ImageAsset } from '../types';
-import { ExternalLink, Copy, Check, Sparkles, X, Image as ImageIcon, Link as LinkIcon, RefreshCw, ShieldCheck, Lock } from 'lucide-react';
+import { ExternalLink, Copy, Check, Sparkles, X, Image as ImageIcon, Link as LinkIcon, RefreshCw, ShieldCheck, Lock, Mail } from 'lucide-react';
 
 interface ImageLinkModalProps {
   isOpen: boolean;
@@ -14,6 +14,11 @@ interface ImageLinkModalProps {
   saveStatus: 'idle' | 'saving' | 'saved' | 'error';
   saveMessage: string | null;
   onSaveToServer: () => void;
+  contactEmail: string;
+  onContactEmailChange: (email: string) => void;
+  siteStatus: 'idle' | 'saving' | 'saved' | 'error';
+  siteMessage: string | null;
+  onSaveSite: () => void;
 }
 
 export default function ImageLinkModal({
@@ -27,7 +32,12 @@ export default function ImageLinkModal({
   onAdminTokenChange,
   saveStatus,
   saveMessage,
-  onSaveToServer
+  onSaveToServer,
+  contactEmail,
+  onContactEmailChange,
+  siteStatus,
+  siteMessage,
+  onSaveSite
 }: ImageLinkModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
@@ -141,6 +151,42 @@ export default function ImageLinkModal({
                 ? 'A publicar as imagens no servidor...'
                 : saveMessage ?? (saveStatus === 'saved' ? 'Imagens publicadas com sucesso.' : '')}
             </p>
+          </div>
+        )}
+
+        {/* Site Settings Toolbar */}
+        <div className="p-4 sm:p-5 border-b border-[#282A30] bg-[#1C1E22] flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Mail className="w-5 h-5 text-[#D4A373] shrink-0" />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#F7F5F0]">Email de contacto do site</p>
+              <p className="text-xs text-[#A6A8AD]">
+                Aplicado em todo o site (rodapé, contactos e secções). Guarde para substituir globalmente.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+            <input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => onContactEmailChange(e.target.value)}
+              placeholder="geral@bocamaldita.pt"
+              className="bg-[#0C0D0E] border border-[#282A30] text-sm text-[#F7F5F0] px-3 py-2 focus:border-[#D4A373] focus:outline-none sm:w-64"
+            />
+            <button
+              onClick={onSaveSite}
+              disabled={siteStatus === 'saving'}
+              className="bg-[#282A30] hover:bg-[#343536] text-[#F7F5F0] text-xs font-semibold uppercase tracking-wider px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {siteStatus === 'saving' ? 'A guardar...' : 'Guardar email'}
+            </button>
+          </div>
+        </div>
+
+        {(siteStatus === 'saved' || siteStatus === 'error') && (
+          <div className={`px-4 sm:px-5 py-2 border-b border-[#282A30] ${siteStatus === 'error' ? 'bg-red-950/40 text-red-300' : 'bg-emerald-950/40 text-emerald-300'}`}>
+            <p className="text-xs">{siteMessage}</p>
           </div>
         )}
 

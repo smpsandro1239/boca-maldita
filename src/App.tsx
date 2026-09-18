@@ -37,8 +37,17 @@ export default function App() {
   const [adminEnabled, setAdminEnabled] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [contactEmail, setContactEmail] = useState('smpsandro1239@gmail.com');
+  const [siteStatus, setSiteStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [siteMessage, setSiteMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    api
+      .getSite()
+      .then(({ contactEmail: email }) => {
+        if (email) setContactEmail(email);
+      })
+      .catch(() => {});
     api
       .getAdminAssets()
       .then(({ enabled, overrides }) => {
@@ -120,6 +129,34 @@ export default function App() {
     }
   };
 
+  const handleSaveSiteEmail = () => {
+    if (!adminToken.trim()) {
+      setSiteStatus('error');
+      setSiteMessage('Introduza o token de administrador para guardar o email.');
+      return;
+    }
+    setSiteStatus('saving');
+    setSiteMessage(null);
+    api
+      .saveSiteSettings(contactEmail.trim(), adminToken.trim())
+      .then(() => {
+        sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, adminToken.trim());
+        setSiteStatus('saved');
+        setSiteMessage('Email de contacto atualizado em todo o site.');
+        showToast('Email atualizado no site');
+      })
+      .catch((err: Error) => {
+        setSiteStatus('error');
+        setSiteMessage(err.message);
+      });
+  };
+
+  const handleContactEmailChange = (email: string) => {
+    setContactEmail(email);
+    setSiteStatus('idle');
+    setSiteMessage(null);
+  };
+
   const showToast = (message: string) => {
     setToastMessage(message);
     setTimeout(() => {
@@ -168,6 +205,7 @@ export default function App() {
             diningRoomUrl={getUrl('dining-room')}
             dryAgingUrl={getUrl('dry-aging-locker')}
             mapUrl={getUrl('map-location')}
+            contactEmail={contactEmail}
             onCopyImageUrl={handleCopyImageUrl}
           />
         )}
@@ -206,6 +244,7 @@ export default function App() {
         {currentScreen === 'contactos' && (
           <ContactScreen
             mapUrl={getUrl('map-location')}
+            contactEmail={contactEmail}
             onCopyImageUrl={handleCopyImageUrl}
           />
         )}
@@ -229,6 +268,7 @@ export default function App() {
       {/* Persistent Footer */}
       <Footer
         onNavigate={handleNavigate}
+        contactEmail={contactEmail}
         onOpenImageModal={() => setIsImageModalOpen(true)}
       />
 
@@ -245,6 +285,11 @@ export default function App() {
         saveStatus={saveStatus}
         saveMessage={saveMessage}
         onSaveToServer={handleSaveAssets}
+        contactEmail={contactEmail}
+        onContactEmailChange={handleContactEmailChange}
+        siteStatus={siteStatus}
+        siteMessage={siteMessage}
+        onSaveSite={handleSaveSiteEmail}
       />
 
       {/* Video Documentary Modal */}

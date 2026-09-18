@@ -70,6 +70,8 @@ vercel.json    # Configuração de deploy Vercel
 ## API
 
 - `GET /api/health` — estado do servidor
+- `GET /api/site` — definições públicas do site (`contactEmail`)
+- `PUT /api/site` — atualizar email de contacto em todo o site (requer `X-Admin-Token`)
 - `POST /api/reservations` — registar pedido de reserva (envia email de confirmação se SMTP configurado)
 - `POST /api/contacts` — registar mensagem de contacto
 - `POST /api/newsletter` — subscrever boletim exclusivo
@@ -85,6 +87,8 @@ As imagens atuais são placeholders trocáveis a qualquer momento, sem recompila
 2. Para publicar para todos os visitantes, insira o `ADMIN_TOKEN` e clique em **Guardar no servidor** (o token fica guardado na sessão do navegador).
 3. As substituições persistem na base de dados (Turso em produção) e são devolvidas em `GET /api/admin/assets`.
 
+O painel permite ainda substituir o **email de contacto do site** (por omissão `smpsandro1239@gmail.com`), que é aplicado globalmente — rodapé, contactos e restantes secções.
+
 > Para disponibilizar um vídeo oficial do "documentário", defina `DOCUMENTARY_VIDEO_URL` em `src/data/assets.ts` com o link `.mp4` — o modal passa a usar um player nativo.
 
 ## Deploy na Vercel
@@ -95,6 +99,7 @@ O projeto está ligado ao repositório GitHub: cada push para `main` é publicad
    - `ADMIN_TOKEN` — token usado pelo painel de administração
    - `TURSO_URL` e `TURSO_AUTH_TOKEN` — base de dados persistente
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — confirmações por email
+   - `SITE_CONTACT_EMAIL` — email de contacto global (opcional; por omissão `smpsandro1239@gmail.com`)
    - `APP_URL` — `https://bmaldita.vercel.app`
    - `DB_PATH` — não é preciso em produção (o Turso sobrepõe-se)
 

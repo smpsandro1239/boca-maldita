@@ -27,6 +27,7 @@ interface HomeScreenProps {
   diningRoomUrl: string;
   dryAgingUrl: string;
   mapUrl: string;
+  contactEmail: string;
   onCopyImageUrl: (url: string) => void;
 }
 
@@ -39,6 +40,7 @@ export default function HomeScreen({
   diningRoomUrl,
   dryAgingUrl,
   mapUrl,
+  contactEmail,
   onCopyImageUrl
 }: HomeScreenProps) {
   const [activeMenuTab, setActiveMenuTab] = useState<'carnes' | 'mar'>('carnes');
@@ -775,10 +777,10 @@ export default function HomeScreen({
                     +351 253 031 890
                   </a>
                   <a
-                    href="mailto:reservas@bocamaldita.pt"
+                    href={`mailto:${contactEmail}`}
                     className="text-xs text-[#A6A8AD] hover:underline block"
                   >
-                    reservas@bocamaldita.pt
+                    {contactEmail}
                   </a>
                 </div>
               </div>

@@ -53,7 +53,7 @@ export async function sendReservationConfirmation(payload: ConfirmationPayload):
 
   try {
     await transporter.sendMail({
-      from: (process.env.MAIL_FROM ?? '').trim() || 'Boca Maldita <reservas@bocamaldita.pt>',
+      from: (process.env.MAIL_FROM ?? '').trim() || 'Boca Maldita <smpsandro1239@gmail.com>',
       to: payload.email,
       subject: `Confirmação de reserva ${payload.reference} — Boca Maldita`,
       html: buildConfirmationHtml(payload),
