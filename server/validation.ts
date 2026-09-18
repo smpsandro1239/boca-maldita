@@ -72,6 +72,27 @@ export const newsletterSchema = z
   })
   .strict();
 
+const assetUrlField = z
+  .string()
+  .trim()
+  .min(1, 'O link da imagem é obrigatório.')
+  .max(2000, 'O link da imagem é demasiado longo.')
+  .refine((value) => /^https?:\/\//i.test(value), 'O link tem de começar por http:// ou https://.');
+
+export const assetOverridesSchema = z
+  .object({
+    overrides: z
+      .array(
+        z.object({
+          id: z.string().trim().min(1).max(80),
+          url: assetUrlField,
+        }),
+      )
+      .max(100, 'Demasiadas substituições.'),
+  })
+  .strict();
+
 export type ReservationInput = z.infer<typeof reservationSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
+export type AssetOverrideInput = z.infer<typeof assetOverridesSchema>['overrides'][number];
