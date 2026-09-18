@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { ReservationData } from '../types';
+import { createReservation } from '../lib/api';
 import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
 
 export default function ReservationScreen() {
@@ -20,6 +21,9 @@ export default function ReservationScreen() {
     data: ReservationData;
   } | null>(null);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const availableTimes = [
     // Almoço (Sábado e Domingo)
     '12:30', '13:00', '13:30', '14:00',
@@ -34,14 +38,32 @@ export default function ReservationScreen() {
     { id: 'Sala Privada Garrafeira', desc: 'Reserva exclusiva para grupos a partir de 6 pessoas' }
   ];
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    const reference = 'BM-' + Math.floor(1000 + Math.random() * 9000);
-    setConfirmedReservation({
-      id: reference,
-      data: { ...formData }
-    });
-    window.scrollTo({ top: 120, behavior: 'smooth' });
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      const created = await createReservation({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        date: formData.date,
+        time: formData.time,
+        guests: formData.guests,
+        area: formData.area,
+        occasion: formData.occasion,
+        notes: formData.notes,
+      });
+      setConfirmedReservation({
+        id: created.reference,
+        data: { ...formData }
+      });
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Ocorreu um erro ao enviar a reserva.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -128,7 +150,7 @@ export default function ReservationScreen() {
 
             <div className="text-xs text-[#A6A8AD] space-y-2 bg-[#1C1E22]/50 p-4 border border-[#282A30]">
               <p>
-                • Enviamos os detalhes e voucher para <strong className="text-[#F7F5F0]">{confirmedReservation.data.email}</strong> e via SMS para <strong className="text-[#F7F5F0]">{confirmedReservation.data.phone}</strong>.
+                • O pedido de reserva foi registado em nome de <strong className="text-[#F7F5F0]">{confirmedReservation.data.email}</strong>. A nossa receção entrará em contacto através de <strong className="text-[#F7F5F0]">{confirmedReservation.data.phone}</strong> para confirmar os detalhes.
               </p>
               <p>
                 • Tolerância de mesa: 15 minutos. Em caso de atraso ou alteração, contacte diretamente a nossa recepção através do número <a href="tel:+351253031890" className="text-[#D4A373] underline">+351 253 031 890</a>.
@@ -304,11 +326,18 @@ export default function ReservationScreen() {
                 </div>
 
                 {/* Submit Action */}
+                {submitError && (
+                  <div className="p-3 bg-red-950/80 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{submitError}</span>
+                  </div>
+                )}
                 <button
                   type="submit"
-                  className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] font-sans text-xs uppercase font-semibold py-4 tracking-[0.2em] transition-colors shadow-lg"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] disabled:opacity-60 disabled:cursor-not-allowed font-sans text-xs uppercase font-semibold py-4 tracking-[0.2em] transition-colors shadow-lg"
                 >
-                  Confirmar Pedido de Reserva
+                  {isSubmitting ? 'A Enviar Pedido de Reserva…' : 'Confirmar Pedido de Reserva'}
                 </button>
               </form>
             </div>

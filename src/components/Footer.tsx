@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ScreenType } from '../types';
-import { Camera, Globe, Share2, Link as LinkIcon, Check, Flame } from 'lucide-react';
+import { subscribeNewsletter } from '../lib/api';
+import { Camera, Globe, Share2, Link as LinkIcon, Check, Flame, AlertCircle } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (screen: ScreenType) => void;
@@ -10,15 +11,25 @@ interface FooterProps {
 export default function Footer({ onNavigate, onOpenImageModal }: FooterProps) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [subscribeError, setSubscribeError] = useState<string | null>(null);
 
-  const handleSubscribe = (e: FormEvent) => {
+  const handleSubscribe = async (e: FormEvent) => {
     e.preventDefault();
-    if (newsletterEmail) {
+    if (!newsletterEmail) return;
+    setIsSubscribing(true);
+    setSubscribeError(null);
+    try {
+      await subscribeNewsletter(newsletterEmail);
       setSubscribed(true);
       setTimeout(() => {
-        setNewsletterEmail('');
         setSubscribed(false);
+        setNewsletterEmail('');
       }, 4000);
+    } catch (err) {
+      setSubscribeError(err instanceof Error ? err.message : 'Ocorreu um erro na subscrição.');
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
@@ -136,15 +147,22 @@ export default function Footer({ onNavigate, onOpenImageModal }: FooterProps) {
               />
               <button
                 type="submit"
-                className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] font-sans text-xs uppercase font-semibold py-2.5 tracking-[0.15em] transition-colors"
+                disabled={isSubscribing}
+                className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] disabled:opacity-60 disabled:cursor-not-allowed font-sans text-xs uppercase font-semibold py-2.5 tracking-[0.15em] transition-colors"
               >
-                {subscribed ? 'Inscrição Confirmada!' : 'Subscrever'}
+                {subscribed ? 'Inscrição Confirmada!' : isSubscribing ? 'A Subscrever…' : 'Subscrever'}
               </button>
             </form>
             {subscribed && (
               <div className="flex items-center gap-1.5 text-xs text-emerald-400">
                 <Check className="w-3.5 h-3.5" />
                 <span>Obrigado! Enviamos um convite de boas-vindas.</span>
+              </div>
+            )}
+            {subscribeError && (
+              <div className="flex items-center gap-1.5 text-xs text-red-400">
+                <AlertCircle className="w-3.5 h-3.5" />
+                <span>{subscribeError}</span>
               </div>
             )}
           </div>

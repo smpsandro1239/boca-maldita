@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { ScreenType, MenuItem } from '../types';
 import { MENU_ITEMS } from '../data/menuData';
+import { createReservation } from '../lib/api';
 import { 
   Play, 
   Flame, 
@@ -13,8 +14,8 @@ import {
   ArrowRight, 
   Car, 
   Check, 
-  Link as LinkIcon,
-  Copy
+  Copy,
+  AlertCircle
 } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -42,8 +43,11 @@ export default function HomeScreen({
 }: HomeScreenProps) {
   const [activeMenuTab, setActiveMenuTab] = useState<'carnes' | 'mar'>('carnes');
   const [quickBookingSuccess, setQuickBookingSuccess] = useState(false);
+  const [isQuickBookingLoading, setIsQuickBookingLoading] = useState(false);
+  const [quickBookingError, setQuickBookingError] = useState<string | null>(null);
   const [bookingFormData, setBookingFormData] = useState({
     nome: '',
+    email: '',
     data: '',
     convidados: '2 Pessoas',
     telefone: ''
@@ -53,19 +57,39 @@ export default function HomeScreen({
     ? MENU_ITEMS.filter(i => i.category === 'carnes').slice(0, 4)
     : MENU_ITEMS.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
 
-  const handleQuickBooking = (e: FormEvent) => {
+  const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
-    if (!bookingFormData.nome || !bookingFormData.telefone) return;
-    setQuickBookingSuccess(true);
-    setTimeout(() => {
-      setQuickBookingSuccess(false);
-      setBookingFormData({
-        nome: '',
-        data: '',
-        convidados: '2 Pessoas',
-        telefone: ''
+    if (!bookingFormData.nome || !bookingFormData.email || !bookingFormData.telefone) return;
+    setIsQuickBookingLoading(true);
+    setQuickBookingError(null);
+    try {
+      const guests = Number.parseInt(bookingFormData.convidados, 10) || 2;
+      await createReservation({
+        name: bookingFormData.nome,
+        email: bookingFormData.email,
+        phone: bookingFormData.telefone,
+        date: bookingFormData.data,
+        time: '20:00',
+        guests,
+        area: 'Salão Nobre da Brasa',
+        occasion: 'Pré-Reserva Rápida',
       });
-    }, 4500);
+      setQuickBookingSuccess(true);
+      setTimeout(() => {
+        setQuickBookingSuccess(false);
+        setBookingFormData({
+          nome: '',
+          email: '',
+          data: '',
+          convidados: '2 Pessoas',
+          telefone: ''
+        });
+      }, 4500);
+    } catch (err) {
+      setQuickBookingError(err instanceof Error ? err.message : 'Ocorreu um erro ao enviar a reserva.');
+    } finally {
+      setIsQuickBookingLoading(false);
+    }
   };
 
   return (
@@ -552,6 +576,20 @@ export default function HomeScreen({
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-[11px] uppercase text-[#A6A8AD] tracking-wider mb-1 font-sans">
+                        Email de Confirmação
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={bookingFormData.email}
+                        onChange={(e) => setBookingFormData({...bookingFormData, email: e.target.value})}
+                        placeholder="nome@exemplo.pt"
+                        className="w-full bg-[#1C1E22] text-[#F7F5F0] px-3.5 py-2.5 text-xs border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                      />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-[11px] uppercase text-[#A6A8AD] tracking-wider mb-1 font-sans">
@@ -600,10 +638,18 @@ export default function HomeScreen({
 
                   <button
                     type="submit"
-                    className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] text-xs uppercase font-sans font-semibold py-3 transition-colors tracking-[0.18em]"
+                    disabled={isQuickBookingLoading}
+                    className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] disabled:opacity-60 disabled:cursor-not-allowed text-xs uppercase font-sans font-semibold py-3 transition-colors tracking-[0.18em]"
                   >
-                    Solicitar Reserva de Mesa
+                    {isQuickBookingLoading ? 'A Enviar Pedido…' : 'Solicitar Reserva de Mesa'}
                   </button>
+
+                  {quickBookingError && (
+                    <div className="p-3 bg-red-950/80 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{quickBookingError}</span>
+                    </div>
+                  )}
 
                   {quickBookingSuccess && (
                     <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs flex items-center gap-2">

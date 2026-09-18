@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
-import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Copy } from 'lucide-react';
+import { createContact } from '../lib/api';
+import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Copy, AlertCircle } from 'lucide-react';
 
 interface ContactScreenProps {
   mapUrl: string;
@@ -14,19 +15,35 @@ export default function ContactScreen({ mapUrl, onCopyImageUrl }: ContactScreenP
     mensagem: ''
   });
   const [sent, setSent] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setSent(true);
-    setTimeout(() => {
-      setSent(false);
-      setFormData({
-        nome: '',
-        email: '',
-        assunto: 'Informações Gerais',
-        mensagem: ''
+    setIsSending(true);
+    setSubmitError(null);
+    try {
+      await createContact({
+        nome: formData.nome,
+        email: formData.email,
+        assunto: formData.assunto,
+        mensagem: formData.mensagem
       });
-    }, 4500);
+      setSent(true);
+      setTimeout(() => {
+        setSent(false);
+        setFormData({
+          nome: '',
+          email: '',
+          assunto: 'Informações Gerais',
+          mensagem: ''
+        });
+      }, 4500);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Ocorreu um erro ao enviar a mensagem.');
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -225,11 +242,19 @@ export default function ContactScreen({ mapUrl, onCopyImageUrl }: ContactScreenP
                 ></textarea>
               </div>
 
+              {submitError && (
+                <div className="p-3 bg-red-950/80 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{submitError}</span>
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] font-sans text-xs uppercase font-semibold py-3.5 tracking-[0.2em] transition-colors"
+                disabled={isSending}
+                className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] disabled:opacity-60 disabled:cursor-not-allowed font-sans text-xs uppercase font-semibold py-3.5 tracking-[0.2em] transition-colors"
               >
-                Enviar Mensagem
+                {isSending ? 'A Enviar Mensagem…' : 'Enviar Mensagem'}
               </button>
 
               {sent && (
