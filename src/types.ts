@@ -34,12 +34,12 @@ export interface MenuItem {
 
 export interface ReservationData {
   name: string;
-  phone: string;
   email: string;
+  phone: string;
   date: string;
-  timeSlot: string;
+  time: string;
   guests: number;
-  zone: 'salao' | 'terraco' | 'garrafeira';
+  area: string;
   occasion: string;
-  specialRequests?: string;
+  notes?: string;
 }
