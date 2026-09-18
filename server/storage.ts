@@ -240,7 +240,7 @@ export async function createStorage(): Promise<Storage> {
 
   if (tursoUrl && tursoToken) {
     try {
-      const { createClient } = await import('@libsql/client');
+      const { createClient } = await import('@libsql/client/web');
       const client = createClient({ url: tursoUrl, authToken: tursoToken }) as unknown as MinimalLibsqlClient;
       return createTursoStorage(client);
     } catch (err) {

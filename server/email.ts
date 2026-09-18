@@ -1,11 +1,35 @@
-import * as nodemailer from 'nodemailer';
 import type { ReservationInput } from './validation';
 
 export interface ConfirmationPayload extends ReservationInput {
   reference: string;
 }
 
-let transporter: nodemailer.Transporter | null = null;
+interface EmailTransporter {
+  sendMail(options: { from: string; to: string; subject: string; html: string }): Promise<unknown>;
+}
+
+let transporterPromise: Promise<EmailTransporter | null> | null = null;
+
+function getTransporter(): Promise<EmailTransporter | null> {
+  const host = (process.env.SMTP_HOST ?? '').trim();
+  if (!host) {
+    return Promise.resolve(null);
+  }
+  if (!transporterPromise) {
+    transporterPromise = (async () => {
+      const nodemailer = await import('nodemailer');
+      return nodemailer.createTransport({
+        host,
+        port: Number(process.env.SMTP_PORT ?? 587),
+        secure: (process.env.SMTP_SECURE ?? '').toLowerCase() === 'true',
+        auth: process.env.SMTP_USER
+          ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? '' }
+          : undefined,
+      }) as EmailTransporter;
+    })();
+  }
+  return transporterPromise;
+}
 
 function buildConfirmationHtml(payload: ConfirmationPayload): string {
   const lines = [
@@ -34,21 +58,10 @@ function buildConfirmationHtml(payload: ConfirmationPayload): string {
 }
 
 export async function sendReservationConfirmation(payload: ConfirmationPayload): Promise<boolean> {
-  const host = (process.env.SMTP_HOST ?? '').trim();
-  if (!host) {
+  const transporter = await getTransporter();
+  if (!transporter) {
     console.warn('[email] SMTP não configurado — confirmação de reserva não enviada.');
     return false;
-  }
-
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      host,
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: (process.env.SMTP_SECURE ?? '').toLowerCase() === 'true',
-      auth: process.env.SMTP_USER
-        ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? '' }
-        : undefined,
-    });
   }
 
   try {
