@@ -1,6 +1,5 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import { createClient } from '@libsql/client';
 import type { ContactInput, NewsletterInput, ReservationInput } from './validation';
 
 export interface ReservationRecord {
@@ -119,11 +118,18 @@ async function createSqliteStorage(): Promise<Storage> {
   };
 }
 
-function createTursoStorage(): Storage {
-  const client = createClient({
-    url: process.env.TURSO_URL ?? '',
-    authToken: process.env.TURSO_AUTH_TOKEN ?? '',
-  });
+interface LibsqlRows {
+  rows: Array<Record<string, unknown>>;
+  lastInsertRowid?: number | bigint;
+}
+
+interface MinimalLibsqlClient {
+  executeMultiple(sql: string): Promise<unknown>;
+  execute(query: { sql: string; args?: unknown[] } | string): Promise<LibsqlRows>;
+  close(): Promise<void>;
+}
+
+function createTursoStorage(client: MinimalLibsqlClient): Storage {
 
   return {
     async init() {
@@ -233,7 +239,14 @@ export async function createStorage(): Promise<Storage> {
   const tursoToken = (process.env.TURSO_AUTH_TOKEN ?? '').trim();
 
   if (tursoUrl && tursoToken) {
-    return createTursoStorage();
+    try {
+      const { createClient } = await import('@libsql/client');
+      const client = createClient({ url: tursoUrl, authToken: tursoToken }) as unknown as MinimalLibsqlClient;
+      return createTursoStorage(client);
+    } catch (err) {
+      console.warn('[storage] Turso indisponível — a usar armazenamento em memória:', err);
+      return createMemoryStorage();
+    }
   }
 
   if (process.env.VERCEL) {
