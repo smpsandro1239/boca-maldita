@@ -5,9 +5,10 @@ interface VideoModalProps {
   isOpen: boolean;
   onClose: () => void;
   posterUrl: string;
+  videoUrl?: string;
 }
 
-export default function VideoModal({ isOpen, onClose, posterUrl }: VideoModalProps) {
+export default function VideoModal({ isOpen, onClose, posterUrl, videoUrl }: VideoModalProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(28);
@@ -37,7 +38,18 @@ export default function VideoModal({ isOpen, onClose, posterUrl }: VideoModalPro
           </button>
         </div>
 
-        {/* Video Player Simulator */}
+        {/* Video Player */}
+        {videoUrl ? (
+          <div className="aspect-video w-full bg-[#0C0D0E]">
+            <video
+              className="w-full h-full object-contain"
+              src={videoUrl}
+              poster={posterUrl || undefined}
+              controls
+              playsInline
+            />
+          </div>
+        ) : (
         <div className="relative aspect-video w-full bg-[#0C0D0E] overflow-hidden group">
           {posterUrl ? (
             <img
@@ -129,6 +141,7 @@ export default function VideoModal({ isOpen, onClose, posterUrl }: VideoModalPro
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

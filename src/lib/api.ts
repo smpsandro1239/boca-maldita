@@ -1,9 +1,5 @@
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`/api${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, init);
 
   const data = (await response.json().catch(() => null)) as { error?: string } | null;
 
@@ -14,6 +10,14 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   }
 
   return data as T;
+}
+
+function post<T>(path: string, body: unknown): Promise<T> {
+  return request<T>(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export interface CreateReservationResult {
@@ -50,4 +54,33 @@ export function createContact(payload: ContactPayload): Promise<{ id: number }> 
 
 export function subscribeNewsletter(email: string): Promise<{ id: number }> {
   return post<{ id: number }>('/newsletter', { email });
+}
+
+export interface AdminAssetsStatus {
+  enabled: boolean;
+  overrides: Record<string, string>;
+}
+
+export interface AssetOverride {
+  id: string;
+  url: string;
+}
+
+export function getAdminAssets(): Promise<AdminAssetsStatus> {
+  return request<AdminAssetsStatus>('/admin/assets');
+}
+
+export function saveAdminAssets(overrides: AssetOverride[], token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/assets', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify({ overrides }),
+  });
+}
+
+export function resetAdminAssets(token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/assets', {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
+  });
 }

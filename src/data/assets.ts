@@ -1,5 +1,7 @@
 import { ImageAsset } from '../types';
 
+export const DOCUMENTARY_VIDEO_URL = '';
+
 export const DEFAULT_IMAGE_ASSETS: ImageAsset[] = [
   {
     id: 'logo-brand',

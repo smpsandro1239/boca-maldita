@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ImageAsset } from '../types';
-import { ExternalLink, Copy, Check, Sparkles, X, Image as ImageIcon, Link as LinkIcon, RefreshCw } from 'lucide-react';
+import { ExternalLink, Copy, Check, Sparkles, X, Image as ImageIcon, Link as LinkIcon, RefreshCw, ShieldCheck, Lock } from 'lucide-react';
 
 interface ImageLinkModalProps {
   isOpen: boolean;
@@ -8,6 +8,12 @@ interface ImageLinkModalProps {
   assets: ImageAsset[];
   onUpdateAssetUrl: (id: string, newUrl: string) => void;
   onResetAssets: () => void;
+  adminEnabled: boolean;
+  adminToken: string;
+  onAdminTokenChange: (token: string) => void;
+  saveStatus: 'idle' | 'saving' | 'saved' | 'error';
+  saveMessage: string | null;
+  onSaveToServer: () => void;
 }
 
 export default function ImageLinkModal({
@@ -15,7 +21,13 @@ export default function ImageLinkModal({
   onClose,
   assets,
   onUpdateAssetUrl,
-  onResetAssets
+  onResetAssets,
+  adminEnabled,
+  adminToken,
+  onAdminTokenChange,
+  saveStatus,
+  saveMessage,
+  onSaveToServer
 }: ImageLinkModalProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
@@ -70,13 +82,13 @@ export default function ImageLinkModal({
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 bg-[#D4A373]"></span>
-              <span className="font-mono text-xs uppercase text-[#D4A373] tracking-[0.2em]">Recurso Solicitado</span>
+              <span className="font-mono text-xs uppercase text-[#D4A373] tracking-[0.2em]">Painel de Administração</span>
             </div>
             <h2 className="font-serif text-2xl sm:text-3xl text-[#F7F5F0]">
-              Links Diretos para as Imagens do HTML
+              Gerir Imagens do Site
             </h2>
             <p className="text-sm text-[#A6A8AD] max-w-2xl">
-              Aqui estão todos os links diretos oficiais das imagens utilizadas nas telas deste projeto. Pode copiar cada URL direta, abrir em nova aba ou substituir qualquer link por uma nova imagem em tempo real.
+              Substitua qualquer imagem do site por um link direto novo. As alterações aplicam-se em tempo real; para as publicar para todos os visitantes, guarde-as no servidor com o token de administrador.
             </p>
           </div>
           <button
@@ -87,6 +99,50 @@ export default function ImageLinkModal({
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Admin Save Toolbar */}
+        <div className="p-4 sm:p-5 border-b border-[#282A30] bg-[#0C0D0E] flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+          <div className="flex items-center gap-3">
+            {adminEnabled
+              ? <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
+              : <Lock className="w-5 h-5 text-amber-400 shrink-0" />}
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#F7F5F0]">Publicação no servidor</p>
+              <p className="text-xs text-[#A6A8AD]">
+                {adminEnabled
+                  ? 'Guardar aplica as imagens substituídas para todos os visitantes.'
+                  : 'O servidor não tem ADMIN_TOKEN definido — a gravação permanente está desativada (as alterações ficam apenas locais e temporárias).'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+            <input
+              type="password"
+              value={adminToken}
+              onChange={(e) => onAdminTokenChange(e.target.value)}
+              placeholder="Token de administrador"
+              className="bg-[#1C1E22] border border-[#282A30] text-sm text-[#F7F5F0] px-3 py-2 focus:border-[#D4A373] focus:outline-none sm:w-56"
+            />
+            <button
+              onClick={onSaveToServer}
+              disabled={saveStatus === 'saving'}
+              className="bg-[#D4A373] hover:bg-[#C59D5F] text-[#0C0D0E] text-xs font-semibold uppercase tracking-wider px-4 py-2 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
+              {saveStatus === 'saving' ? 'A guardar...' : 'Guardar no servidor'}
+            </button>
+          </div>
+        </div>
+
+        {saveStatus !== 'idle' && (
+          <div className={`px-4 sm:px-5 py-2 border-b border-[#282A30] ${saveStatus === 'error' ? 'bg-red-950/40 text-red-300' : 'bg-emerald-950/40 text-emerald-300'}`}>
+            <p className="text-xs">
+              {saveStatus === 'saving'
+                ? 'A publicar as imagens no servidor...'
+                : saveMessage ?? (saveStatus === 'saved' ? 'Imagens publicadas com sucesso.' : '')}
+            </p>
+          </div>
+        )}
 
         {/* Action Controls & Filters */}
         <div className="p-4 sm:p-6 border-b border-[#282A30] bg-[#141518] flex flex-col sm:flex-row gap-4 justify-between items-center">
