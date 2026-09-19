@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MouseEvent, WheelEvent } from 'react';
 import {
   X,
@@ -19,6 +19,9 @@ import {
   Check,
   AlertTriangle,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
+  List,
 } from 'lucide-react';
 import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, SiteContent } from '../types';
 import {
@@ -87,6 +90,25 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function dateToKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function todayKey(): string {
+  return dateToKey(new Date());
+}
+
+const WEEKDAY_LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+function formatDateLabel(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString('pt-PT', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 const DEFAULT_PROTECTION: ReservationProtectionConfig = {
   enabled: false,
   pauseForm: false,
@@ -147,6 +169,8 @@ export default function AdminPanel({
     mode: 'create' | 'edit' | 'duplicate';
     draft: ReservationEditorData;
   } | null>(null);
+  const [reservationsView, setReservationsView] = useState<'calendario' | 'lista'>('calendario');
+  const [selectedDate, setSelectedDate] = useState<string>(() => todayKey());
 
   useEffect(() => {
     if (isOpen) setImageDrafts(assets);
@@ -317,7 +341,7 @@ export default function AdminPanel({
     notes: r.notes ?? '',
   });
 
-  const openNewReservation = () => {
+  const openNewReservation = (date?: string) => {
     setReservationEditor({
       id: null,
       mode: 'create',
@@ -325,7 +349,7 @@ export default function AdminPanel({
         name: '',
         email: '',
         phone: '',
-        date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        date: date ?? new Date(Date.now() + 86400000).toISOString().split('T')[0],
         time: '20:00',
         guests: 2,
         area: 'Salão Nobre da Brasa',
@@ -808,78 +832,67 @@ export default function AdminPanel({
             <div className="space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-xs text-[#F7F5F0]/60">
-                  Reservas registadas no site. Podes criar, duplicar, editar ou remover.
+                  Reservas registadas no site. Podes criar, duplicar, editar, remover e ver em calendário.
                 </p>
-                <button
-                  type="button"
-                  onClick={openNewReservation}
-                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nova reserva
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="flex border border-[#282A30]">
+                    <button
+                      type="button"
+                      onClick={() => setReservationsView('calendario')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-wider font-semibold ${
+                        reservationsView === 'calendario'
+                          ? 'bg-[#D4A373] text-[#0C0D0E]'
+                          : 'text-[#F7F5F0]/60 hover:text-[#F7F5F0]'
+                      }`}
+                      title="Ver reservas por dia num calendário"
+                    >
+                      <CalendarDays className="w-3.5 h-3.5" /> Calendário
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setReservationsView('lista')}
+                      className={`flex items-center gap-1.5 px-3 py-2 text-[11px] uppercase tracking-wider font-semibold ${
+                        reservationsView === 'lista'
+                          ? 'bg-[#D4A373] text-[#0C0D0E]'
+                          : 'text-[#F7F5F0]/60 hover:text-[#F7F5F0]'
+                      }`}
+                      title="Ver reservas agrupadas por data numa lista"
+                    >
+                      <List className="w-3.5 h-3.5" /> Lista
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => openNewReservation()}
+                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Nova reserva
+                  </button>
+                </div>
               </div>
               {reservations.length === 0 ? (
                 <p className="text-sm text-[#F7F5F0]/50">Ainda não há reservas.</p>
+              ) : reservationsView === 'calendario' ? (
+                <ReservationsCalendar
+                  reservations={reservations}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                  capacity={protection.enabled ? protection.dailyCapacity : undefined}
+                  busy={busy}
+                  onEdit={openEditReservation}
+                  onDuplicate={openDuplicateReservation}
+                  onDelete={(r) => handleDeleteReservation(r.id)}
+                  onBookOnDay={(d) => openNewReservation(d)}
+                />
               ) : (
-                reservations.map((r) => (
-                  <div key={r.id} className="bg-[#141518] border border-[#282A30] p-4">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div>
-                        <p className="font-serif text-base text-[#F7F5F0]">
-                          {r.name} <span className="text-[#D4A373]">· {r.reference}</span>
-                          {r.status && r.status !== 'confirmed' && (
-                            <span
-                              className={`ml-2 text-[9px] uppercase tracking-widest font-mono px-2 py-0.5 border ${
-                                r.status === 'pending'
-                                  ? 'text-amber-400 border-amber-500/40'
-                                  : 'text-red-400 border-red-500/40'
-                              }`}
-                            >
-                              {r.status === 'pending' ? 'Pendente' : r.status}
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-xs text-[#F7F5F0]/60 mt-1">
-                          {r.date.split('T')[0]} às {r.time} · {r.guests} convidados · {r.area} · {r.occasion}
-                        </p>
-                        <p className="text-xs text-[#F7F5F0]/60">
-                          {r.email} · {r.phone}
-                        </p>
-                        {r.notes ? <p className="text-xs text-[#F7F5F0]/40 mt-1 italic">"{r.notes}"</p> : null}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => openEditReservation(r)}
-                          className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
-                          aria-label={`Editar ${r.reference}`}
-                          title="Editar reserva"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => openDuplicateReservation(r)}
-                          className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
-                          aria-label={`Duplicar ${r.reference}`}
-                          title="Duplicar reserva"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteReservation(r.id)}
-                          disabled={busy === 'reservas'}
-                          className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Remover
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))
+                <ReservationsList
+                  reservations={reservations}
+                  busy={busy}
+                  onEdit={openEditReservation}
+                  onDuplicate={openDuplicateReservation}
+                  onDelete={(r) => handleDeleteReservation(r.id)}
+                />
               )}
             </div>
           )}
@@ -1252,6 +1265,315 @@ function ContentField({ label, value, onChange, helper }: ContentFieldProps) {
         className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
       />
       {helper ? <p className="text-[10px] text-[#F7F5F0]/40 mt-1">{helper}</p> : null}
+    </div>
+  );
+}
+
+interface ReservationCardProps {
+  r: ReservationAdminRow;
+  busy?: string | null;
+  onEdit: (r: ReservationAdminRow) => void;
+  onDuplicate: (r: ReservationAdminRow) => void;
+  onDelete: (r: ReservationAdminRow) => void;
+}
+
+function ReservationCard({ r, busy, onEdit, onDuplicate, onDelete }: ReservationCardProps) {
+  return (
+    <div className="bg-[#141518] border border-[#282A30] p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="font-serif text-base text-[#F7F5F0]">
+            {r.name} <span className="text-[#D4A373]">· {r.reference}</span>
+            {r.status && r.status !== 'confirmed' && (
+              <span
+                className={`ml-2 text-[9px] uppercase tracking-widest font-mono px-2 py-0.5 border ${
+                  r.status === 'pending'
+                    ? 'text-amber-400 border-amber-500/40'
+                    : 'text-red-400 border-red-500/40'
+                }`}
+              >
+                {r.status === 'pending' ? 'Pendente' : r.status}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-[#F7F5F0]/60 mt-1">
+            {r.date.split('T')[0]} às {r.time} · {r.guests} convidados · {r.area} · {r.occasion}
+          </p>
+          <p className="text-xs text-[#F7F5F0]/60">
+            {r.email} · {r.phone}
+          </p>
+          {r.notes ? <p className="text-xs text-[#F7F5F0]/40 mt-1 italic">"{r.notes}"</p> : null}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onEdit(r)}
+            className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
+            aria-label={`Editar ${r.reference}`}
+            title="Editar reserva"
+          >
+            <Pencil className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDuplicate(r)}
+            className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
+            aria-label={`Duplicar ${r.reference}`}
+            title="Duplicar reserva"
+          >
+            <Copy className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(r)}
+            disabled={busy === 'reservas'}
+            className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            Remover
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReservationsCalendar({
+  reservations,
+  selectedDate,
+  onSelectDate,
+  capacity,
+  busy,
+  onEdit,
+  onDuplicate,
+  onDelete,
+  onBookOnDay,
+}: {
+  reservations: ReservationAdminRow[];
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  capacity?: number;
+  busy?: string | null;
+  onEdit: (r: ReservationAdminRow) => void;
+  onDuplicate: (r: ReservationAdminRow) => void;
+  onDelete: (r: ReservationAdminRow) => void;
+  onBookOnDay: (date: string) => void;
+}) {
+  const [cursor, setCursor] = useState(() => {
+    const [y, m] = selectedDate.split('-').map(Number);
+    return { year: y, month: m - 1 };
+  });
+
+  useEffect(() => {
+    const [y, m] = selectedDate.split('-').map(Number);
+    if (Number.isFinite(y) && Number.isFinite(m) && (y !== cursor.year || m - 1 !== cursor.month)) {
+      setCursor({ year: y, month: m - 1 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate]);
+
+  const byDate = useMemo(() => {
+    const map = new Map<string, ReservationAdminRow[]>();
+    for (const r of reservations) {
+      const key = String(r.date).split('T')[0];
+      const arr = map.get(key) ?? [];
+      arr.push(r);
+      map.set(key, arr);
+    }
+    return map;
+  }, [reservations]);
+
+  const today = todayKey();
+  const first = new Date(cursor.year, cursor.month, 1);
+  const offset = (first.getDay() + 6) % 7;
+  const cells: Date[] = [];
+  const start = new Date(cursor.year, cursor.month, 1 - offset);
+  for (let i = 0; i < 42; i++) {
+    cells.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+  }
+
+  const prevMonth = () =>
+    setCursor((c) => (c.month === 0 ? { year: c.year - 1, month: 11 } : { year: c.year, month: c.month - 1 }));
+  const nextMonth = () =>
+    setCursor((c) => (c.month === 11 ? { year: c.year + 1, month: 0 } : { year: c.year, month: c.month + 1 }));
+  const goToday = () => {
+    const t = new Date();
+    setCursor({ year: t.getFullYear(), month: t.getMonth() });
+    onSelectDate(todayKey());
+  };
+
+  const dayReservations = (byDate.get(selectedDate) ?? [])
+    .slice()
+    .sort((a, b) => a.time.localeCompare(b.time));
+  const [selYear, selMonth, selDay] = selectedDate.split('-').map(Number);
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-[#141518] border border-[#282A30] p-4">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <button
+            type="button"
+            onClick={prevMonth}
+            className="p-2 text-[#F7F5F0]/60 hover:text-[#D4A373]"
+            aria-label="Mês anterior"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <div className="flex items-center gap-3">
+            <span className="font-serif text-lg text-[#F7F5F0] capitalize">
+              {first.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' })}
+            </span>
+            <button
+              type="button"
+              onClick={goToday}
+              className="text-[10px] uppercase tracking-widest text-[#D4A373] border border-[#D4A373]/40 px-2 py-1 hover:bg-[#D4A373]/10"
+            >
+              Hoje
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={nextMonth}
+            className="p-2 text-[#F7F5F0]/60 hover:text-[#D4A373]"
+            aria-label="Mês seguinte"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-7 text-center text-[10px] uppercase tracking-widest text-[#F7F5F0]/40 font-mono mb-1">
+          {WEEKDAY_LABELS.map((w) => (
+            <span key={w} className="py-1">
+              {w}
+            </span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d) => {
+            const key = dateToKey(d);
+            const inMonth = d.getMonth() === cursor.month;
+            const isToday = key === today;
+            const isSelected = key === selectedDate;
+            const count = (byDate.get(key) ?? []).length;
+            const full = capacity != null && capacity > 0 && count >= capacity;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onSelectDate(key)}
+                className={`relative flex flex-col items-center justify-center gap-0.5 aspect-square border text-[11px] transition-colors ${
+                  inMonth ? 'text-[#F7F5F0]' : 'text-[#F7F5F0]/25'
+                } ${isSelected ? 'border-[#D4A373] bg-[#D4A373]/15' : 'border-[#282A30] hover:border-[#D4A373]/60'} ${
+                  inMonth && count > 0 ? 'bg-[#1C1E22]' : 'bg-transparent'
+                }`}
+                aria-label={`${d.getDate()}/${cursor.month + 1}/${cursor.year}${count > 0 ? ` — ${count} reservas` : ''}`}
+              >
+                <span className={`font-mono ${isToday ? 'text-[#D4A373] font-bold' : ''}`}>{d.getDate()}</span>
+                {count > 0 && (
+                  <span className={`text-[9px] font-mono leading-none ${full ? 'text-red-400' : 'text-[#D4A373]'}`}>
+                    {capacity != null ? `${count}/${capacity}` : `${count}`}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-[#F7F5F0]/40 mt-2 font-mono">
+          {dayReservations.length} {dayReservations.length === 1 ? 'reserva' : 'reservas'} a{' '}
+          {String(selDay).padStart(2, '0')}/{String(selMonth + 1).padStart(2, '0')}/{selYear}
+          {capacity != null ? ` · capacidade ${capacity} por dia` : ''}
+        </p>
+      </div>
+
+      {dayReservations.length === 0 ? (
+        <div className="bg-[#141518] border border-[#282A30] p-4 flex items-center justify-between gap-3">
+          <p className="text-sm text-[#F7F5F0]/50">Sem reservas nesta data.</p>
+          <button
+            type="button"
+            onClick={() => onBookOnDay(selectedDate)}
+            className="flex items-center gap-2 border border-[#D4A373]/50 text-[#D4A373] hover:bg-[#D4A373]/10 px-3 py-2 text-[11px] uppercase tracking-wider font-semibold"
+          >
+            <Plus className="w-3.5 h-3.5" /> Reservar aqui
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {dayReservations.map((r) => (
+            <div key={r.id}>
+              <ReservationCard r={r} busy={busy} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReservationsList({
+  reservations,
+  busy,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  reservations: ReservationAdminRow[];
+  busy?: string | null;
+  onEdit: (r: ReservationAdminRow) => void;
+  onDuplicate: (r: ReservationAdminRow) => void;
+  onDelete: (r: ReservationAdminRow) => void;
+}) {
+  const today = todayKey();
+  const sorted = [...reservations].sort(
+    (a, b) => String(a.date).localeCompare(String(b.date)) || a.time.localeCompare(b.time),
+  );
+  const byDate = new Map<string, ReservationAdminRow[]>();
+  for (const r of sorted) {
+    const key = String(r.date).split('T')[0];
+    const arr = byDate.get(key) ?? [];
+    arr.push(r);
+    byDate.set(key, arr);
+  }
+  const upcomingDates = [...byDate.keys()].filter((d) => d >= today).sort();
+  const pastDates = [...byDate.keys()].filter((d) => d < today).sort().reverse();
+
+  const renderGroup = (date: string, dimmed: boolean) => (
+    <div key={date} className={`space-y-2 ${dimmed ? 'opacity-55' : ''}`}>
+      <div className="flex items-center gap-2">
+        <h4 className="text-xs uppercase tracking-widest text-[#D4A373] font-mono capitalize">
+          {formatDateLabel(date)}
+        </h4>
+        {date === today && (
+          <span className="text-[9px] uppercase tracking-widest text-[#0C0D0E] bg-[#D4A373] px-1.5 py-0.5 font-mono">
+            Hoje
+          </span>
+        )}
+        <span className="h-px flex-1 bg-[#282A30]" />
+        <span className="text-[10px] font-mono text-[#F7F5F0]/40">
+          {byDate.get(date)!.length} {byDate.get(date)!.length === 1 ? 'reserva' : 'reservas'}
+        </span>
+      </div>
+      {byDate.get(date)!.map((r) => (
+        <div key={r.id}>
+          <ReservationCard r={r} busy={busy} onEdit={onEdit} onDuplicate={onDuplicate} onDelete={onDelete} />
+        </div>
+      ))}
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        {upcomingDates.map((date) => renderGroup(date, false))}
+        {upcomingDates.length === 0 && (
+          <p className="text-sm text-[#F7F5F0]/50">Sem reservas futuras.</p>
+        )}
+      </div>
+      {pastDates.length > 0 && (
+        <div className="space-y-4">
+          <h4 className="text-xs uppercase tracking-widest text-[#F7F5F0]/40 font-mono">Passadas</h4>
+          {pastDates.map((date) => renderGroup(date, true))}
+        </div>
+      )}
     </div>
   );
 }
