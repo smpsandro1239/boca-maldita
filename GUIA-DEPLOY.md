@@ -98,6 +98,66 @@ O código (`api/lib/storage.ts`) cria o esquema **automaticamente na primeira ut
 
 > Acessório importante: se **não** houver `TURSO_URL`/`TURSO_AUTH_TOKEN`, em produção cai em memória (e avisa no log: `[storage] VERCEL sem Turso configurado — a usar armazenamento em memória (não persistente)`). **Sempre** configurar Turso para ter persistência.
 
+### 4.6. Como consultar a base de dados
+
+Os dados estão todos no SQLite da Turso. Para os ver, tens três caminhos (o 1º e o 2º são os principais).
+
+#### Opção 1 — Dashboard da Turso (no navegador, sem instalar nada)
+
+1. https://turso.tech → **Databases** → **boca-maldita**.
+2. No separador/consola de **Query** (editor de SQL incorporado) escreves e executas as consultas; as tabelas aparecem do lado esquerdo.
+
+Isto funciona em qualquer sistema (Windows incluído) — é útil para espreitar valores sem instalar software.
+
+#### Opção 2 — CLI oficial (`turso db shell`)
+
+CLI disponível em **Mac/Linux/WSL** (para Windows nativo usa a Opção 1 ou WSL):
+
+```bash
+# Instalar (uma vez)
+curl -sSfL https://get.tur.so/install.sh | bash
+
+# Entrar e autenticar (uma vez)
+turso auth login
+
+# Sessão interativa — escreves consultas à vez
+turso db shell boca-maldita
+
+# Consulta única, devolve e sai
+turso db shell boca-maldita "SELECT * FROM reservations;"
+```
+
+#### Consultas úteis para este projeto
+
+```sql
+-- Listar tabelas e o esquema
+.tables
+.schema
+
+-- Reservas (as do painel de administração)
+SELECT id, reference, name, date, time, guests, created_at
+FROM reservations
+ORDER BY created_at DESC;
+
+-- Mensagens de contacto
+SELECT id, nome, email, assunto, created_at FROM contacts ORDER BY created_at DESC;
+
+-- Subscritores da newsletter
+SELECT id, email, created_at FROM newsletter ORDER BY created_at DESC;
+
+-- Settings do painel (menu, conteúdo, imagem/logótipo)
+SELECT key, substr(value, 1, 120) AS valor FROM settings;
+```
+
+Cada linha da tabela `settings` guarda o JSON completo de uma chave (`menu_items`, `site_content`, `image_asset_overrides`) — para ler tudo usa `SELECT key, value FROM settings;`.
+
+> **Backups:** `turso db shell boca-maldita .dump > dump.sql` cria uma fotografia SQL completa da base (para restaurar: `turso db shell boca-maldita < dump.sql`). Recomendo guardar um dump de vez em quando.
+
+#### Opção 3 — API do próprio site
+
+Sem acesso à conta Turso, dá para ler os dados via API pública:
+`https://bmaldita.vercel.app/api/menus` e `.../api/site-content` (públicos), e as listas do painel `.../api/admin/reservations|contacts|newsletter` (com o header `X-Admin-Token`).
+
 ### 4.4. Como obter o URL e o token (se um dia precisares de regenerar)
 
 **Opção A — Dashboard (recomendado, funciona em qualquer sistema):**
@@ -289,6 +349,7 @@ npm run start            # corre só a API (dev)
 npx vercel env ls production        # lista env vars da produção
 npx vercel logs https://bmaldita.vercel.app   # logs da produção
 npx vercel --prod --yes  # redeploy
+turso db shell boca-maldita         # consultar a base (ver secção 4.6)
 ```
 
 ---
