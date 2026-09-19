@@ -256,6 +256,13 @@ export async function createApp(): Promise<AppInstance> {
     }
   });
 
+  app.get('/api/admin/verify-token', (_req: Request, res: Response) => {
+    if (!adminToken || _req.headers['x-admin-token'] !== adminToken) {
+      return adminUnauthorized(res);
+    }
+    res.json({ ok: true });
+  });
+
   app.get('/api/admin/assets', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const raw = await storage.getSetting(IMAGE_OVERRIDES_KEY);

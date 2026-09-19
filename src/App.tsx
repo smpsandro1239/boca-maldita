@@ -15,7 +15,7 @@ import ContactScreen from './screens/ContactScreen';
 import * as api from './lib/api';
 import { SiteProvider, DEFAULT_SITE_CONTENT, computeAssets } from './context/SiteContext';
 import AdminPanel from './components/AdminPanel';
-import { Link as LinkIcon, Check } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
@@ -35,9 +35,50 @@ export default function App() {
   const [adminEnabled, setAdminEnabled] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isAdminLoginOpen, setIsAdminLoginOpen] = useState(false);
+  const [isAdminAuthorized, setIsAdminAuthorized] = useState(false);
+  const [isAdminVerifying, setIsAdminVerifying] = useState(true);
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [adminToken, setAdminToken] = useState<string>(() => sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '');
+
+  useEffect(() => {
+    const token = adminToken.trim();
+    if (!token) {
+      setIsAdminAuthorized(false);
+      setIsAdminVerifying(false);
+      return;
+    }
+    setIsAdminVerifying(true);
+    let cancelled = false;
+    api
+      .verifyAdminToken(token)
+      .then(() => {
+        if (!cancelled) setIsAdminAuthorized(true);
+      })
+      .catch(() => {
+        if (!cancelled) setIsAdminAuthorized(false);
+      })
+      .finally(() => {
+        if (!cancelled) setIsAdminVerifying(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [adminToken]);
+
+  useEffect(() => {
+    const isAdminPath = window.location.pathname.replace(/\/+$/, '').toLowerCase() === '/admin';
+    if (!isAdminPath) return;
+    if (isAdminVerifying) return;
+    if (isAdminAuthorized) {
+      setIsAdminLoginOpen(false);
+      setIsAdminPanelOpen(true);
+    } else {
+      setIsAdminPanelOpen(false);
+      setIsAdminLoginOpen(true);
+    }
+  }, [isAdminAuthorized, isAdminVerifying]);
 
   const refreshAssets = useCallback(async () => {
     try {
@@ -175,18 +216,6 @@ export default function App() {
           )}
         </main>
 
-        <aside aria-label="Acesso rápido ao painel de administração">
-          <button
-            type="button"
-            onClick={() => setIsAdminPanelOpen(true)}
-            className="fixed bottom-6 right-6 z-40 bg-[#141518] hover:bg-[#D4A373] text-[#D4A373] hover:text-[#0C0D0E] border border-[#282A30] hover:border-[#D4A373] p-3 shadow-2xl flex items-center gap-2 transition-all duration-300 group focus:outline-none"
-            title="Painel de Administração"
-          >
-            <LinkIcon className="w-4 h-4 group-hover:scale-110 transition-transform" />
-            <span className="text-xs uppercase font-semibold tracking-wider hidden sm:inline">Administração</span>
-          </button>
-        </aside>
-
         <Footer
           onNavigate={handleNavigate}
           contactEmail={siteContent.contactEmail}
@@ -207,6 +236,19 @@ export default function App() {
           showToast={showToast}
         />
 
+        {isAdminLoginOpen && (
+          <AdminLoginModal
+            token={adminToken}
+            onTokenChange={setAdminToken}
+            onClose={() => setIsAdminLoginOpen(false)}
+            onSuccess={() => {
+              setIsAdminLoginOpen(false);
+              setIsAdminAuthorized(true);
+              setIsAdminPanelOpen(true);
+            }}
+          />
+        )}
+
         <VideoModal
           isOpen={isVideoModalOpen}
           onClose={() => setIsVideoModalOpen(false)}
@@ -224,5 +266,85 @@ export default function App() {
         />
       </div>
     </SiteProvider>
+  );
+}
+
+function AdminLoginModal({
+  token,
+  onTokenChange,
+  onClose,
+  onSuccess,
+}: {
+  token: string;
+  onTokenChange: (token: string) => void;
+  onClose: () => void;
+  onSuccess: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setError(null);
+    const value = token.trim();
+    if (!value) {
+      setError('Introduza o token de administrador.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.verifyAdminToken(value);
+      sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, value);
+      onTokenChange(value);
+      onSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Token de administrador inválido.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/90 p-4" onClick={onClose}>
+      <div className="w-full max-w-sm bg-[#0C0D0E] border border-[#282A30] p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="font-serif text-lg text-[#F7F5F0]">Acesso de Administração</h2>
+          <button type="button" onClick={onClose} className="p-1 text-[#F7F5F0]/60 hover:text-[#F7F5F0]" aria-label="Fechar">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="text-xs text-[#F7F5F0]/50 mb-4">
+          Introduza o token de administrador para aceder ao painel de gestão do Boca Maldita.
+        </p>
+        <input
+          type="password"
+          value={token}
+          onChange={(e) => onTokenChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void submit();
+          }}
+          placeholder="Token de administrador"
+          autoFocus
+          className="w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373] font-mono"
+        />
+        {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+        <div className="flex justify-end gap-2 mt-6">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 bg-[#0C0D0E] border border-[#282A30] text-[#F7F5F0]/70 text-xs uppercase tracking-wider font-semibold hover:border-[#D4A373]/60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={busy}
+            className="px-4 py-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+          >
+            {busy ? 'A verificar…' : 'Entrar'}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

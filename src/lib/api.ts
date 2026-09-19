@@ -85,6 +85,12 @@ export interface AdminAssetsStatus {
   overrides: Record<string, { url: string; scale?: number; px?: number; py?: number }>;
 }
 
+export function verifyAdminToken(token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/verify-token', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
 export function getAdminAssets(): Promise<AdminAssetsStatus> {
   return request<AdminAssetsStatus>('/admin/assets');
 }
