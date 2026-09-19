@@ -4,6 +4,26 @@ Website oficial do restaurante **Boca Maldita**, em Vila de Prado, Vila Verde. T
 
 **Em produção:** https://bmaldita.vercel.app
 
+<img src="screenshots/inicio/screencapture-bmaldita-vercel-app-2026-09-19-10_42_30.png" alt="Boca Maldita — homepage" width="100%" />
+
+## Screenshots
+
+### Site público
+
+| | |
+| --- | --- |
+| <img src="screenshots/o-restaurante/screencapture-bmaldita-vercel-app-2026-09-19-10_42_55.png" alt="O Restaurante" width="100%" /> | <img src="screenshots/menu/screencapture-bmaldita-vercel-app-2026-09-19-10_43_18.png" alt="Menu &amp; Carne" width="100%" /> |
+| <img src="screenshots/experiencia/screencapture-bmaldita-vercel-app-2026-09-19-10_43_32.png" alt="Experiência Gastronómica" width="100%" /> | <img src="screenshots/reservas/screencapture-bmaldita-vercel-app-2026-09-19-10_45_25.png" alt="Reservas" width="100%" /> |
+| <img src="screenshots/contactos/screencapture-bmaldita-vercel-app-2026-09-19-10_43_44.png" alt="Contactos" width="100%" /> | |
+
+### Painel de administração
+
+| | |
+| --- | --- |
+| <img src="screenshots/admin/screencapture-bmaldita-vercel-app-2026-09-19-10_44_02.png" alt="Painel de administração" width="100%" /> | <img src="screenshots/admin/screencapture-bmaldita-vercel-app-2026-09-19-10_44_17.png" alt="Painel de administração" width="100%" /> |
+| <img src="screenshots/admin/screencapture-bmaldita-vercel-app-2026-09-19-10_44_26.png" alt="Painel de administração" width="100%" /> | <img src="screenshots/admin/screencapture-bmaldita-vercel-app-2026-09-19-10_44_34.png" alt="Painel de administração" width="100%" /> |
+| <img src="screenshots/admin/screencapture-bmaldita-vercel-app-2026-09-19-10_44_48.png" alt="Painel de administração" width="100%" /> | <img src="screenshots/admin/screencapture-bmaldita-vercel-app-2026-09-19-10_44_56.png" alt="Painel de administração" width="100%" /> |
+
 ## Stack
 
 - **Frontend:** React 19, TypeScript, Vite 6, Tailwind CSS 4, lucide-react
