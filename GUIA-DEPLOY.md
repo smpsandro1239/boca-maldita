@@ -98,7 +98,7 @@ O código (`api/lib/storage.ts`) cria o esquema **automaticamente na primeira ut
 
 > Acessório importante: se **não** houver `TURSO_URL`/`TURSO_AUTH_TOKEN`, em produção cai em memória (e avisa no log: `[storage] VERCEL sem Turso configurado — a usar armazenamento em memória (não persistente)`). **Sempre** configurar Turso para ter persistência.
 
-### 4.6. Como consultar a base de dados
+### 4.4. Como consultar a base de dados
 
 Os dados estão todos no SQLite da Turso. Para os ver, tens três caminhos (o 1º e o 2º são os principais).
 
@@ -158,7 +158,7 @@ Cada linha da tabela `settings` guarda o JSON completo de uma chave (`menu_items
 Sem acesso à conta Turso, dá para ler os dados via API pública:
 `https://bmaldita.vercel.app/api/menus` e `.../api/site-content` (públicos), e as listas do painel `.../api/admin/reservations|contacts|newsletter` (com o header `X-Admin-Token`).
 
-### 4.4. Como obter o URL e o token (se um dia precisares de regenerar)
+### 4.5. Como obter o URL e o token (se um dia precisares de regenerar)
 
 **Opção A — Dashboard (recomendado, funciona em qualquer sistema):**
 
@@ -178,7 +178,7 @@ turso db tokens create boca-maldita # imprime o token "eyJ..." (só aparece uma 
 
 > **Nota Windows nativo:** o CLI oficial **não tem build nativa para Windows** (apenas para `tursodb`, a shell SQL). É por isso que na máquina Windows de origem usámos um container Docker/Linux para criar a base. No dia-a-dia, o **painel web** (Opção A) resolve tudo sem instalar nada.
 
-### 4.5. Rodar de outro local com a MESMA base de dados
+### 4.6. Rodar de outro local com a MESMA base de dados
 
 Como a base vive na nuvem, um computador novo **não faz cópias, liga-se** à mesma base:
 
@@ -257,6 +257,42 @@ Depois de mudar alguma variável de ambiente, é sempre preciso **redeploy** (`n
 - `outputDirectory`: `dist`.
 - Rewrites: `/api/*` → `api`; tudo o resto → `index.html` (SPA).
 
+### 6.5. Usar o teu próprio domínio (ex.: `bocamaldita.pt`)
+
+**Custos:** adicionar um domínio próprio na Vercel é **grátis no plano Hobby** (inclui até 50 domínios por projeto e certificado SSL automático). O **único** custo é a **própria inscrição do domínio** no registar (já tens `bocamaldita.pt`) e a sua renovação anual — nada é cobrado pela Vercel.
+
+> ⚠️ **Não basta mudar o `.env`.** O `.env` local só afeta o teu computador (dev). Para produção é preciso (a) adicionar o domínio na Vercel, (b) apontar o DNS, e (c) atualizar a variavel `APP_URL` **na Vercel** e fazer redeploy. No código **não existe** nenhum endereço fixo do site (verificado: só a env var `APP_URL` é usada, pelo CORS), portanto **não há mais nada para alterar**.
+
+#### Passo a passo (o mais simples — forma A: DNS da Vercel)
+
+1. **Vercel → Projeto `bmaldita` → Settings → Domains → «Add»** e escreve `bocamaldita.pt` (se quiseres, adiciona também `www.bocamaldita.pt`).
+2. No painel de **DNS.PT** (registar oficial de `.pt` onde geres o domínio), muda os **nameservers** para os que a Vercel mostra (ex.: `ns1.vercel-dns.com`, `ns2.vercel-dns.com`).
+3. Aguarda a propagação (minutos a algumas horas). A Vercel verifica sozinha, marca o domínio como **Valid Configuration** e emite o certificado SSL gratuitamente.
+
+> ⚠️ **Forma A substitui todo o teu DNS (email, outros serviços)** desse domínio. Se o `bocamaldita.pt` já for usado para email (MX, SPF) ou outros serviços, prefere a **forma B**.
+
+#### Forma B — manter o teu DNS atual (menos disruptiva, recomendada se o domínio já tem email/serviços)
+
+1. **Vercel → Settings → Domains → Add** `bocamaldita.pt` (+ `www.bocamaldita.pt`).
+2. No painel do registar (DNS.PT), adiciona um **registo A** para o domínio principal e para `www` com o endereço IP que a Vercel mostra (tipicamente `76.76.21.21`), ou um **CNAME** `www` → `cname.vercel-dns.com`.
+3. Se a Vercel pedir **verificação TXT** (acontece em domínios `.pt` / domínios registados noutro local), adiciona o registo **TXT** indicado no registar e clica em **Verify**.
+4. Quando o estado aparecer **Valid Configuration**, o domínio está ativo.
+
+#### Atualizar a APP_URL (depois do domínio ativo)
+
+```bash
+npx vercel env add APP_URL production    # valor: https://bocamaldita.pt
+npx vercel --prod --yes                  # redeploy para aplicar
+```
+
+(O ficheiro `.env` local só importa para desenvolvimento — atualiza-o também se usares CORS em dev.)
+
+#### Depois da troca
+
+- O site continua igual em `http://bmaldita.vercel.app` (a Vercel mantém o alias automático). Para redirecionar o velho domínio para o novo: **Settings → Domains → Redirects** (301) — opcional.
+- **Os dados não mudam nada:** toda a informação continua na base Turso.
+- **Desfazer:** basta remover o domínio em **Settings → Domains** e reverter `APP_URL` + redeploy.
+
 ---
 
 ## 7. Alternativa: VPS / computador sempre ligado (self-hosting)
@@ -310,7 +346,62 @@ Continua a ser o **Turso** — nenhuma configuração extra no servidor. As tabe
 
 ---
 
-## 8. Checklist final "rodar do zero noutro local"
+## 8. Custos — o que tem e o que não tem custo
+
+**Situação atual: custo mensal €0** — tudo está em planos gratuitos.
+
+### 8.1. Base de dados Turso — €0/mês
+
+A base `boca-maldita` está no plano **Free** (o dashboard/API mostra `plan_id: starter`, nome interno do gratuito). Limites do Free (verificados 2026):
+
+| Recurso | Limite Free | O nosso uso |
+| --- | --- | --- |
+| Bases de dados | 100 | 1 |
+| Armazenamento | 5 GB | <1 MB |
+| Rows lidas / mês | 500 milhões | quase zero |
+| Rows escritas / mês | 10 milhões | algumas |
+| Syncs / mês | 3 GB | mínimo |
+
+Sem cartão de crédito. Se um limite for excedido no Free, a base **bloqueia** (não cobra). Planos pagos: Developer a partir de **$4.99/mês** (só necessário se cresceres muito).
+
+### 8.2. Hosting Vercel — €0/mês
+
+O projeto `bmaldita` está no plano **Hobby** (grátis, sem faturação). Limites incluídos:
+
+| Recurso | Limite Hobby |
+| --- | --- |
+| Invocações de função | 1 milhão / mês |
+| Active CPU | 4 CPU-horas / mês |
+| Memória provisionada | 360 GB-hrs / mês |
+| Transferência de dados | 100 GB / mês |
+| Builds | 6.000 min / mês |
+| Domínios por projeto | 50 (grátis) |
+
+No Hobby não há faturação em excesso: exceder limites pausa funcionalidades até ao ciclo seguinte. Pro paga-se apenas se quiseres (a partir de $20/mês).
+
+### 8.3. Tudo de que o projeto depende
+
+| Dependência | Papel | Custo hoje | Quando começaria a custar |
+| --- | --- | --- | --- |
+| Turso (base) | Base de dados | **Grátis** | Exceder limites Free → plano pago $4.99/mo |
+| Vercel (hosting) | Site + API | **Grátis** (Hobby) | Exceder limites/funcionalidades → Pro $20/mo |
+| Domínio `bocamaldita.pt` | Endereço próprio | Já teu (inscrição + renovação anual no registar) | Renovação anual no DNS.PT |
+| Domínio `*.vercel.app` | Endereço automático | **Grátis** | — |
+| GitHub | Repositório e git | **Grátis** | — |
+| Gmail (SMTP) | Envio de emails | **Grátis** | — |
+| GitHub/Google (login) | Contas | **Grátis** | — |
+| Certificado SSL | HTTPS | **Grátis** (Vercel/Let's Encrypt) | — |
+| Node.js + npm (express, react, vite, @libsql/client, nodemailer…) | Stack | **Grátis** (open source) | — |
+| CLI Turso / Docker | Ferramentas de criação/consulta (usadas aqui) | **Grátis** | — |
+
+### 8.4. Custos potenciais (opcionais, não atuais)
+
+- **Renovação do domínio** `bocamaldita.pt` — já é teu; custo de renovação no registar (DNS.PT), ex.: ~10€/ano.
+- **VPS** (opção de self-hosting, secção 7) — ~€3–10/mês se um dia quiseres sair da Vercel; hoje não usamos.
+
+---
+
+## 9. Checklist final "rodar do zero noutro local"
 
 - [ ] Node.js ≥ 20 instalado
 - [ ] `git clone` do repositório
@@ -325,7 +416,7 @@ Continua a ser o **Turso** — nenhuma configuração extra no servidor. As tabe
 
 ---
 
-## 9. Resolução de problemas
+## 10. Resolução de problemas
 
 | Sintoma | Causa provável | Solução |
 | --- | --- | --- |
@@ -336,10 +427,11 @@ Continua a ser o **Turso** — nenhuma configuração extra no servidor. As tabe
 | Emails chegam à pasta Spam | Autenticação de remetente (SPF/DKIM) do Gmail | É normal neste setup com `MAIL_FROM` via Gmail; não bloqueia o funcionamento |
 | `vercel env rm SМTP_PASS` pede confirmação | Remoção interativa | Usar `--yes` |
 | Logs com `DEP0169 url.parse()` | Warning de dependência do node (cosmético) | Ignorar — não afeta o funcionamento |
+| Domínio próprio não fica *Valid Configuration* / a API devolve CORS | DNS ainda a propagar, ou `APP_URL` em falta na Vercel | Aguardar DNS e repetir; depois atualizar `APP_URL` na Vercel + redeploy (secção 6.5) |
 
 ---
 
-## 10. Comandos úteis
+## 11. Comandos úteis
 
 ```bash
 npm run dev              # dev local (API 3001 + site 3000)
@@ -349,12 +441,12 @@ npm run start            # corre só a API (dev)
 npx vercel env ls production        # lista env vars da produção
 npx vercel logs https://bmaldita.vercel.app   # logs da produção
 npx vercel --prod --yes  # redeploy
-turso db shell boca-maldita         # consultar a base (ver secção 4.6)
+turso db shell boca-maldita         # consultar a base (ver secção 4.4)
 ```
 
 ---
 
-## 11. Segurança — regras de ouro
+## 12. Segurança — regras de ouro
 
 1. **Nunca commitar** `.env`, `.env.local` nem segredos (estão no `.gitignore`; `.env.example` é o único modelo público).
 2. O `TURSO_AUTH_TOKEN` e a app password do Gmail são segredos — só no `.env`/Vercel.
