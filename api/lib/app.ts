@@ -3,7 +3,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
-import { assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationSchema, siteContentSchema, siteSettingsSchema } from './validation';
+import { assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
 import { sendReservationConfirmation } from './email';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -16,7 +16,21 @@ const IMAGE_OVERRIDES_KEY = 'image_asset_overrides';
 const SITE_CONTACT_EMAIL_KEY = 'site_contact_email';
 const MENU_ITEMS_KEY = 'menu_items';
 const SITE_CONTENT_KEY = 'site_content';
+const RESERVATION_PROTECTION_KEY = 'reservation_protection';
 const DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? '').trim() || 'smpsandro1239@gmail.com';
+
+const CHECK_ANSWER = '7';
+const RATE_WINDOW_MS = 15 * 60 * 1000;
+const RATE_MAX_HITS = 5;
+
+const DEFAULT_RESERVATION_PROTECTION: ReservationProtectionInput = {
+  enabled: false,
+  pauseForm: false,
+  dailyCapacity: 40,
+  maxPerClient: 2,
+  rateLimit: true,
+  requireCheck: true,
+};
 
 const DEFAULT_SITE_CONTENT: Record<string, string> = {
   contactEmail: DEFAULT_CONTACT_EMAIL,
@@ -40,6 +54,32 @@ function parseStoredJson(raw: string | null): Record<string, unknown> {
   } catch {
     return {};
   }
+}
+
+function getClientIp(req: Request): string {
+  const fwd = req.headers['x-forwarded-for'];
+  if (typeof fwd === 'string' && fwd) {
+    const first = fwd.split(',')[0].trim();
+    if (first) return first;
+  }
+  return req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+}
+
+function parseReservationProtection(raw: string | null): ReservationProtectionInput {
+  const parsed = parseStoredJson(raw);
+  return {
+    enabled: parsed.enabled === true,
+    pauseForm: parsed.pauseForm === true,
+    dailyCapacity: typeof parsed.dailyCapacity === 'number' && parsed.dailyCapacity > 0 ? parsed.dailyCapacity : DEFAULT_RESERVATION_PROTECTION.dailyCapacity,
+    maxPerClient: typeof parsed.maxPerClient === 'number' && parsed.maxPerClient > 0 ? parsed.maxPerClient : DEFAULT_RESERVATION_PROTECTION.maxPerClient,
+    rateLimit: parsed.rateLimit !== false,
+    requireCheck: parsed.requireCheck !== false,
+  };
+}
+
+async function getReservationProtection(storage: Storage): Promise<ReservationProtectionInput> {
+  const raw = await storage.getSetting(RESERVATION_PROTECTION_KEY);
+  return parseReservationProtection(raw);
 }
 
 const adminToken = (process.env.ADMIN_TOKEN ?? '').trim();
@@ -73,6 +113,19 @@ export async function createApp(): Promise<AppInstance> {
   app.disable('x-powered-by');
   app.use(express.json({ limit: '200kb' }));
 
+  const ipHits = new Map<string, { count: number; startedAt: number }>();
+  function allowIpHit(ip: string | undefined): boolean {
+    if (!ip) return true;
+    const now = Date.now();
+    const entry = ipHits.get(ip);
+    if (!entry || now - entry.startedAt >= RATE_WINDOW_MS) {
+      ipHits.set(ip, { count: 1, startedAt: now });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= RATE_MAX_HITS;
+  }
+
   app.use((req: Request, res: Response, next: NextFunction) => {
     const allowed = process.env.APP_URL ?? 'http://localhost:3000';
     const origin = req.headers.origin;
@@ -94,13 +147,52 @@ export async function createApp(): Promise<AppInstance> {
     res.json({ status: 'ok', database: storage.isOpen() });
   });
 
+  app.get('/api/reservations-config', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const protection = await getReservationProtection(storage);
+      res.json({
+        protectionEnabled: protection.enabled,
+        paused: protection.enabled && protection.pauseForm,
+        requireCheck: protection.enabled && protection.requireCheck,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.post('/api/reservations', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const parsed = reservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
       }
-      const { id, reference } = await storage.createReservation(parsed.data);
+      const protection = await getReservationProtection(storage);
+      let ip: string | undefined;
+      if (protection.enabled) {
+        ip = getClientIp(req);
+        if (protection.pauseForm) {
+          return res.status(423).json({
+            error: 'As reservas online estão temporariamente pausadas. Ligue +351 253 031 890 para reservar.',
+          });
+        }
+        if (protection.requireCheck) {
+          const checkOk = parsed.data.check === CHECK_ANSWER;
+          const honeypotEmpty = !parsed.data.honeypot;
+          if (!checkOk || !honeypotEmpty) {
+            return res.status(400).json({ error: 'Verificação anti-robô incorreta. Tente de novo.' });
+          }
+        }
+        if (protection.rateLimit && !allowIpHit(ip)) {
+          return res.status(429).json({ error: 'Demasiados pedidos de reserva. Aguarde alguns minutos.' });
+        }
+        if ((await storage.countByDate(parsed.data.date)) >= protection.dailyCapacity) {
+          return res.status(409).json({ error: 'Lotação esgotada para esta data. Tente outra data ou ligue +351 253 031 890.' });
+        }
+        if ((await storage.countByClientOnDate(parsed.data.date, parsed.data.email, parsed.data.phone)) >= protection.maxPerClient) {
+          return res.status(409).json({ error: 'Já existem reservas para esta data com este contacto.' });
+        }
+      }
+      const { id, reference } = await storage.createReservation(parsed.data, { ip });
       sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
         console.error('[email] Falha no envio de confirmação:', err);
       });
@@ -286,6 +378,33 @@ export async function createApp(): Promise<AppInstance> {
       }
       await storage.setSetting(SITE_CONTENT_KEY, JSON.stringify(parsed.data));
       await storage.setSetting(SITE_CONTACT_EMAIL_KEY, parsed.data.contactEmail);
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/admin/reservation-protection', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      res.json(await getReservationProtection(storage));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/admin/reservation-protection', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = reservationProtectionSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      await storage.setSetting(RESERVATION_PROTECTION_KEY, JSON.stringify(parsed.data));
       res.json({ ok: true });
     } catch (err) {
       next(err);

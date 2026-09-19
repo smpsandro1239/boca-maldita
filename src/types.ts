@@ -71,6 +71,8 @@ export interface ReservationAdminRow {
   area: string;
   occasion: string;
   notes: string;
+  status: string;
+  ip_address?: string;
   created_at: string;
 }
 
@@ -99,4 +101,21 @@ export interface ReservationData {
   area: string;
   occasion: string;
   notes?: string;
+  check?: string;
+  honeypot?: string;
+}
+
+export interface PublicReservationConfig {
+  protectionEnabled: boolean;
+  paused: boolean;
+  requireCheck: boolean;
+}
+
+export interface ReservationProtectionConfig {
+  enabled: boolean;
+  pauseForm: boolean;
+  dailyCapacity: number;
+  maxPerClient: number;
+  rateLimit: boolean;
+  requireCheck: boolean;
 }

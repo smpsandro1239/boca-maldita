@@ -22,6 +22,8 @@ var TABLE_SCHEMA = `
     area TEXT NOT NULL,
     occasion TEXT NOT NULL,
     notes TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'confirmed',
+    ip_address TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -52,6 +54,9 @@ var UPSERT_SETTING_SQL = `
 function toReference(count) {
   return `BM-${String(count + 1).padStart(4, "0")}`;
 }
+function normalizePhone(value) {
+  return value.replace(/[\s-]/g, "").replace(/^\+/, "");
+}
 async function createSqliteStorage() {
   const { DatabaseSync } = await import("node:sqlite");
   const dbPath = process.env.DB_PATH ?? "data/boca-maldita.db";
@@ -59,21 +64,40 @@ async function createSqliteStorage() {
   const db = new DatabaseSync(dbPath);
   db.exec(`PRAGMA journal_mode = WAL;
 ${TABLE_SCHEMA}`);
+  const reservationColumns = () => {
+    const cols = db.prepare("PRAGMA table_info(reservations)").all();
+    return new Set(cols.map((c) => c.name));
+  };
   return {
     async init() {
+      const cols = reservationColumns();
+      if (!cols.has("status")) db.exec(`ALTER TABLE reservations ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'`);
+      if (!cols.has("ip_address")) db.exec(`ALTER TABLE reservations ADD COLUMN ip_address TEXT`);
     },
-    async createReservation(input) {
+    async createReservation(input, meta) {
       const { count } = db.prepare("SELECT COUNT(*) AS count FROM reservations").get();
       const reference = toReference(count);
       const info = db.prepare(
-        `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "");
+        `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`
+      ).run(reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", meta?.ip ?? null);
       return { id: Number(info.lastInsertRowid), reference };
+    },
+    async countByDate(date) {
+      const { count } = db.prepare("SELECT COUNT(*) AS count FROM reservations WHERE date = ?").get(date);
+      return Number(count);
+    },
+    async countByClientOnDate(date, email, phone) {
+      const phoneNorm = normalizePhone(phone);
+      const { count } = db.prepare(
+        `SELECT COUNT(*) AS count FROM reservations
+           WHERE date = ? AND (lower(email) = lower(?) OR replace(replace(phone, ' ', ''), '-', '') = ?)`
+      ).get(date, email, phoneNorm);
+      return Number(count);
     },
     async listReservations() {
       const rows = db.prepare(
-        `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, created_at
+        `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address, created_at
            FROM reservations ORDER BY id DESC`
       ).all();
       return rows;
@@ -131,21 +155,42 @@ function createTursoStorage(client) {
   return {
     async init() {
       await client.executeMultiple(TABLE_SCHEMA);
+      const cols = await client.execute({ sql: "PRAGMA table_info(reservations)" });
+      const names = new Set(cols.rows.map((r) => String(r.name ?? "")));
+      if (!names.has("status")) {
+        await client.execute({ sql: "ALTER TABLE reservations ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'" });
+      }
+      if (!names.has("ip_address")) {
+        await client.execute({ sql: "ALTER TABLE reservations ADD COLUMN ip_address TEXT" });
+      }
     },
-    async createReservation(input) {
+    async createReservation(input, meta) {
       const { rows } = await client.execute("SELECT COUNT(*) AS count FROM reservations");
       const count = Number(rows[0]?.count ?? 0);
       const reference = toReference(count);
       const result = await client.execute({
-        sql: `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? ""]
+        sql: `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
+        args: [reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", meta?.ip ?? null]
       });
       return { id: Number(result.lastInsertRowid), reference };
     },
+    async countByDate(date) {
+      const { rows } = await client.execute({ sql: "SELECT COUNT(*) AS count FROM reservations WHERE date = ?", args: [date] });
+      return Number(rows[0]?.count ?? 0);
+    },
+    async countByClientOnDate(date, email, phone) {
+      const phoneNorm = normalizePhone(phone);
+      const { rows } = await client.execute({
+        sql: `SELECT COUNT(*) AS count FROM reservations
+              WHERE date = ? AND (lower(email) = lower(?) OR replace(replace(phone, ' ', ''), '-', '') = ?)`,
+        args: [date, email, phoneNorm]
+      });
+      return Number(rows[0]?.count ?? 0);
+    },
     async listReservations() {
       const { rows } = await client.execute({
-        sql: `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, created_at
+        sql: `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address, created_at
               FROM reservations ORDER BY id DESC`
       });
       return rows;
@@ -228,7 +273,7 @@ function createMemoryStorage() {
   return {
     async init() {
     },
-    async createReservation(input) {
+    async createReservation(input, meta) {
       maxId.reservations += 1;
       const reference = toReference(maxId.reservations - 1);
       reservations.push({
@@ -243,9 +288,20 @@ function createMemoryStorage() {
         area: input.area,
         occasion: input.occasion,
         notes: input.notes ?? "",
+        status: "confirmed",
+        ip_address: meta?.ip ?? "",
         created_at: createdAt()
       });
       return { id: maxId.reservations, reference };
+    },
+    async countByDate(date) {
+      return reservations.filter((r) => r.date === date).length;
+    },
+    async countByClientOnDate(date, email, phone) {
+      const phoneNorm = normalizePhone(phone);
+      return reservations.filter(
+        (r) => r.date === date && (r.email.toLowerCase() === email.toLowerCase() || normalizePhone(r.phone) === phoneNorm)
+      ).length;
     },
     async listReservations() {
       return reservations.map((r) => ({ ...r })).reverse();
@@ -369,7 +425,17 @@ var reservationSchema = z.object({
   guests: z.number().int("N\xFAmero de convidados inv\xE1lido.").min(1).max(16, "M\xE1ximo de 16 convidados por reserva."),
   area: z.string().trim().min(2, "Selecione uma \xE1rea do restaurante.").max(120),
   occasion: z.string().trim().min(1, "A ocasi\xE3o \xE9 obrigat\xF3ria.").max(120),
-  notes: z.string().trim().max(1e3, "Notas demasiado longas.").optional().default("")
+  notes: z.string().trim().max(1e3, "Notas demasiado longas.").optional().default(""),
+  check: z.string().trim().max(20).optional().default(""),
+  honeypot: z.string().trim().max(200).optional().default("")
+}).strict();
+var reservationProtectionSchema = z.object({
+  enabled: z.boolean(),
+  pauseForm: z.boolean(),
+  dailyCapacity: z.number().int("Capacidade inv\xE1lida.").min(1).max(1e4, "Capacidade demasiado alta."),
+  maxPerClient: z.number().int("Limite inv\xE1lido.").min(1).max(100, "Limite demasiado alto."),
+  rateLimit: z.boolean(),
+  requireCheck: z.boolean()
 }).strict();
 var contactSchema = z.object({
   nome: nameField,
@@ -504,7 +570,19 @@ var IMAGE_OVERRIDES_KEY = "image_asset_overrides";
 var SITE_CONTACT_EMAIL_KEY = "site_contact_email";
 var MENU_ITEMS_KEY = "menu_items";
 var SITE_CONTENT_KEY = "site_content";
+var RESERVATION_PROTECTION_KEY = "reservation_protection";
 var DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? "").trim() || "smpsandro1239@gmail.com";
+var CHECK_ANSWER = "7";
+var RATE_WINDOW_MS = 15 * 60 * 1e3;
+var RATE_MAX_HITS = 5;
+var DEFAULT_RESERVATION_PROTECTION = {
+  enabled: false,
+  pauseForm: false,
+  dailyCapacity: 40,
+  maxPerClient: 2,
+  rateLimit: true,
+  requireCheck: true
+};
 var DEFAULT_SITE_CONTENT = {
   contactEmail: DEFAULT_CONTACT_EMAIL,
   phone: "",
@@ -526,6 +604,29 @@ function parseStoredJson(raw) {
   } catch {
     return {};
   }
+}
+function getClientIp(req) {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd) {
+    const first = fwd.split(",")[0].trim();
+    if (first) return first;
+  }
+  return req.ip ?? req.socket?.remoteAddress ?? "unknown";
+}
+function parseReservationProtection(raw) {
+  const parsed = parseStoredJson(raw);
+  return {
+    enabled: parsed.enabled === true,
+    pauseForm: parsed.pauseForm === true,
+    dailyCapacity: typeof parsed.dailyCapacity === "number" && parsed.dailyCapacity > 0 ? parsed.dailyCapacity : DEFAULT_RESERVATION_PROTECTION.dailyCapacity,
+    maxPerClient: typeof parsed.maxPerClient === "number" && parsed.maxPerClient > 0 ? parsed.maxPerClient : DEFAULT_RESERVATION_PROTECTION.maxPerClient,
+    rateLimit: parsed.rateLimit !== false,
+    requireCheck: parsed.requireCheck !== false
+  };
+}
+async function getReservationProtection(storage) {
+  const raw = await storage.getSetting(RESERVATION_PROTECTION_KEY);
+  return parseReservationProtection(raw);
 }
 var adminToken = (process.env.ADMIN_TOKEN ?? "").trim();
 function adminUnauthorized(res) {
@@ -549,6 +650,18 @@ async function createApp() {
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "200kb" }));
+  const ipHits = /* @__PURE__ */ new Map();
+  function allowIpHit(ip) {
+    if (!ip) return true;
+    const now = Date.now();
+    const entry = ipHits.get(ip);
+    if (!entry || now - entry.startedAt >= RATE_WINDOW_MS) {
+      ipHits.set(ip, { count: 1, startedAt: now });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= RATE_MAX_HITS;
+  }
   app.use((req, res, next) => {
     const allowed = process.env.APP_URL ?? "http://localhost:3000";
     const origin = req.headers.origin;
@@ -568,13 +681,51 @@ async function createApp() {
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", database: storage.isOpen() });
   });
+  app.get("/api/reservations-config", async (_req, res, next) => {
+    try {
+      const protection = await getReservationProtection(storage);
+      res.json({
+        protectionEnabled: protection.enabled,
+        paused: protection.enabled && protection.pauseForm,
+        requireCheck: protection.enabled && protection.requireCheck
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
   app.post("/api/reservations", async (req, res, next) => {
     try {
       const parsed = reservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
       }
-      const { id, reference } = await storage.createReservation(parsed.data);
+      const protection = await getReservationProtection(storage);
+      let ip;
+      if (protection.enabled) {
+        ip = getClientIp(req);
+        if (protection.pauseForm) {
+          return res.status(423).json({
+            error: "As reservas online est\xE3o temporariamente pausadas. Ligue +351 253 031 890 para reservar."
+          });
+        }
+        if (protection.requireCheck) {
+          const checkOk = parsed.data.check === CHECK_ANSWER;
+          const honeypotEmpty = !parsed.data.honeypot;
+          if (!checkOk || !honeypotEmpty) {
+            return res.status(400).json({ error: "Verifica\xE7\xE3o anti-rob\xF4 incorreta. Tente de novo." });
+          }
+        }
+        if (protection.rateLimit && !allowIpHit(ip)) {
+          return res.status(429).json({ error: "Demasiados pedidos de reserva. Aguarde alguns minutos." });
+        }
+        if (await storage.countByDate(parsed.data.date) >= protection.dailyCapacity) {
+          return res.status(409).json({ error: "Lota\xE7\xE3o esgotada para esta data. Tente outra data ou ligue +351 253 031 890." });
+        }
+        if (await storage.countByClientOnDate(parsed.data.date, parsed.data.email, parsed.data.phone) >= protection.maxPerClient) {
+          return res.status(409).json({ error: "J\xE1 existem reservas para esta data com este contacto." });
+        }
+      }
+      const { id, reference } = await storage.createReservation(parsed.data, { ip });
       sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
         console.error("[email] Falha no envio de confirma\xE7\xE3o:", err);
       });
@@ -747,6 +898,31 @@ async function createApp() {
       }
       await storage.setSetting(SITE_CONTENT_KEY, JSON.stringify(parsed.data));
       await storage.setSetting(SITE_CONTACT_EMAIL_KEY, parsed.data.contactEmail);
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/reservation-protection", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      res.json(await getReservationProtection(storage));
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/reservation-protection", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = reservationProtectionSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      await storage.setSetting(RESERVATION_PROTECTION_KEY, JSON.stringify(parsed.data));
       res.json({ ok: true });
     } catch (err) {
       next(err);

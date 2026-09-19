@@ -18,19 +18,22 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
-import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, SiteContent } from '../types';
+import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationProtectionConfig, SiteContent } from '../types';
 import {
   deleteAdminContact,
   deleteAdminNewsletter,
   deleteAdminReservation,
   getAdminContacts,
   getAdminNewsletter,
+  getAdminReservationProtection,
   getAdminReservations,
   resetAdminAssets,
   resetAdminMenus,
   saveAdminAssets,
   saveAdminMenus,
+  saveAdminReservationProtection,
   saveSiteContent,
 } from '../lib/api';
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
@@ -38,7 +41,7 @@ import { MENU_ITEMS } from '../data/menuData';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
-type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'contactos' | 'newsletter' | 'conteudo';
+type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao';
 
 const CATEGORY_LABELS: Record<string, string> = {
   logo: 'Logótipo',
@@ -81,6 +84,15 @@ const EMPTY_MENU_ITEM: MenuItem = {
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
+
+const DEFAULT_PROTECTION: ReservationProtectionConfig = {
+  enabled: false,
+  pauseForm: false,
+  dailyCapacity: 40,
+  maxPerClient: 2,
+  rateLimit: true,
+  requireCheck: true,
+};
 
 export interface AdminPanelProps {
   isOpen: boolean;
@@ -126,6 +138,7 @@ export default function AdminPanel({
   const [reservations, setReservations] = useState<ReservationAdminRow[]>([]);
   const [contacts, setContacts] = useState<ContactAdminRow[]>([]);
   const [newsletter, setNewsletter] = useState<NewsletterAdminRow[]>([]);
+  const [protection, setProtection] = useState<ReservationProtectionConfig>(DEFAULT_PROTECTION);
 
   useEffect(() => {
     if (isOpen) setImageDrafts(assets);
@@ -150,10 +163,12 @@ export default function AdminPanel({
       getAdminReservations(token).catch(() => null),
       getAdminContacts(token).catch(() => null),
       getAdminNewsletter(token).catch(() => null),
-    ]).then(([r, c, n]) => {
+      getAdminReservationProtection(token).catch(() => null),
+    ]).then(([r, c, n, p]) => {
       if (r) setReservations(r.items);
       if (c) setContacts(c.items);
       if (n) setNewsletter(n.items);
+      if (p) setProtection(p);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, adminToken]);
@@ -248,6 +263,27 @@ export default function AdminPanel({
       },
       'Conteúdo do site publicado.',
     );
+  };
+
+  const handlePublishProtection = () => {
+    void run(
+      'protecao',
+      async () => {
+        await saveAdminReservationProtection(
+          {
+            ...protection,
+            dailyCapacity: Number(protection.dailyCapacity) || DEFAULT_PROTECTION.dailyCapacity,
+            maxPerClient: Number(protection.maxPerClient) || DEFAULT_PROTECTION.maxPerClient,
+          },
+          token,
+        );
+      },
+      protection.enabled ? 'Proteção de reservas ligada.' : 'Proteção de reservas desligada.',
+    );
+  };
+
+  const setProtectionField = <K extends keyof ReservationProtectionConfig>(key: K, value: ReservationProtectionConfig[K]) => {
+    setProtection((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleDeleteReservation = (id: number) => {
@@ -387,6 +423,7 @@ export default function AdminPanel({
     { id: 'contactos', label: 'Contactos', icon: Mail },
     { id: 'newsletter', label: 'Newsletter', icon: Rss },
     { id: 'conteudo', label: 'Conteúdo', icon: Settings },
+    { id: 'protecao', label: 'Proteção', icon: ShieldCheck },
   ];
 
   return (
@@ -696,6 +733,17 @@ export default function AdminPanel({
                       <div>
                         <p className="font-serif text-base text-[#F7F5F0]">
                           {r.name} <span className="text-[#D4A373]">· {r.reference}</span>
+                          {r.status && r.status !== 'confirmed' && (
+                            <span
+                              className={`ml-2 text-[9px] uppercase tracking-widest font-mono px-2 py-0.5 border ${
+                                r.status === 'pending'
+                                  ? 'text-amber-400 border-amber-500/40'
+                                  : 'text-red-400 border-red-500/40'
+                              }`}
+                            >
+                              {r.status === 'pending' ? 'Pendente' : r.status}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-[#F7F5F0]/60 mt-1">
                           {r.date.split('T')[0]} às {r.time} · {r.guests} convidados · {r.area} · {r.occasion}
@@ -815,6 +863,87 @@ export default function AdminPanel({
                   rows={6}
                   className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y"
                 />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'protecao' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60">
+                  Protege contra reservas fraudulentas (robôs / alguém a reservar todas as mesas). És tu quem decide: desligado não muda nada no site; ligado aplica as regras que escolheres.
+                </p>
+                <button
+                  type="button"
+                  onClick={handlePublishProtection}
+                  disabled={busy === 'protecao'}
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                >
+                  {busy === 'protecao' ? 'A guardar…' : <Save className="w-4 h-4" />}
+                  <span>Guardar proteção</span>
+                </button>
+              </div>
+
+              <ProtectionSwitch
+                checked={protection.enabled}
+                onChange={(v) => setProtectionField('enabled', v)}
+                label="Proteção ligada (interruptor geral)"
+                hint={protection.enabled ? 'ATIVO — as regras abaixo são aplicadas a novas reservas.' : 'DESLIGADO — comportamento atual, sem regras.'}
+                important={protection.enabled}
+              />
+
+              <div className={`space-y-3 opacity-100 transition-opacity ${protection.enabled ? '' : 'opacity-40 pointer-events-none'}`}>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-[#D4A373] font-mono">Regras ativas quando ligado</p>
+
+                <ProtectionSwitch
+                  checked={protection.pauseForm}
+                  onChange={(v) => setProtectionField('pauseForm', v)}
+                  label="Pausar reservas online"
+                  hint="Desliga o formulário e mostra «ligue +351 253 031 890» aos visitantes."
+                />
+                <ProtectionSwitch
+                  checked={protection.requireCheck}
+                  onChange={(v) => setProtectionField('requireCheck', v)}
+                  label="Pergunta anti-robô no formulário"
+                  hint="Mostra «Quanto é 3+4?» + campo escondido (honeypot) para travar bots."
+                />
+                <ProtectionSwitch
+                  checked={protection.rateLimit}
+                  onChange={(v) => setProtectionField('rateLimit', v)}
+                  label="Limite de ritmo por IP"
+                  hint="Máximo de 5 pedidos de reserva por 15 minutos e por visitante (aproximado em serverless)."
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">
+                      Capacidade máxima por dia
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={10000}
+                      value={protection.dailyCapacity}
+                      onChange={(e) => setProtectionField('dailyCapacity', Number(e.target.value))}
+                      className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+                    />
+                    <p className="text-[10px] text-[#F7F5F0]/40 mt-1">Acima deste número, o site devolve «Lotação esgotada para esta data».</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">
+                      Máximo por cliente (por dia)
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={protection.maxPerClient}
+                      onChange={(e) => setProtectionField('maxPerClient', Number(e.target.value))}
+                      className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+                    />
+                    <p className="text-[10px] text-[#F7F5F0]/40 mt-1">Limita reservas repetidas na mesma data com o mesmo email/telefone.</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -946,6 +1075,35 @@ function Slider({ label, min, max, step, value, onChange }: SliderProps) {
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full mt-1.5 accent-[#D4A373]"
+      />
+    </label>
+  );
+}
+
+interface ProtectionSwitchProps {
+  checked: boolean;
+  onChange: (value: boolean) => void;
+  label: string;
+  hint: string;
+  important?: boolean;
+}
+
+function ProtectionSwitch({ checked, onChange, label, hint, important }: ProtectionSwitchProps) {
+  return (
+    <label
+      className={`flex items-start justify-between gap-4 bg-[#141518] border p-4 cursor-pointer ${
+        checked && important ? 'border-[#D4A373] bg-[#D4A373]/5' : 'border-[#282A30] hover:border-[#686B73]'
+      }`}
+    >
+      <div>
+        <p className="text-sm text-[#F7F5F0] font-semibold">{label}</p>
+        <p className="text-[11px] text-[#F7F5F0]/50 mt-0.5 leading-snug">{hint}</p>
+      </div>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="w-5 h-5 shrink-0 accent-[#D4A373] mt-0.5 cursor-pointer"
       />
     </label>
   );

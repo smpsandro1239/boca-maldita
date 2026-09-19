@@ -54,6 +54,19 @@ export const reservationSchema = z
     area: z.string().trim().min(2, 'Selecione uma área do restaurante.').max(120),
     occasion: z.string().trim().min(1, 'A ocasião é obrigatória.').max(120),
     notes: z.string().trim().max(1000, 'Notas demasiado longas.').optional().default(''),
+    check: z.string().trim().max(20).optional().default(''),
+    honeypot: z.string().trim().max(200).optional().default(''),
+  })
+  .strict();
+
+export const reservationProtectionSchema = z
+  .object({
+    enabled: z.boolean(),
+    pauseForm: z.boolean(),
+    dailyCapacity: z.number().int('Capacidade inválida.').min(1).max(10000, 'Capacidade demasiado alta.'),
+    maxPerClient: z.number().int('Limite inválido.').min(1).max(100, 'Limite demasiado alto.'),
+    rateLimit: z.boolean(),
+    requireCheck: z.boolean(),
   })
   .strict();
 
@@ -160,6 +173,7 @@ export const siteContentSchema = z
 export const idParamSchema = z.coerce.number().int().positive();
 
 export type ReservationInput = z.infer<typeof reservationSchema>;
+export type ReservationProtectionInput = z.infer<typeof reservationProtectionSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;

@@ -1,4 +1,4 @@
-import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, ReservationAdminRow, SiteContent } from '../types';
+import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationProtectionConfig, SiteContent } from '../types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
@@ -37,10 +37,16 @@ export interface ReservationPayload {
   area: string;
   occasion: string;
   notes?: string;
+  check?: string;
+  honeypot?: string;
 }
 
 export function createReservation(payload: ReservationPayload): Promise<CreateReservationResult> {
   return post<CreateReservationResult>('/reservations', payload);
+}
+
+export function getReservationConfig(): Promise<PublicReservationConfig> {
+  return request<PublicReservationConfig>('/reservations-config');
 }
 
 export interface ContactPayload {
@@ -132,6 +138,20 @@ export function saveSiteContent(content: SiteContent, token: string): Promise<{ 
 export function getAdminReservations(token: string): Promise<{ items: ReservationAdminRow[] }> {
   return request<{ items: ReservationAdminRow[] }>('/admin/reservations', {
     headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function getAdminReservationProtection(token: string): Promise<ReservationProtectionConfig> {
+  return request<ReservationProtectionConfig>('/admin/reservation-protection', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function saveAdminReservationProtection(config: ReservationProtectionConfig, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/reservation-protection', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify(config),
   });
 }
 

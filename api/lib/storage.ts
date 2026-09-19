@@ -19,6 +19,8 @@ export interface ReservationRow {
   area: string;
   occasion: string;
   notes: string;
+  status: string;
+  ip_address: string;
   created_at: string;
 }
 
@@ -39,7 +41,9 @@ export interface NewsletterRow {
 
 export interface Storage {
   init(): Promise<void>;
-  createReservation(input: ReservationInput): Promise<ReservationRecord>;
+  createReservation(input: ReservationInput, meta?: { ip?: string }): Promise<ReservationRecord>;
+  countByDate(date: string): Promise<number>;
+  countByClientOnDate(date: string, email: string, phone: string): Promise<number>;
   listReservations(): Promise<ReservationRow[]>;
   deleteReservation(id: number): Promise<boolean>;
   createContact(input: ContactInput): Promise<{ id: number }>;
@@ -69,6 +73,8 @@ const TABLE_SCHEMA = `
     area TEXT NOT NULL,
     occasion TEXT NOT NULL,
     notes TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'confirmed',
+    ip_address TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -102,6 +108,10 @@ function toReference(count: number): string {
   return `BM-${String(count + 1).padStart(4, '0')}`;
 }
 
+function normalizePhone(value: string): string {
+  return value.replace(/[\s-]/g, '').replace(/^\+/, '');
+}
+
 async function createSqliteStorage(): Promise<Storage> {
   const { DatabaseSync } = await import('node:sqlite');
   const dbPath = process.env.DB_PATH ?? 'data/boca-maldita.db';
@@ -109,23 +119,46 @@ async function createSqliteStorage(): Promise<Storage> {
   const db = new DatabaseSync(dbPath);
   db.exec(`PRAGMA journal_mode = WAL;\n${TABLE_SCHEMA}`);
 
+  const reservationColumns = () => {
+    const cols = db.prepare('PRAGMA table_info(reservations)').all() as Array<{ name: string }>;
+    return new Set(cols.map((c) => c.name));
+  };
+
   return {
-    async init() {},
-    async createReservation(input) {
+    async init() {
+      const cols = reservationColumns();
+      if (!cols.has('status')) db.exec(`ALTER TABLE reservations ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'`);
+      if (!cols.has('ip_address')) db.exec(`ALTER TABLE reservations ADD COLUMN ip_address TEXT`);
+    },
+    async createReservation(input, meta) {
       const { count } = db.prepare('SELECT COUNT(*) AS count FROM reservations').get() as { count: number };
       const reference = toReference(count);
       const info = db
         .prepare(
-          `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
         )
-        .run(reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? '');
+        .run(reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? '', meta?.ip ?? null);
       return { id: Number(info.lastInsertRowid), reference };
+    },
+    async countByDate(date) {
+      const { count } = db.prepare('SELECT COUNT(*) AS count FROM reservations WHERE date = ?').get(date) as { count: number };
+      return Number(count);
+    },
+    async countByClientOnDate(date, email, phone) {
+      const phoneNorm = normalizePhone(phone);
+      const { count } = db
+        .prepare(
+          `SELECT COUNT(*) AS count FROM reservations
+           WHERE date = ? AND (lower(email) = lower(?) OR replace(replace(phone, ' ', ''), '-', '') = ?)`,
+        )
+        .get(date, email, phoneNorm) as { count: number };
+      return Number(count);
     },
     async listReservations() {
       const rows = db
         .prepare(
-          `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, created_at
+          `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address, created_at
            FROM reservations ORDER BY id DESC`,
         )
         .all() as unknown as ReservationRow[];
@@ -203,21 +236,42 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
   return {
     async init() {
       await client.executeMultiple(TABLE_SCHEMA);
+      const cols = await client.execute({ sql: 'PRAGMA table_info(reservations)' });
+      const names = new Set(cols.rows.map((r) => String(r.name ?? '')));
+      if (!names.has('status')) {
+        await client.execute({ sql: "ALTER TABLE reservations ADD COLUMN status TEXT NOT NULL DEFAULT 'confirmed'" });
+      }
+      if (!names.has('ip_address')) {
+        await client.execute({ sql: 'ALTER TABLE reservations ADD COLUMN ip_address TEXT' });
+      }
     },
-    async createReservation(input) {
+    async createReservation(input, meta) {
       const { rows } = await client.execute('SELECT COUNT(*) AS count FROM reservations');
       const count = Number(rows[0]?.count ?? 0);
       const reference = toReference(count);
       const result = await client.execute({
-        sql: `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        args: [reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? ''],
+        sql: `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
+        args: [reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? '', meta?.ip ?? null],
       });
       return { id: Number(result.lastInsertRowid), reference };
     },
+    async countByDate(date) {
+      const { rows } = await client.execute({ sql: 'SELECT COUNT(*) AS count FROM reservations WHERE date = ?', args: [date] });
+      return Number(rows[0]?.count ?? 0);
+    },
+    async countByClientOnDate(date, email, phone) {
+      const phoneNorm = normalizePhone(phone);
+      const { rows } = await client.execute({
+        sql: `SELECT COUNT(*) AS count FROM reservations
+              WHERE date = ? AND (lower(email) = lower(?) OR replace(replace(phone, ' ', ''), '-', '') = ?)`,
+        args: [date, email, phoneNorm],
+      });
+      return Number(rows[0]?.count ?? 0);
+    },
     async listReservations() {
       const { rows } = await client.execute({
-        sql: `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, created_at
+        sql: `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address, created_at
               FROM reservations ORDER BY id DESC`,
       });
       return rows as unknown as ReservationRow[];
@@ -301,7 +355,7 @@ export function createMemoryStorage(): Storage {
 
   return {
     async init() {},
-    async createReservation(input) {
+    async createReservation(input, meta) {
       maxId.reservations += 1;
       const reference = toReference(maxId.reservations - 1);
       reservations.push({
@@ -316,9 +370,20 @@ export function createMemoryStorage(): Storage {
         area: input.area,
         occasion: input.occasion,
         notes: input.notes ?? '',
+        status: 'confirmed',
+        ip_address: meta?.ip ?? '',
         created_at: createdAt(),
       });
       return { id: maxId.reservations, reference };
+    },
+    async countByDate(date) {
+      return reservations.filter((r) => r.date === date).length;
+    },
+    async countByClientOnDate(date, email, phone) {
+      const phoneNorm = normalizePhone(phone);
+      return reservations.filter(
+        (r) => r.date === date && (r.email.toLowerCase() === email.toLowerCase() || normalizePhone(r.phone) === phoneNorm),
+      ).length;
     },
     async listReservations() {
       return reservations.map((r) => ({ ...r })).reverse();

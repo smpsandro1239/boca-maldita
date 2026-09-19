@@ -1,9 +1,13 @@
-import { useState, type FormEvent } from 'react';
-import { ReservationData } from '../types';
-import { createReservation } from '../lib/api';
+import { useEffect, useState, type FormEvent } from 'react';
+import { ReservationData, PublicReservationConfig } from '../types';
+import { createReservation, getReservationConfig } from '../lib/api';
 import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
 
 export default function ReservationScreen() {
+  const [config, setConfig] = useState<PublicReservationConfig | null>(null);
+  const [checkValue, setCheckValue] = useState('');
+  const [honeypotValue, setHoneypotValue] = useState('');
+
   const [formData, setFormData] = useState<ReservationData>({
     name: '',
     email: '',
@@ -23,6 +27,12 @@ export default function ReservationScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getReservationConfig()
+      .then(setConfig)
+      .catch(() => setConfig({ protectionEnabled: false, paused: false, requireCheck: false }));
+  }, []);
 
   const availableTimes = [
     // Almoço (Sábado e Domingo)
@@ -53,6 +63,8 @@ export default function ReservationScreen() {
         area: formData.area,
         occasion: formData.occasion,
         notes: formData.notes,
+        check: config?.requireCheck ? checkValue : '',
+        honeypot: config?.requireCheck ? honeypotValue : '',
       });
       setConfirmedReservation({
         id: created.reference,
@@ -68,6 +80,8 @@ export default function ReservationScreen() {
 
   const resetForm = () => {
     setConfirmedReservation(null);
+    setCheckValue('');
+    setHoneypotValue('');
     setFormData({
       name: '',
       email: '',
@@ -102,8 +116,30 @@ export default function ReservationScreen() {
           </p>
         </div>
 
-        {/* Confirmed State Voucher */}
-        {confirmedReservation ? (
+        {/* Paused State — online form temporarily closed by administration */}
+        {config?.paused ? (
+          <div className="bg-[#141518] border border-[#D4A373]/60 p-8 lg:p-12 shadow-2xl space-y-6 text-center max-w-2xl mx-auto">
+            <div className="w-16 h-16 bg-[#D4A373]/10 border border-[#D4A373]/40 text-[#D4A373] flex items-center justify-center mx-auto">
+              <Phone className="w-8 h-8" />
+            </div>
+            <h2 className="font-serif text-3xl text-[#F7F5F0]">
+              Reservas online temporariamente pausadas
+            </h2>
+            <p className="text-sm text-[#A6A8AD] leading-relaxed max-w-lg mx-auto">
+              De momento, as reservas online estão suspensas para garantir o serviço da melhor forma. Para fazer a sua
+              reserva, contacte a nossa receção por telefone:
+            </p>
+            <a
+              href="tel:+351253031890"
+              className="inline-block bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] font-sans text-sm uppercase font-semibold px-8 py-4 tracking-[0.2em] transition-colors"
+            >
+              +351 253 031 890
+            </a>
+            <p className="text-[11px] text-[#686B73]">
+              Linha de reservas aberta das 11h00 às 23h30
+            </p>
+          </div>
+        ) : confirmedReservation ? (
           <div className="bg-[#141518] border border-[#D4A373] p-8 lg:p-12 shadow-2xl relative space-y-8 animate-fadeIn">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-[#282A30] pb-6">
               <div className="flex items-center gap-3">
@@ -326,6 +362,36 @@ export default function ReservationScreen() {
                 </div>
 
                 {/* Submit Action */}
+                {config?.requireCheck && (
+                  <div className="space-y-4 pt-4 border-t border-[#282A30]">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="hidden" aria-hidden="true">
+                        <label>Não preencher</label>
+                        <input
+                          type="text"
+                          tabIndex={-1}
+                          autoComplete="off"
+                          value={honeypotValue}
+                          onChange={(e) => setHoneypotValue(e.target.value)}
+                          className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                          Verificação anti-robô: quanto é 3+4?
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={checkValue}
+                          onChange={(e) => setCheckValue(e.target.value)}
+                          autoComplete="off"
+                          className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {submitError && (
                   <div className="p-3 bg-red-950/80 border border-red-500/50 text-red-300 text-xs flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0" />
