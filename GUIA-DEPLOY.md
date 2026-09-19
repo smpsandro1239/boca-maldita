@@ -278,6 +278,12 @@ Depois de mudar alguma variável de ambiente, é sempre preciso **redeploy** (`n
 3. Se a Vercel pedir **verificação TXT** (acontece em domínios `.pt` / domínios registados noutro local), adiciona o registo **TXT** indicado no registar e clica em **Verify**.
 4. Quando o estado aparecer **Valid Configuration**, o domínio está ativo.
 
+#### SSL — não precisas de fazer nada
+
+- O **certificado SSL é automático, gratuito e renovado sozinho** pela Vercel (não tens de comprar, carregar nem renovar nada) — em qualquer domínio, seja `.vercel.app` ou próprio, nas Formas A e B.
+- A Vercel só emite o certificado **depois de** o domínio estar a apontar para ela (*Valid Configuration*); até lá o HTTPS fica pendente, mas é só aguardar a propagação do DNS (minutos a algumas horas).
+- O HTTPS passa a cobrir `https://bocamaldita.pt` e `https://www.bocamaldita.pt` (e o velho `bmaldita.vercel.app`) automaticamente.
+
 #### Atualizar a APP_URL (depois do domínio ativo)
 
 ```bash
