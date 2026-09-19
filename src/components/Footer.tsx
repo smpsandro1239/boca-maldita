@@ -1,15 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import { ScreenType } from '../types';
 import { subscribeNewsletter } from '../lib/api';
-import { Camera, Globe, Share2, Link as LinkIcon, Check, Flame, AlertCircle } from 'lucide-react';
+import { Camera, Globe, Share2, Check, Flame, AlertCircle } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (screen: ScreenType) => void;
-  onOpenImageModal: () => void;
   contactEmail: string;
 }
 
-export default function Footer({ onNavigate, onOpenImageModal, contactEmail }: FooterProps) {
+export default function Footer({ onNavigate, contactEmail }: FooterProps) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -68,13 +67,6 @@ export default function Footer({ onNavigate, onOpenImageModal, contactEmail }: F
               >
                 <Globe className="w-4 h-4" />
               </a>
-              <button
-                onClick={onOpenImageModal}
-                className="w-9 h-9 flex items-center justify-center bg-[#1C1E22] text-[#D4A373] hover:text-[#F7F5F0] hover:bg-[#282A30] border border-[#282A30] transition-colors"
-                title="Links Diretos das Imagens do HTML"
-              >
-                <LinkIcon className="w-4 h-4" />
-              </button>
             </div>
           </div>
 
@@ -174,13 +166,6 @@ export default function Footer({ onNavigate, onOpenImageModal, contactEmail }: F
         <div className="mt-16 pt-8 border-t border-[#282A30] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#686B73]">
           <p>© 2024 Boca Maldita Restaurante &amp; Grill. Todos os direitos reservados.</p>
           <div className="flex items-center gap-6">
-            <button
-              onClick={onOpenImageModal}
-              className="text-[#D4A373] hover:underline flex items-center gap-1 font-mono"
-            >
-              <LinkIcon className="w-3 h-3" />
-              <span>Links Diretos das Imagens</span>
-            </button>
             <a href="#privacidade" onClick={(e) => e.preventDefault()} className="hover:text-[#A6A8AD] transition-colors">
               Política de Privacidade
             </a>

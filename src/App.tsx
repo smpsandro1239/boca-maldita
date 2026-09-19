@@ -119,7 +119,6 @@ export default function App() {
           currentScreen={currentScreen}
           onNavigate={handleNavigate}
           logoUrl={getUrl('logo-brand')}
-          onOpenImageModal={() => setIsAdminPanelOpen(true)}
         />
 
         <main className="flex-1 pt-20">
@@ -191,7 +190,6 @@ export default function App() {
         <Footer
           onNavigate={handleNavigate}
           contactEmail={siteContent.contactEmail}
-          onOpenImageModal={() => setIsAdminPanelOpen(true)}
         />
 
         <AdminPanel
