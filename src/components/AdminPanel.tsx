@@ -505,22 +505,42 @@ export default function AdminPanel({
               <div>
                 <h3 className="font-serif text-lg text-[#F7F5F0] mb-3">Visão geral</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('reservas')}
+                    className="bg-[#141518] border border-[#282A30] p-4 text-left transition-colors hover:border-[#D4A373]/60 hover:bg-[#1C1E22]"
+                    title="Abrir Reservas"
+                  >
                     <p className="text-2xl font-serif text-[#D4A373]">{reservations.length}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Reservas</p>
-                  </div>
-                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Reservas ›</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('contactos')}
+                    className="bg-[#141518] border border-[#282A30] p-4 text-left transition-colors hover:border-[#D4A373]/60 hover:bg-[#1C1E22]"
+                    title="Abrir Contactos"
+                  >
                     <p className="text-2xl font-serif text-[#D4A373]">{contacts.length}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Contactos</p>
-                  </div>
-                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Contactos ›</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('newsletter')}
+                    className="bg-[#141518] border border-[#282A30] p-4 text-left transition-colors hover:border-[#D4A373]/60 hover:bg-[#1C1E22]"
+                    title="Abrir Newsletter"
+                  >
                     <p className="text-2xl font-serif text-[#D4A373]">{newsletter.length}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Newsletter</p>
-                  </div>
-                  <div className="bg-[#141518] border border-[#282A30] p-4">
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Newsletter ›</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('menu')}
+                    className="bg-[#141518] border border-[#282A30] p-4 text-left transition-colors hover:border-[#D4A373]/60 hover:bg-[#1C1E22]"
+                    title="Abrir Menu"
+                  >
                     <p className="text-2xl font-serif text-[#D4A373]">{menus.length}</p>
-                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Pratos</p>
-                  </div>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Pratos ›</p>
+                  </button>
                 </div>
               </div>
               <div className="bg-[#141518] border border-[#282A30] p-5 text-sm text-[#F7F5F0]/70 space-y-2">
