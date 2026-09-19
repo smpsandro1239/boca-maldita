@@ -397,7 +397,24 @@ No Hobby não há faturação em excesso: exceder limites pausa funcionalidades 
 ### 8.4. Custos potenciais (opcionais, não atuais)
 
 - **Renovação do domínio** `bocamaldita.pt` — já é teu; custo de renovação no registar (DNS.PT), ex.: ~10€/ano.
-- **VPS** (opção de self-hosting, secção 7) — ~€3–10/mês se um dia quiseres sair da Vercel; hoje não usamos.
+- **VPS** (opção de self-hosting, secção 7) — ver tabela de preços em 8.5; hoje não usamos.
+
+### 8.5. Opções de VPS na faixa de 3–10€/mês
+
+Preços indicativos (sem IVA) verificados em setembro 2026 — confirmar no site antes de comprar (alguns têm IVA à parte e promoções só no 1.º ano). Qualquer uma destas chega de sobra para este projeto (server pequeno: Node + nginx/servir `dist/`).
+
+| Empresa | Produto / Plano | Preço | Link |
+| --- | --- | --- | --- |
+| **Hetzner** | Cloud `CX23` — 2 vCPU, 4 GB RAM, 40 GB NVMe, 20 TB | €5.99/mês | https://www.hetzner.com/cloud |
+| **Contabo** | Cloud VPS S (Core) — 4 vCPU, 8 GB RAM, 100+ GB | ~€4.50–5.50/mês | https://contabo.com/en/vps/ |
+| **OVHcloud** | VPS Starter — 2 vCPU, 2 GB RAM, 40 GB | ~€3.50–4.50/mês | https://www.ovhcloud.com/pt/vps/ |
+| **Hostinger** | VPS KVM 1 — 1 vCPU, 4 GB RAM, 50 GB | ~€4–6/mês (promo 1.º ano) | https://www.hostinger.pt/vps-hosting |
+| **DigitalOcean** | Basic 1 GB — 1 vCPU, 1 GB RAM, 25 GB, 1 TB | $6/mês (~€5.5) | https://www.digitalocean.com/pricing |
+| **Akamai Linode** | Nanode 1 GB — 1 vCPU, 1 GB RAM, 25 GB, 1 TB | $5/mês (~€4.6) | https://www.linode.com/pricing |
+| **Vultr** | Cloud Compute — 1 vCPU, 1 GB RAM, 25 GB | $6/mês (~€5.5) | https://www.vultr.com/pricing |
+| **Netcup** | VPS 1000 — 1 vCPU, 2 GB RAM, 100 GB | €3.49/mês | https://www.netcup.com/en/server/vps |
+
+> Recomendação para este projeto: **Hetzner** ou **Contabo** sobem o melhor preço/desempenho e estão na UE. Nota: à exceção da Vercel, num VPS também tens de tratar tu do certificado SSL — é fácil e grátis com o **Let's Encrypt**. E lembra-te: a Vercel continua **€0** — por isso um VPS só compensa se quiseres mesmo sair da Vercel ou aumentar o controlo.
 
 ---
 
