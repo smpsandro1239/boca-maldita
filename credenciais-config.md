@@ -18,9 +18,9 @@ Este documento explica como criar as credenciais que **só o dono da conta** pod
 | `SMTP_SECURE` | Feito automaticamente | `false` |
 | `SMTP_USER` | Feito automaticamente | `smpsandro1239@gmail.com` |
 | `MAIL_FROM` | Feito automaticamente | `Boca Maldita <smpsandro1239@gmail.com>` |
-| `SMTP_PASS` | **TU (passo 1)** | — |
-| `TURSO_URL` | **TU (passo 2)** | — |
-| `TURSO_AUTH_TOKEN` | **TU (passo 2)** | — |
+| `SMTP_PASS` | Feito (passo 1) | app password do Gmail no `.env` + Vercel (testado — email a funcionar) |
+| `TURSO_URL` | Feito (passo 2) | `libsql://boca-maldita-smpsandro1239.aws-eu-west-1.turso.io` |
+| `TURSO_AUTH_TOKEN` | Feito (passo 2) | token gerado para a base `boca-maldita` (no `.env` + Vercel) |
 
 ---
 
