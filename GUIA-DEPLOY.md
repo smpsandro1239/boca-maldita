@@ -474,4 +474,4 @@ turso db shell boca-maldita         # consultar a base (ver secção 4.4)
 1. **Nunca commitar** `.env`, `.env.local` nem segredos (estão no `.gitignore`; `.env.example` é o único modelo público).
 2. O `TURSO_AUTH_TOKEN` e a app password do Gmail são segredos — só no `.env`/Vercel.
 3. Se algum token vazar: **Turso** → *Invalidate tokens* (gira novos); **Gmail** → apagar a app password e criar outra.
-4. O `ADMIN_TOKEN` protege o painel; mantém-no longo e privado.
+4. O `ADMIN_TOKEN` protege o painel; mantém-no longo e privado. O acesso é feito pela URL `https://<site>/admin` (gera um ecrã de login com o token); o site público **não mostra** nenhum botão de acesso ao painel.

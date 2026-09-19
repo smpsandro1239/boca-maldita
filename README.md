@@ -96,34 +96,39 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 - `GET /api/health` — estado do servidor
 - `GET /api/site` — definições públicas do site (`contactEmail`)
 - `PUT /api/site` — atualizar email de contacto em todo o site (requer `X-Admin-Token`)
-- `POST /api/reservations` — registar pedido de reserva (envia email de confirmação se SMTP configurado)
+- `POST /api/reservations` — registar pedido de reserva (sujeito à proteção anti-fraude; envia email de confirmação se SMTP configurado)
+- `GET /api/reservations-config` — configuração pública da proteção de reservas (pausa, pergunta anti-robô)
 - `POST /api/contacts` — registar mensagem de contacto
 - `POST /api/newsletter` — subscrever boletim exclusivo
 - `GET /api/menus` — menu publicado (ou `null` se ainda não houver alterações)
 - `GET /api/site-content` — conteúdo público (email, contactos, textos, vídeo)
-- `GET /api/admin/assets` — ler substituições de imagens publicadas (inclui zoom/posição)
-- `PUT /api/admin/assets` — publicar imagens substituídas (requer `X-Admin-Token`)
-- `DELETE /api/admin/assets` — repor imagens originais (requer `X-Admin-Token`)
-- `GET /api/admin/menus` — ler o menu guardado (requer `X-Admin-Token`)
-- `PUT /api/admin/menus` — publicar a carta (requer `X-Admin-Token`)
-- `DELETE /api/admin/menus` — repor a carta original (requer `X-Admin-Token`)
+- `GET /api/admin/verify-token` — validar o token de administrador (usado pelo ecrã de login de `/admin`)
+- `GET /api/admin/assets`, `PUT /api/admin/assets`, `DELETE /api/admin/assets` — ler/publicar/repor imagens e logótipo (requer `X-Admin-Token`)
+- `GET /api/admin/menus`, `PUT /api/admin/menus`, `DELETE /api/admin/menus` — ler/publicar/repor a carta (requer `X-Admin-Token`)
 - `PUT /api/admin/site-content` — publicar conteúdo/contactos (requer `X-Admin-Token`)
-- `GET /api/admin/reservations`, `DELETE /api/admin/reservations/:id` (+ `contacts`, `newsletter`) — gestão de dados (requer `X-Admin-Token`)
+- `GET /api/admin/reservations`, `POST /api/admin/reservations`, `PUT /api/admin/reservations/:id`, `DELETE /api/admin/reservations/:id` — gestão completa de reservas (criar, duplicar, editar, remover; requer `X-Admin-Token`)
+- `GET /api/admin/reservation-protection`, `PUT /api/admin/reservation-protection` — consultar/configurar a proteção anti-fraude das reservas (requer `X-Admin-Token`)
+- `GET /api/admin/contacts`, `DELETE /api/admin/contacts/:id` — mensagens de contacto (requer `X-Admin-Token`)
+- `GET /api/admin/newsletter`, `DELETE /api/admin/newsletter/:id` — subscrições do boletim (requer `X-Admin-Token`)
 
 ## Painel de administração
 
-O botão flutuante **“Administração”** (canto inferior direito) abre o painel completo de gestão do site. Separa-se em:
+Acede-se em **https://bmaldita.vercel.app/admin** (em dev: `http://localhost:3001/admin`). O site público **não mostra qualquer botão de acesso** — ao abrir `/admin` é pedido o `ADMIN_TOKEN` num ecrã de login, que fica guardado na sessão do navegador.
+
+Separa-se em:
 
 - **Estado** — contadores de reservas, contactos, newsletter e pratos, com explicação do fluxo.
-- **Imagens & Logótipo** — altera o **logótipo** e todas as imagens do site (plano de fundo, salão, pratos, mapa…).
+- **Imagens & Logótipo** — altera o **logótipo** e todas as imagens do site (fundo, salão, pratos, mapa…).
   - Arraste sobre a miniatura para **posicionar** (esquerda/direita/cima/baixo) e use a **roda do rato** (ou os cursores) para fazer **zoom**;
   - O enquadramento aplica-se automaticamente em todo o site (objetos `cover` com `object-position` + `scale`);
-  - “Publicar imagens” guarda no servidor para todos os visitantes; “Repor originais” volta aos placeholders.
-- **Menu** — gestão completa da carta: adicionar, editar, duplicar posição, ocultar ou eliminar pratos; preço, categoria, foto, descrição, origem, sugestão de vinho e “especial do chef”. Publicar atualiza o site; repor restaura a carta de origem.
-- **Reservas / Contactos / Newsletter** — listas de todos os dados recebidos, com remoção.
+  - "Publicar imagens" guarda no servidor para todos os visitantes; "Repor originais" volta aos placeholders.
+- **Menu** — gestão completa da carta: adicionar, editar, duplicar posição, ocultar ou eliminar pratos; preço, categoria, foto, descrição, origem, sugestão de vinho e "especial do chef". Publicar atualiza o site; repor restaura a carta de origem.
+- **Reservas** — duas vistas: **calendário** (grelha mensal com contagem de reservas por dia e lista detalhada do dia selecionado) ou **lista** agrupada por data (futuras primeiro, passadas ao fundo e esbatidas). Permite **criar**, **duplicar** e **editar** reservas, além de remover — "Reservar aqui" cria logo na data escolhida.
+- **Contactos / Newsletter** — listas de todas as mensagens e subscrições recebidas, com remoção.
+- **Proteção** — liga/desliga a proteção anti-fraude das reservas: pausa do formulário, pergunta anti-robô, limite de pedidos por IP e capacidade máxima por dia e por cliente.
 - **Conteúdo** — email de contacto (aplicado em todo o site), telefone, morada, horário, textos do hero, textos sobre o restaurante, redes sociais e link do vídeo (`.mp4`) do documentário.
 
-As alterações só são visíveis para os visitantes depois de clicar em **Publicar**, o que exige o `ADMIN_TOKEN` (fica guardado na sessão do navegador). Sem `ADMIN_TOKEN` no servidor, o painel mostra o estado “Admin desativado”.
+As alterações só são visíveis para os visitantes depois de clicar em **Publicar**, o que exige o `ADMIN_TOKEN`. Sem `ADMIN_TOKEN` no servidor, o painel mostra o estado "Admin desativado".
 
 > Para disponibilizar um vídeo oficial do "documentário" também pode colar o link `.mp4` no separador **Conteúdo** do painel (campo “Link do vídeo”).
 
