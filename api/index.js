@@ -95,6 +95,12 @@ ${TABLE_SCHEMA}`);
       ).get(date, email, phoneNorm);
       return Number(count);
     },
+    async updateReservation(id, input) {
+      const info = db.prepare(
+        `UPDATE reservations SET name = ?, email = ?, phone = ?, date = ?, time = ?, guests = ?, area = ?, occasion = ?, notes = ? WHERE id = ?`
+      ).run(input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", id);
+      return Number(info.changes) > 0;
+    },
     async listReservations() {
       const rows = db.prepare(
         `SELECT id, reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address, created_at
@@ -187,6 +193,13 @@ function createTursoStorage(client) {
         args: [date, email, phoneNorm]
       });
       return Number(rows[0]?.count ?? 0);
+    },
+    async updateReservation(id, input) {
+      await client.execute({
+        sql: `UPDATE reservations SET name = ?, email = ?, phone = ?, date = ?, time = ?, guests = ?, area = ?, occasion = ?, notes = ? WHERE id = ?`,
+        args: [input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", id]
+      });
+      return true;
     },
     async listReservations() {
       const { rows } = await client.execute({
@@ -302,6 +315,23 @@ function createMemoryStorage() {
       return reservations.filter(
         (r) => r.date === date && (r.email.toLowerCase() === email.toLowerCase() || normalizePhone(r.phone) === phoneNorm)
       ).length;
+    },
+    async updateReservation(id, input) {
+      const index = reservations.findIndex((r) => r.id === id);
+      if (index === -1) return false;
+      reservations[index] = {
+        ...reservations[index],
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        date: input.date,
+        time: input.time,
+        guests: input.guests,
+        area: input.area,
+        occasion: input.occasion,
+        notes: input.notes ?? ""
+      };
+      return true;
     },
     async listReservations() {
       return reservations.map((r) => ({ ...r })).reverse();
@@ -436,6 +466,21 @@ var reservationProtectionSchema = z.object({
   maxPerClient: z.number().int("Limite inv\xE1lido.").min(1).max(100, "Limite demasiado alto."),
   rateLimit: z.boolean(),
   requireCheck: z.boolean()
+}).strict();
+var adminReservationSchema = z.object({
+  name: nameField,
+  email: emailField,
+  phone: phoneField,
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inv\xE1lida.").refine((value) => {
+    const [year, month, day] = value.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+  }, "Data inv\xE1lida."),
+  time: z.enum(AVAILABLE_TIMES, { message: "Hora n\xE3o dispon\xEDvel para reserva." }),
+  guests: z.number().int("N\xFAmero de convidados inv\xE1lido.").min(1).max(16, "M\xE1ximo de 16 convidados por reserva."),
+  area: z.string().trim().min(2, "Selecione uma \xE1rea do restaurante.").max(120),
+  occasion: z.string().trim().min(1, "A ocasi\xE3o \xE9 obrigat\xF3ria.").max(120),
+  notes: z.string().trim().max(1e3, "Notas demasiado longas.").optional().default("")
 }).strict();
 var contactSchema = z.object({
   nome: nameField,
@@ -948,6 +993,43 @@ async function createApp() {
         return res.status(400).json({ error: "ID inv\xE1lido." });
       }
       res.json({ ok: await storage.deleteReservation(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.post("/api/admin/reservations", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = adminReservationSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const { id, reference } = await storage.createReservation(parsed.data);
+      res.status(201).json({ id, reference });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/reservations/:id", async (req, res, next) => {
+    try {
+      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      const parsed = adminReservationSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const ok = await storage.updateReservation(idResult.data, parsed.data);
+      if (!ok) {
+        return res.status(404).json({ error: "Reserva n\xE3o encontrada." });
+      }
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }

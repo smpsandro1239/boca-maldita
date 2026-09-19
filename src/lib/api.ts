@@ -1,4 +1,4 @@
-import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationProtectionConfig, SiteContent } from '../types';
+import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, SiteContent } from '../types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
@@ -159,6 +159,22 @@ export function deleteAdminReservation(id: number, token: string): Promise<{ ok:
   return request<{ ok: boolean }>(`/admin/reservations/${id}`, {
     method: 'DELETE',
     headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function createAdminReservation(payload: ReservationEditorData, token: string): Promise<{ id: number; reference: string }> {
+  return request<{ id: number; reference: string }>('/admin/reservations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateAdminReservation(id: number, payload: ReservationEditorData, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/reservations/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify(payload),
   });
 }
 

@@ -70,6 +70,27 @@ export const reservationProtectionSchema = z
   })
   .strict();
 
+export const adminReservationSchema = z
+  .object({
+    name: nameField,
+    email: emailField,
+    phone: phoneField,
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.')
+      .refine((value) => {
+        const [year, month, day] = value.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+      }, 'Data inválida.'),
+    time: z.enum(AVAILABLE_TIMES, { message: 'Hora não disponível para reserva.' }),
+    guests: z.number().int('Número de convidados inválido.').min(1).max(16, 'Máximo de 16 convidados por reserva.'),
+    area: z.string().trim().min(2, 'Selecione uma área do restaurante.').max(120),
+    occasion: z.string().trim().min(1, 'A ocasião é obrigatória.').max(120),
+    notes: z.string().trim().max(1000, 'Notas demasiado longas.').optional().default(''),
+  })
+  .strict();
+
 export const contactSchema = z
   .object({
     nome: nameField,
@@ -174,6 +195,7 @@ export const idParamSchema = z.coerce.number().int().positive();
 
 export type ReservationInput = z.infer<typeof reservationSchema>;
 export type ReservationProtectionInput = z.infer<typeof reservationProtectionSchema>;
+export type AdminReservationInput = z.infer<typeof adminReservationSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;

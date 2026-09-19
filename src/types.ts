@@ -91,6 +91,18 @@ export interface NewsletterAdminRow {
   created_at: string;
 }
 
+export interface ReservationEditorData {
+  name: string;
+  email: string;
+  phone: string;
+  date: string;
+  time: string;
+  guests: number;
+  area: string;
+  occasion: string;
+  notes: string;
+}
+
 export interface ReservationData {
   name: string;
   email: string;

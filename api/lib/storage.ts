@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { ContactInput, NewsletterInput, ReservationInput } from './validation';
+import type { AdminReservationInput, ContactInput, NewsletterInput, ReservationInput } from './validation';
 
 export interface ReservationRecord {
   id: number;
@@ -44,6 +44,7 @@ export interface Storage {
   createReservation(input: ReservationInput, meta?: { ip?: string }): Promise<ReservationRecord>;
   countByDate(date: string): Promise<number>;
   countByClientOnDate(date: string, email: string, phone: string): Promise<number>;
+  updateReservation(id: number, input: AdminReservationInput): Promise<boolean>;
   listReservations(): Promise<ReservationRow[]>;
   deleteReservation(id: number): Promise<boolean>;
   createContact(input: ContactInput): Promise<{ id: number }>;
@@ -154,6 +155,14 @@ async function createSqliteStorage(): Promise<Storage> {
         )
         .get(date, email, phoneNorm) as { count: number };
       return Number(count);
+    },
+    async updateReservation(id, input) {
+      const info = db
+        .prepare(
+          `UPDATE reservations SET name = ?, email = ?, phone = ?, date = ?, time = ?, guests = ?, area = ?, occasion = ?, notes = ? WHERE id = ?`,
+        )
+        .run(input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? '', id);
+      return Number(info.changes) > 0;
     },
     async listReservations() {
       const rows = db
@@ -268,6 +277,13 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
         args: [date, email, phoneNorm],
       });
       return Number(rows[0]?.count ?? 0);
+    },
+    async updateReservation(id, input) {
+      await client.execute({
+        sql: `UPDATE reservations SET name = ?, email = ?, phone = ?, date = ?, time = ?, guests = ?, area = ?, occasion = ?, notes = ? WHERE id = ?`,
+        args: [input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? '', id],
+      });
+      return true;
     },
     async listReservations() {
       const { rows } = await client.execute({
@@ -384,6 +400,23 @@ export function createMemoryStorage(): Storage {
       return reservations.filter(
         (r) => r.date === date && (r.email.toLowerCase() === email.toLowerCase() || normalizePhone(r.phone) === phoneNorm),
       ).length;
+    },
+    async updateReservation(id, input) {
+      const index = reservations.findIndex((r) => r.id === id);
+      if (index === -1) return false;
+      reservations[index] = {
+        ...reservations[index],
+        name: input.name,
+        email: input.email,
+        phone: input.phone,
+        date: input.date,
+        time: input.time,
+        guests: input.guests,
+        area: input.area,
+        occasion: input.occasion,
+        notes: input.notes ?? '',
+      };
+      return true;
     },
     async listReservations() {
       return reservations.map((r) => ({ ...r })).reverse();

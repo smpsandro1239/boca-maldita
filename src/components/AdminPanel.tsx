@@ -20,8 +20,9 @@ import {
   AlertTriangle,
   ShieldCheck,
 } from 'lucide-react';
-import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationProtectionConfig, SiteContent } from '../types';
+import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, SiteContent } from '../types';
 import {
+  createAdminReservation,
   deleteAdminContact,
   deleteAdminNewsletter,
   deleteAdminReservation,
@@ -35,6 +36,7 @@ import {
   saveAdminMenus,
   saveAdminReservationProtection,
   saveSiteContent,
+  updateAdminReservation,
 } from '../lib/api';
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 import { MENU_ITEMS } from '../data/menuData';
@@ -139,6 +141,12 @@ export default function AdminPanel({
   const [contacts, setContacts] = useState<ContactAdminRow[]>([]);
   const [newsletter, setNewsletter] = useState<NewsletterAdminRow[]>([]);
   const [protection, setProtection] = useState<ReservationProtectionConfig>(DEFAULT_PROTECTION);
+  const [reservationEditor, setReservationEditor] = useState<{
+    id: number | null;
+    reference?: string;
+    mode: 'create' | 'edit' | 'duplicate';
+    draft: ReservationEditorData;
+  } | null>(null);
 
   useEffect(() => {
     if (isOpen) setImageDrafts(assets);
@@ -295,6 +303,63 @@ export default function AdminPanel({
       },
       'Reserva removida.',
     );
+  };
+
+  const draftFromRow = (r: ReservationAdminRow): ReservationEditorData => ({
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    date: String(r.date).split('T')[0],
+    time: r.time,
+    guests: r.guests,
+    area: r.area,
+    occasion: r.occasion,
+    notes: r.notes ?? '',
+  });
+
+  const openNewReservation = () => {
+    setReservationEditor({
+      id: null,
+      mode: 'create',
+      draft: {
+        name: '',
+        email: '',
+        phone: '',
+        date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        time: '20:00',
+        guests: 2,
+        area: 'Salão Nobre da Brasa',
+        occasion: 'Jantar Gastronómico',
+        notes: '',
+      },
+    });
+  };
+
+  const openEditReservation = (r: ReservationAdminRow) => {
+    setReservationEditor({ id: r.id, reference: r.reference, mode: 'edit', draft: draftFromRow(r) });
+  };
+
+  const openDuplicateReservation = (r: ReservationAdminRow) => {
+    setReservationEditor({ id: null, reference: r.reference, mode: 'duplicate', draft: draftFromRow(r) });
+  };
+
+  const handleSaveReservation = (draft: ReservationEditorData) => {
+    const mode = reservationEditor?.mode ?? 'create';
+    const id = reservationEditor?.id ?? null;
+    void run(
+      'reservas',
+      async () => {
+        if (mode === 'edit' && id !== null) {
+          await updateAdminReservation(id, draft, token);
+        } else {
+          await createAdminReservation(draft, token);
+        }
+        const rows = await getAdminReservations(token);
+        setReservations(rows.items);
+      },
+      mode === 'edit' ? 'Reserva atualizada.' : 'Reserva criada.',
+    );
+    setReservationEditor(null);
   };
 
   const handleDeleteContact = (id: number) => {
@@ -741,9 +806,19 @@ export default function AdminPanel({
 
           {activeTab === 'reservas' && (
             <div className="space-y-3">
-              <p className="text-xs text-[#F7F5F0]/60">
-                Reservas registadas no site. Remove reservas canceladas ou duplicadas.
-              </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60">
+                  Reservas registadas no site. Podes criar, duplicar, editar ou remover.
+                </p>
+                <button
+                  type="button"
+                  onClick={openNewReservation}
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold"
+                >
+                  <Plus className="w-4 h-4" />
+                  Nova reserva
+                </button>
+              </div>
               {reservations.length === 0 ? (
                 <p className="text-sm text-[#F7F5F0]/50">Ainda não há reservas.</p>
               ) : (
@@ -773,15 +848,35 @@ export default function AdminPanel({
                         </p>
                         {r.notes ? <p className="text-xs text-[#F7F5F0]/40 mt-1 italic">"{r.notes}"</p> : null}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteReservation(r.id)}
-                        disabled={busy === 'reservas'}
-                        className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Remover
-                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => openEditReservation(r)}
+                          className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
+                          aria-label={`Editar ${r.reference}`}
+                          title="Editar reserva"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openDuplicateReservation(r)}
+                          className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
+                          aria-label={`Duplicar ${r.reference}`}
+                          title="Duplicar reserva"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReservation(r.id)}
+                          disabled={busy === 'reservas'}
+                          className="flex items-center gap-2 px-3 py-2 border border-red-900/60 text-red-300 hover:bg-red-950/50 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Remover
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))
@@ -981,6 +1076,16 @@ export default function AdminPanel({
           onSave={saveEditingItem}
         />
       )}
+
+      {reservationEditor && (
+        <ReservationEditor
+          draft={reservationEditor.draft}
+          mode={reservationEditor.mode}
+          reference={reservationEditor.reference}
+          onCancel={() => setReservationEditor(null)}
+          onSave={handleSaveReservation}
+        />
+      )}
     </div>
   );
 }
@@ -1147,6 +1252,149 @@ function ContentField({ label, value, onChange, helper }: ContentFieldProps) {
         className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
       />
       {helper ? <p className="text-[10px] text-[#F7F5F0]/40 mt-1">{helper}</p> : null}
+    </div>
+  );
+}
+
+interface ReservationEditorProps {
+  draft: ReservationEditorData;
+  mode: 'create' | 'edit' | 'duplicate';
+  reference?: string;
+  onCancel: () => void;
+  onSave: (draft: ReservationEditorData) => void;
+}
+
+const RESERVATION_TIMES = ['12:30', '13:00', '13:30', '14:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00'];
+const RESERVATION_GUESTS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16];
+
+function ReservationEditor({ draft, mode, reference, onCancel, onSave }: ReservationEditorProps) {
+  const [data, setData] = useState<ReservationEditorData>(draft);
+  const title = mode === 'edit' ? `Editar reserva ${reference ?? ''}`.trim() : mode === 'duplicate' ? 'Duplicar reserva' : 'Nova reserva';
+  const set = (key: keyof ReservationEditorData, value: string | number) => setData((prev) => ({ ...prev, [key]: value }));
+
+  return (
+    <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-4" onClick={onCancel}>
+      <div
+        className="w-full max-w-lg bg-[#0C0D0E] border border-[#282A30] max-h-[90vh] overflow-y-auto flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#282A30] bg-[#141518]">
+          <h3 className="font-serif text-lg text-[#F7F5F0]">{title}</h3>
+          <button type="button" onClick={onCancel} className="p-1.5 text-[#F7F5F0]/70 hover:text-[#F7F5F0]" aria-label="Fechar">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Nome completo *</label>
+              <input
+                type="text"
+                value={data.name}
+                onChange={(e) => set('name', e.target.value)}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Telemóvel *</label>
+              <input
+                type="tel"
+                value={data.phone}
+                onChange={(e) => set('phone', e.target.value)}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Email *</label>
+              <input
+                type="email"
+                value={data.email}
+                onChange={(e) => set('email', e.target.value)}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Data *</label>
+              <input
+                type="date"
+                value={data.date}
+                onChange={(e) => set('date', e.target.value)}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Hora *</label>
+              <select
+                value={data.time}
+                onChange={(e) => set('time', e.target.value)}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              >
+                {RESERVATION_TIMES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Convidados *</label>
+              <select
+                value={data.guests}
+                onChange={(e) => set('guests', Number(e.target.value))}
+                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+              >
+                {RESERVATION_GUESTS.map((n) => (
+                  <option key={n} value={n}>{n} {n === 1 ? 'pessoa' : 'pessoas'}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Área *</label>
+            <input
+              type="text"
+              value={data.area}
+              onChange={(e) => set('area', e.target.value)}
+              className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Ocasião *</label>
+            <input
+              type="text"
+              value={data.occasion}
+              onChange={(e) => set('occasion', e.target.value)}
+              className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+            />
+          </div>
+          <div>
+            <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Notas</label>
+            <textarea
+              value={data.notes}
+              onChange={(e) => set('notes', e.target.value)}
+              rows={3}
+              className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373] resize-y"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 px-5 py-4 border-t border-[#282A30] bg-[#141518]">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 bg-[#0C0D0E] border border-[#282A30] text-[#F7F5F0]/70 text-xs uppercase tracking-wider font-semibold hover:border-[#D4A373]/60"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(data)}
+            className="px-4 py-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] text-xs uppercase tracking-wider font-semibold"
+          >
+            {mode === 'edit' ? 'Guardar alterações' : mode === 'duplicate' ? 'Criar duplicada' : 'Criar reserva'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

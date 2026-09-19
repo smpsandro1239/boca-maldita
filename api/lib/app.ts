@@ -3,7 +3,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
-import { assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
+import { adminReservationSchema, assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
 import { sendReservationConfirmation } from './email';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -432,6 +432,45 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(400).json({ error: 'ID inválido.' });
       }
       res.json({ ok: await storage.deleteReservation(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/admin/reservations', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const parsed = adminReservationSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const { id, reference } = await storage.createReservation(parsed.data);
+      res.status(201).json({ id, reference });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/admin/reservations/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
+        return adminUnauthorized(res);
+      }
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: 'ID inválido.' });
+      }
+      const parsed = adminReservationSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const ok = await storage.updateReservation(idResult.data, parsed.data);
+      if (!ok) {
+        return res.status(404).json({ error: 'Reserva não encontrada.' });
+      }
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }
