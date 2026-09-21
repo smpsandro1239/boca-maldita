@@ -75,13 +75,15 @@ ${TABLE_SCHEMA}`);
       if (!cols.has("ip_address")) db.exec(`ALTER TABLE reservations ADD COLUMN ip_address TEXT`);
     },
     async createReservation(input, meta) {
-      const { count } = db.prepare("SELECT COUNT(*) AS count FROM reservations").get();
-      const reference = toReference(count);
+      const tmpReference = `BM-TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const info = db.prepare(
         `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`
-      ).run(reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", meta?.ip ?? null);
-      return { id: Number(info.lastInsertRowid), reference };
+      ).run(tmpReference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", meta?.ip ?? null);
+      const id = Number(info.lastInsertRowid);
+      const reference = toReference(id - 1);
+      db.prepare("UPDATE reservations SET reference = ? WHERE id = ?").run(reference, id);
+      return { id, reference };
     },
     async countByDate(date) {
       const { count } = db.prepare("SELECT COUNT(*) AS count FROM reservations WHERE date = ?").get(date);
@@ -171,15 +173,19 @@ function createTursoStorage(client) {
       }
     },
     async createReservation(input, meta) {
-      const { rows } = await client.execute("SELECT COUNT(*) AS count FROM reservations");
-      const count = Number(rows[0]?.count ?? 0);
-      const reference = toReference(count);
+      const tmpReference = `BM-TMP-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const result = await client.execute({
         sql: `INSERT INTO reservations (reference, name, email, phone, date, time, guests, area, occasion, notes, status, ip_address)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?)`,
-        args: [reference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", meta?.ip ?? null]
+        args: [tmpReference, input.name, input.email, input.phone, input.date, input.time, input.guests, input.area, input.occasion, input.notes ?? "", meta?.ip ?? null]
       });
-      return { id: Number(result.lastInsertRowid), reference };
+      const id = Number(result.lastInsertRowid);
+      const reference = toReference(id - 1);
+      await client.execute({
+        sql: "UPDATE reservations SET reference = ? WHERE id = ?",
+        args: [reference, id]
+      });
+      return { id, reference };
     },
     async countByDate(date) {
       const { rows } = await client.execute({ sql: "SELECT COUNT(*) AS count FROM reservations WHERE date = ?", args: [date] });
