@@ -4,7 +4,10 @@ export type ScreenType =
   | 'menu-carnes' 
   | 'experiencia' 
   | 'reservas' 
-  | 'contactos';
+  | 'contactos' 
+  | 'legal';
+
+export type LegalDoc = 'privacidade' | 'termos' | 'livro';
 
 export interface ImageAsset {
   id: string;
@@ -139,10 +142,38 @@ export interface ReservationData {
   honeypot?: string;
 }
 
+export type ClosedPeriodRepeat = 'none' | 'weekly' | 'yearly';
+
+export interface ClosedPeriod {
+  id: number;
+  title: string;
+  start_date: string;
+  end_date: string | null;
+  repeat: ClosedPeriodRepeat;
+  note: string;
+  created_at: string;
+}
+
+export interface ClosedPeriodInput {
+  title: string;
+  startDate: string;
+  endDate?: string;
+  repeat: ClosedPeriodRepeat;
+  note?: string;
+}
+
+export interface PublicClosedPeriod {
+  title: string;
+  startDate: string;
+  endDate?: string;
+  repeat: ClosedPeriodRepeat;
+}
+
 export interface PublicReservationConfig {
   protectionEnabled: boolean;
   paused: boolean;
   requireCheck: boolean;
+  closedPeriods: PublicClosedPeriod[];
 }
 
 export interface ReservationProtectionConfig {

@@ -1,4 +1,4 @@
-import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
+import type { AssetOverride, ClosedPeriod, ClosedPeriodInput, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
@@ -245,5 +245,26 @@ export function updateAdminToken(newToken: string, currentToken: string): Promis
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-Admin-Token': currentToken },
     body: JSON.stringify({ token: newToken }),
+  });
+}
+
+export function getAdminClosedDays(token: string): Promise<{ items: ClosedPeriod[] }> {
+  return request<{ items: ClosedPeriod[] }>('/admin/closed-days', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function createAdminClosedDay(input: ClosedPeriodInput, token: string): Promise<{ id: number }> {
+  return request<{ id: number }>('/admin/closed-days', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminClosedDay(id: number, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/closed-days/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
   });
 }

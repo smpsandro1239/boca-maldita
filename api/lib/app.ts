@@ -3,7 +3,7 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
-import { adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
+import { adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
 import { sendNewsletterWelcome, sendReservationConfirmation } from './email';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -30,6 +30,69 @@ function solveCheckExpression(expression: string): number | null {
   const b = Number(match[3]);
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   return match[2] === '+' ? a + b : a - b;
+}
+
+function parseDateKey(key: string): { year: number; month: number; day: number } {
+  const [year, month, day] = key.split('-').map(Number);
+  return { year, month, day };
+}
+
+function dayOfYear(key: string): number {
+  const { year, month, day } = parseDateKey(key);
+  const d = new Date(Date.UTC(year, month - 1, day));
+  const epoch = Date.UTC(year, 0, 1);
+  return Math.floor((d.getTime() - epoch) / 86400000);
+}
+
+function isDateBlocked(date: string, period: { start_date: string; end_date: string | null; repeat: string }): boolean {
+  const end = period.end_date && period.end_date >= period.start_date ? period.end_date : period.start_date;
+
+  if (period.repeat === 'weekly') {
+    const dayOfWeek = (dateKey: string): number => {
+      const { year, month, day } = parseDateKey(dateKey);
+      return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    };
+    const startDow = dayOfWeek(period.start_date);
+    const spanDays = Math.round((new Date(Date.UTC(parseDateKey(end).year, parseDateKey(end).month - 1, parseDateKey(end).day)).getTime() - new Date(Date.UTC(parseDateKey(period.start_date).year, parseDateKey(period.start_date).month - 1, parseDateKey(period.start_date).day)).getTime()) / 86400000);
+    const rel = (dayOfWeek(date) - startDow + 7) % 7;
+    return rel <= spanDays;
+  }
+
+  if (period.repeat === 'yearly') {
+    const { year, month, day } = parseDateKey(date);
+    const s = parseDateKey(period.start_date);
+    const e = parseDateKey(end);
+    const key = (m: number, d: number): number => m * 100 + d;
+    const sd = key(s.month, s.day);
+    const ed = key(e.month, e.day);
+    const cd = key(month, day);
+    if (sd <= ed) return cd >= sd && cd <= ed;
+    return cd >= sd || cd <= ed;
+  }
+
+  return date >= period.start_date && date <= end;
+}
+
+type PublicClosedPeriodShape = { title: string; startDate: string; endDate?: string; repeat: string };
+
+async function getPublicClosedPeriods(storage: Storage): Promise<PublicClosedPeriodShape[]> {
+  const rows = await storage.listClosedPeriods();
+  return rows.map((r) => ({
+    title: r.title,
+    startDate: r.start_date,
+    ...(r.end_date && r.end_date !== r.start_date ? { endDate: r.end_date } : {}),
+    repeat: r.repeat,
+  }));
+}
+
+async function getClosedPeriodForDate(storage: Storage, date: string): Promise<{ title: string } | null> {
+  const periods = await storage.listClosedPeriods();
+  for (const period of periods) {
+    if (isDateBlocked(date, period)) {
+      return { title: period.title };
+    }
+  }
+  return null;
 }
 
 const DEFAULT_RESERVATION_PROTECTION: ReservationProtectionInput = {
@@ -173,10 +236,12 @@ export async function createApp(): Promise<AppInstance> {
   app.get('/api/reservations-config', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const protection = await getReservationProtection(storage);
+      const closedPeriods = await getPublicClosedPeriods(storage);
       res.json({
         protectionEnabled: protection.enabled,
         paused: protection.enabled && protection.pauseForm,
         requireCheck: protection.enabled && protection.requireCheck,
+        closedPeriods,
       });
     } catch (err) {
       next(err);
@@ -188,6 +253,12 @@ export async function createApp(): Promise<AppInstance> {
       const parsed = reservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const closed = await getClosedPeriodForDate(storage, parsed.data.date);
+      if (closed) {
+        return res.status(423).json({
+          error: `Não é possível reservar para esta data: ${closed.title}. Escolha outro dia ou ligue +351 253 031 890.`,
+        });
       }
       const protection = await getReservationProtection(storage);
       let ip: string | undefined;
@@ -588,6 +659,42 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(400).json({ error: 'ID inválido.' });
       }
       res.json({ ok: await storage.deleteReview(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/admin/closed-days', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      res.json({ items: await storage.listClosedPeriods() });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/admin/closed-days', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      const parsed = closedPeriodSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const { id } = await storage.createClosedPeriod(parsed.data);
+      res.status(201).json({ id });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.delete('/api/admin/closed-days/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: 'ID inválido.' });
+      }
+      res.json({ ok: await storage.deleteClosedPeriod(idResult.data) });
     } catch (err) {
       next(err);
     }

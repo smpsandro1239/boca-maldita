@@ -1,14 +1,15 @@
 import { useState, type FormEvent } from 'react';
-import { ScreenType } from '../types';
+import { LegalDoc, ScreenType } from '../types';
 import { subscribeNewsletter } from '../lib/api';
 import { Camera, Globe, Share2, Check, Flame, AlertCircle } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (screen: ScreenType) => void;
+  onOpenLegal: (doc: LegalDoc) => void;
   contactEmail: string;
 }
 
-export default function Footer({ onNavigate, contactEmail }: FooterProps) {
+export default function Footer({ onNavigate, onOpenLegal, contactEmail }: FooterProps) {
   const [newsletterEmail, setNewsletterEmail] = useState('');
   const [subscribed, setSubscribed] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -166,15 +167,15 @@ export default function Footer({ onNavigate, contactEmail }: FooterProps) {
         <div className="mt-16 pt-8 border-t border-[#282A30] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#686B73]">
           <p>© {new Date().getFullYear()} Boca Maldita Restaurante &amp; Grill. Todos os direitos reservados.</p>
           <div className="flex items-center gap-6">
-            <a href="#privacidade" onClick={(e) => e.preventDefault()} className="hover:text-[#A6A8AD] transition-colors">
+            <button type="button" onClick={() => onOpenLegal('privacidade')} className="hover:text-[#A6A8AD] transition-colors">
               Política de Privacidade
-            </a>
-            <a href="#termos" onClick={(e) => e.preventDefault()} className="hover:text-[#A6A8AD] transition-colors">
+            </button>
+            <button type="button" onClick={() => onOpenLegal('termos')} className="hover:text-[#A6A8AD] transition-colors">
               Termos de Reserva
-            </a>
-            <a href="#livro" onClick={(e) => e.preventDefault()} className="hover:text-[#A6A8AD] transition-colors">
+            </button>
+            <button type="button" onClick={() => onOpenLegal('livro')} className="hover:text-[#A6A8AD] transition-colors">
               Livro de Reclamações
-            </a>
+            </button>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ScreenType, ImageAsset, MenuItem, SiteContent } from './types';
+import { LegalDoc, ScreenType, ImageAsset, MenuItem, SiteContent } from './types';
 import { DEFAULT_IMAGE_ASSETS, DOCUMENTARY_VIDEO_URL } from './data/assets';
 import { MENU_ITEMS } from './data/menuData';
 import Header from './components/Header';
@@ -12,6 +12,7 @@ import MenuScreen from './screens/MenuScreen';
 import ExperienceScreen from './screens/ExperienceScreen';
 import ReservationScreen from './screens/ReservationScreen';
 import ContactScreen from './screens/ContactScreen';
+import LegalScreen from './screens/LegalScreen';
 import * as api from './lib/api';
 import { SiteProvider, DEFAULT_SITE_CONTENT, computeAssets } from './context/SiteContext';
 import AdminPanel from './components/AdminPanel';
@@ -29,6 +30,7 @@ const ALIAS_MAP: Record<string, string> = {
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('inicio');
+  const [legalDoc, setLegalDoc] = useState<LegalDoc>('privacidade');
   const [assets, setAssets] = useState<ImageAsset[]>(DEFAULT_IMAGE_ASSETS);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(MENU_ITEMS);
   const [siteContent, setSiteContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
@@ -138,6 +140,12 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleOpenLegal = (doc: LegalDoc) => {
+    setLegalDoc(doc);
+    setCurrentScreen('legal');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <SiteProvider
       siteContent={siteContent}
@@ -214,10 +222,15 @@ export default function App() {
               onCopyImageUrl={handleCopyImageUrl}
             />
           )}
+
+          {currentScreen === 'legal' && (
+            <LegalScreen doc={legalDoc} onBack={() => handleNavigate('inicio')} />
+          )}
         </main>
 
         <Footer
           onNavigate={handleNavigate}
+          onOpenLegal={handleOpenLegal}
           contactEmail={siteContent.contactEmail}
         />
 

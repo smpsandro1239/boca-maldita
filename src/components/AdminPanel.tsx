@@ -25,14 +25,18 @@ import {
   Star,
   KeyRound,
   ShieldAlert,
+  CalendarX,
 } from 'lucide-react';
-import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewStatus, SiteContent } from '../types';
+import type { AssetOverride, ClosedPeriod, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewStatus, SiteContent } from '../types';
 import {
+  createAdminClosedDay,
   createAdminReservation,
+  deleteAdminClosedDay,
   deleteAdminContact,
   deleteAdminNewsletter,
   deleteAdminReservation,
   deleteAdminReview,
+  getAdminClosedDays,
   getAdminContacts,
   getAdminNewsletter,
   getAdminReservationProtection,
@@ -53,7 +57,7 @@ import { MENU_ITEMS } from '../data/menuData';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
-type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
+type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'dias' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   logo: 'Logótipo',
@@ -117,7 +121,7 @@ function formatDateLabel(date: string): string {
 }
 
 const DEFAULT_PROTECTION: ReservationProtectionConfig = {
-  enabled: false,
+  enabled: true,
   pauseForm: false,
   dailyCapacity: 40,
   maxPerClient: 2,
@@ -519,6 +523,7 @@ export default function AdminPanel({
     { id: 'imagens', label: 'Imagens & Logótipo', icon: ImageIcon },
     { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
     { id: 'reservas', label: 'Reservas', icon: CalendarDays },
+    { id: 'dias', label: 'Datas Fechadas', icon: CalendarX },
     { id: 'avaliacoes', label: 'Avaliações', icon: Star },
     { id: 'contactos', label: 'Contactos', icon: Mail },
     { id: 'newsletter', label: 'Newsletter', icon: Rss },
@@ -1044,6 +1049,10 @@ export default function AdminPanel({
                 />
               </div>
             </div>
+          )}
+
+          {activeTab === 'dias' && (
+            <ClosedDaysManager adminToken={token} busy={busy} run={run} />
           )}
 
           {activeTab === 'avaliacoes' && (
@@ -2127,6 +2136,224 @@ function SecurityTabContent({
           <KeyRound className="w-4 h-4" />
           Alterar token
         </button>
+      </div>
+    </div>
+  );
+}
+
+const REPEAT_LABELS: Record<string, string> = {
+  none: 'Sem repetição',
+  weekly: 'Todas as semanas',
+  yearly: 'Todos os anos',
+};
+
+function dateKeyFromDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function ClosedDaysManager({
+  adminToken,
+  busy,
+  run,
+}: {
+  adminToken: string;
+  busy: string | null;
+  run: RunFn;
+}) {
+  const [items, setItems] = useState<ClosedPeriod[]>([]);
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState(() => dateKeyFromDate(new Date(Date.now() + 86400000)));
+  const [endDate, setEndDate] = useState('');
+  const [repeat, setRepeat] = useState<'none' | 'weekly' | 'yearly'>('none');
+  const [note, setNote] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const reload = async () => {
+    try {
+      const { items: list } = await getAdminClosedDays(adminToken);
+      setItems(list);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Erro ao carregar datas fechadas.');
+    }
+  };
+
+  useEffect(() => {
+    if (!adminToken.trim()) return;
+    void reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminToken]);
+
+  const handleAdd = () => {
+    setFormError(null);
+    if (title.trim().length < 2) {
+      setFormError('Indique um motivo (mínimo de 2 caracteres).');
+      return;
+    }
+    if (!startDate) {
+      setFormError('Escolha a data de início.');
+      return;
+    }
+    if (endDate && endDate < startDate) {
+      setFormError('A data final tem de ser igual ou posterior à data inicial.');
+      return;
+    }
+    void run(
+      'dias',
+      async () => {
+        await createAdminClosedDay({ title: title.trim(), startDate, endDate: endDate || undefined, repeat, note: note.trim() }, adminToken);
+        setTitle('');
+        setEndDate('');
+        setNote('');
+        await reload();
+      },
+      'Período registado. As reservas online nesse(s) dia(s) ficarão bloqueadas.',
+    );
+  };
+
+  const handleDelete = (id: number) => {
+    void run(
+      'dias',
+      async () => {
+        await deleteAdminClosedDay(id, adminToken);
+        await reload();
+      },
+      'Período removido.',
+    );
+  };
+
+  const formatDate = (key: string) =>
+    new Date(`${key}T12:00:00`).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="font-serif text-lg text-[#F7F5F0] mb-1">Datas Fechadas</h3>
+        <p className="text-xs text-[#F7F5F0]/60">
+          Defina dias em que não há reservas online (ex.: feriados, férias, eventos privados). Pode usar um só dia, um intervalo, ou repetir a regra todas as semanas ou todos os anos. As reservas online nesses dias são bloqueadas; pelo painel continua a poder registar reservas manualmente.
+        </p>
+      </div>
+
+      <div className="bg-[#141518] border border-[#282A30] p-4 space-y-3">
+        <p className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Novo período fechado</p>
+        <div>
+          <label className="block text-[10px] uppercase tracking-wider text-[#A6A8AD] mb-1">Motivo</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ex.: Férias de verão · Feriado nacional · Evento privado"
+            className="w-full bg-[#1C1E22] border border-[#282A30] px-3.5 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
+          />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-[#A6A8AD] mb-1">Data de início</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full bg-[#1C1E22] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-[#A6A8AD] mb-1">
+              Data final <span className="normal-case text-[#F7F5F0]/40">(opcional — só para intervalo)</span>
+            </label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full bg-[#1C1E22] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] uppercase tracking-wider text-[#A6A8AD] mb-1">Repetição</label>
+          <div className="flex flex-wrap gap-2">
+            {(['none', 'weekly', 'yearly'] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setRepeat(value)}
+                className={`px-3 py-2 text-xs uppercase tracking-wider font-semibold border transition-colors ${
+                  repeat === value
+                    ? 'bg-[#D4A373] text-[#0C0D0E] border-[#D4A373]'
+                    : 'bg-[#0C0D0E] text-[#F7F5F0]/70 border-[#282A30] hover:border-[#D4A373]/50'
+                }`}
+              >
+                {REPEAT_LABELS[value]}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-[#F7F5F0]/50 mt-2">
+            {repeat === 'weekly'
+              ? 'Bloqueia o(s) mesmo(s) dia(s) da semana todas as semanas (ex.: encerrado aos sábados e domingos).'
+              : repeat === 'yearly'
+                ? 'Bloqueia as mesmas datas todos os anos (ex.: 24 e 25 de dezembro).'
+                : 'Bloqueia apenas a(s) data(s) indicada(s), sem repetição.'}
+          </p>
+        </div>
+        <div>
+          <label className="block text-[10px] uppercase tracking-wider text-[#A6A8AD] mb-1">
+            Nota interna <span className="normal-case text-[#F7F5F0]/40">(opcional, não é mostrada no site)</span>
+          </label>
+          <input
+            type="text"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Ex.: equipa de férias"
+            className="w-full bg-[#1C1E22] border border-[#282A30] px-3.5 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
+          />
+        </div>
+        {formError && <p className="text-xs text-red-300 bg-red-950/60 border border-red-500/40 px-3 py-2">{formError}</p>}
+        <button
+          type="button"
+          onClick={handleAdd}
+          disabled={busy === 'dias' || !adminToken.trim()}
+          className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2.5 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+        >
+          <Plus className="w-4 h-4" />
+          Adicionar período fechado
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {items.length === 0 ? (
+          <div className="bg-[#141518] border border-[#282A30] p-5 text-sm text-[#F7F5F0]/60">
+            Sem períodos fechados. Enquanto não adicionar nada, todas as datas estão disponíveis para reserva online.
+          </div>
+        ) : (
+          items.map((item) => {
+            const end = item.end_date && item.end_date !== item.start_date ? item.end_date : null;
+            return (
+              <div key={item.id} className="bg-[#141518] border border-[#282A30] p-4 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <CalendarX className="w-4 h-4 text-amber-400" />
+                    <span className="font-serif text-[#F7F5F0]">{item.title}</span>
+                    <span className="text-[10px] uppercase tracking-wider font-mono px-2 py-0.5 border text-amber-300 border-amber-500/40 bg-amber-950/40">
+                      {REPEAT_LABELS[item.repeat] ?? item.repeat}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy === 'dias'}
+                    onClick={() => handleDelete(item.id)}
+                    className="flex items-center gap-1.5 bg-[#0C0D0E] border border-[#282A30] hover:border-red-500/60 text-red-300 px-3 py-1.5 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    Remover
+                  </button>
+                </div>
+                <p className="text-[13px] text-[#F7F5F0]/85">
+                  {formatDate(item.start_date)}
+                  {end ? ` → ${formatDate(end)}` : ''}
+                </p>
+                {item.note && <p className="text-[11px] text-[#A6A8AD]">Nota: {item.note}</p>}
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

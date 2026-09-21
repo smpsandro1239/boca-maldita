@@ -96,13 +96,18 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 - `GET /api/health` — estado do servidor
 - `GET /api/site` — definições públicas do site (`contactEmail`)
 - `PUT /api/site` — atualizar email de contacto em todo o site (requer `X-Admin-Token`)
-- `POST /api/reservations` — registar pedido de reserva (sujeito à proteção anti-fraude; envia email de confirmação se SMTP configurado)
-- `GET /api/reservations-config` — configuração pública da proteção de reservas (pausa, pergunta anti-robô)
+- `POST /api/reservations` — registar pedido de reserva (sujeito à proteção anti-fraude e às datas fechadas; envia email de confirmação se SMTP configurado)
+- `GET /api/reservations-config` — configuração pública das reservas (pausa, pergunta anti-robô, **datas fechadas**)
 - `POST /api/contacts` — registar mensagem de contacto
-- `POST /api/newsletter` — subscrever boletim exclusivo
+- `POST /api/newsletter` — subscrever boletim exclusivo (envia email de boas-vindas se SMTP configurado)
+- `POST /api/reviews` — registar avaliação (fica pendente até aprovação do admin)
+- `GET /api/reviews` — avaliações aprovadas (público)
 - `GET /api/menus` — menu publicado (ou `null` se ainda não houver alterações)
 - `GET /api/site-content` — conteúdo público (email, contactos, textos, vídeo)
 - `GET /api/admin/verify-token` — validar o token de administrador (usado pelo ecrã de login de `/admin`)
+- `PUT /api/admin/security/token` — alterar o token do painel (política forte; o novo token passa a ser o efetivo, guardado na base; requer `X-Admin-Token`)
+- `GET /api/admin/reviews`, `PUT /api/admin/reviews/:id`, `DELETE /api/admin/reviews/:id` — aprovar/rejeitar/remover avaliações (requer `X-Admin-Token`)
+- `GET /api/admin/closed-days`, `POST /api/admin/closed-days`, `DELETE /api/admin/closed-days/:id` — gerir **datas fechadas** (dia único, intervalo com repetição semanal ou anual; requer `X-Admin-Token`)
 - `GET /api/admin/assets`, `PUT /api/admin/assets`, `DELETE /api/admin/assets` — ler/publicar/repor imagens e logótipo (requer `X-Admin-Token`)
 - `GET /api/admin/menus`, `PUT /api/admin/menus`, `DELETE /api/admin/menus` — ler/publicar/repor a carta (requer `X-Admin-Token`)
 - `PUT /api/admin/site-content` — publicar conteúdo/contactos (requer `X-Admin-Token`)
@@ -122,10 +127,13 @@ Separa-se em:
   - Arraste sobre a miniatura para **posicionar** (esquerda/direita/cima/baixo) e use a **roda do rato** (ou os cursores) para fazer **zoom**;
   - O enquadramento aplica-se automaticamente em todo o site (objetos `cover` com `object-position` + `scale`);
   - "Publicar imagens" guarda no servidor para todos os visitantes; "Repor originais" volta aos placeholders.
-- **Menu** — gestão completa da carta: adicionar, editar, duplicar posição, ocultar ou eliminar pratos; preço, categoria, foto, descrição, origem, sugestão de vinho e "especial do chef". Publicar atualiza o site; repor restaura a carta de origem.
-- **Reservas** — duas vistas: **calendário** (grelha mensal com contagem de reservas por dia e lista detalhada do dia selecionado) ou **lista** agrupada por data (futuras primeiro, passadas ao fundo e esbatidas). Permite **criar**, **duplicar** e **editar** reservas, além de remover — "Reservar aqui" cria logo na data escolhida.
-- **Contactos / Newsletter** — listas de todas as mensagens e subscrições recebidas, com remoção.
-- **Proteção** — liga/desliga a proteção anti-fraude das reservas: pausa do formulário, pergunta anti-robô, limite de pedidos por IP e capacidade máxima por dia e por cliente.
+- **Menu** — gestão completa da carta: adicionar, editar, duplicar posição, ocultar ou eliminar pratos; preço, categoria (inclui a **Carta de Vinhos**), foto, descrição, origem, sugestão de vinho e "especial do chef". Publicar atualiza o site; repor restaura a carta de origem.
+- **Reservas** — duas vistas: **calendário** (grelha mensal com contagem de reservas por dia e lista detalhada do dia selecionado) ou **lista** agrupada por data (futuras primeiro, passadas ao fundo e esbatidas). Permite **criar**, **duplicar** e **editar** reservas, além de remover — "Reservar aqui" cria logo na data escolhida. O separador **Estado** tem atalhos "Reservas hoje" e "Novas 24h", que abrem o calendário nesse dia.
+- **Datas Fechadas** — impede reservas em períodos específicos (fecho do restaurante): dia único, ou intervalo com **repetição semanal** (ex.: fins de semana) ou **anual** (ex.: Natal). O formulário público avisa e bloqueia a data escolhida; pedidos diretos aí recebem erro 423. O admin pode sempre registar reservas manualmente.
+- **Avaliações** — avaliações dos clientes chegam pendentes; o admin **aprova** para aparecerem no site (ou rejeita/apaga). Incluem estrelas, nome, data e texto.
+- **Contactos / Newsletter** — listas de todas as mensagens e subscrições recebidas, com remoção. Subscrever a newsletter envia um email de boas-vindas.
+- **Proteção** — liga/desliga a proteção anti-fraude das reservas (pausa do formulário, pergunta anti-robô, limite de pedidos por IP e capacidade máxima por dia e por cliente). A pergunta anti-robô vem **ligada por predefinição** — é uma conta aritmética aleatória (ex.: "Quanto é 23 menos 8?") gerada no navegador, que o servidor valida sem armazenar nada (o cliente envia a pergunta e a resposta; o servidor recalcula pela expressão e aceita só a resposta certa). Inclui também um campo oculto (honeypot) que bots preenchem.
+- **Segurança** — alterar o **token do painel** com política forte (mín. 16 caracteres, maiúscula, minúscula, número e símbolo) e gerador aleatório; o novo token passa a valer imediatamente em todo o site.
 - **Conteúdo** — email de contacto (aplicado em todo o site), telefone, morada, horário, textos do hero, textos sobre o restaurante, redes sociais e link do vídeo (`.mp4`) do documentário.
 
 As alterações só são visíveis para os visitantes depois de clicar em **Publicar**, o que exige o `ADMIN_TOKEN`. Sem `ADMIN_TOKEN` no servidor, o painel mostra o estado "Admin desativado".
@@ -160,7 +168,9 @@ O projeto está ligado ao repositório GitHub: cada push para `main` é publicad
 
 ## Email de confirmação
 
-Sem `SMTP_HOST` não é enviado qualquer email (as reservas continuam a ser gravadas). Com SMTP configurado, cada reserva gera um email HTML com a referência `BM-XXXX`, data, hora e detalhes.
+Sem `SMTP_HOST` não é enviado qualquer email (as reservas continuam a ser gravadas). Com SMTP configurado, cada reserva gera um email HTML com a referência `BM-XXXX`, data, hora e detalhes, e cada subscrição da newsletter gera um email de boas-vindas.
+
+O rodapé do site inclui **Política de Privacidade**, **Termos de Reserva** e **Livro de Reclamações** — cada um abre a respetiva página legal com o conteúdo em português.
 
 ## Autor
 

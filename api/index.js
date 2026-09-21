@@ -54,6 +54,16 @@ var TABLE_SCHEMA = `
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS closed_periods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT,
+    repeat TEXT NOT NULL DEFAULT 'none',
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -176,6 +186,24 @@ ${TABLE_SCHEMA}`);
     },
     async deleteReview(id) {
       const info = db.prepare("DELETE FROM reviews WHERE id = ?").run(id);
+      return Number(info.changes) > 0;
+    },
+    async listClosedPeriods() {
+      const rows = db.prepare(
+        `SELECT id, title, start_date, end_date, repeat, note, created_at
+           FROM closed_periods ORDER BY start_date ASC, id ASC`
+      ).all();
+      return rows;
+    },
+    async createClosedPeriod(input) {
+      const info = db.prepare(
+        `INSERT INTO closed_periods (title, start_date, end_date, repeat, note)
+           VALUES (?, ?, ?, ?, ?)`
+      ).run(input.title, input.startDate, input.endDate || null, input.repeat, input.note);
+      return { id: Number(info.lastInsertRowid) };
+    },
+    async deleteClosedPeriod(id) {
+      const info = db.prepare("DELETE FROM closed_periods WHERE id = ?").run(id);
       return Number(info.changes) > 0;
     },
     async getSetting(key) {
@@ -327,6 +355,25 @@ function createTursoStorage(client) {
       await client.execute({ sql: "DELETE FROM reviews WHERE id = ?", args: [id] });
       return true;
     },
+    async listClosedPeriods() {
+      const { rows } = await client.execute({
+        sql: `SELECT id, title, start_date, end_date, repeat, note, created_at
+              FROM closed_periods ORDER BY start_date ASC, id ASC`
+      });
+      return rows;
+    },
+    async createClosedPeriod(input) {
+      const result = await client.execute({
+        sql: `INSERT INTO closed_periods (title, start_date, end_date, repeat, note)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: [input.title, input.startDate, input.endDate || null, input.repeat, input.note]
+      });
+      return { id: Number(result.lastInsertRowid) };
+    },
+    async deleteClosedPeriod(id) {
+      await client.execute({ sql: "DELETE FROM closed_periods WHERE id = ?", args: [id] });
+      return true;
+    },
     async getSetting(key) {
       const { rows } = await client.execute({
         sql: "SELECT value FROM settings WHERE key = ?",
@@ -350,12 +397,13 @@ function createTursoStorage(client) {
   };
 }
 function createMemoryStorage() {
-  const maxId = { reservations: 0, contacts: 0, newsletters: 0, reviews: 0 };
+  const maxId = { reservations: 0, contacts: 0, newsletters: 0, reviews: 0, closedPeriods: 0 };
   const reservations = [];
   const contacts = [];
   const newsletters = [];
   const newsletterEmails = /* @__PURE__ */ new Set();
   const reviews = [];
+  const closedPeriods = [];
   const settings = /* @__PURE__ */ new Map();
   const createdAt = () => (/* @__PURE__ */ new Date()).toISOString();
   return {
@@ -484,6 +532,29 @@ function createMemoryStorage() {
       reviews.splice(index, 1);
       return true;
     },
+    async listClosedPeriods() {
+      return [...closedPeriods].sort((a, b) => a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : a.id - b.id);
+    },
+    async createClosedPeriod(input) {
+      maxId.closedPeriods += 1;
+      const id = maxId.closedPeriods;
+      closedPeriods.push({
+        id,
+        title: input.title,
+        start_date: input.startDate,
+        end_date: input.endDate || null,
+        repeat: input.repeat,
+        note: input.note,
+        created_at: createdAt()
+      });
+      return { id };
+    },
+    async deleteClosedPeriod(id) {
+      const index = closedPeriods.findIndex((c) => c.id === id);
+      if (index === -1) return false;
+      closedPeriods.splice(index, 1);
+      return true;
+    },
     async getSetting(key) {
       return settings.get(key) ?? null;
     },
@@ -573,6 +644,21 @@ var reservationProtectionSchema = z.object({
   rateLimit: z.boolean(),
   requireCheck: z.boolean()
 }).strict();
+var dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inv\xE1lida.").refine((value) => {
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}, "Data inv\xE1lida.");
+var closedPeriodSchema = z.object({
+  title: z.string().trim().min(2, "Indique um motivo (m\xEDnimo de 2 caracteres).").max(160, "O motivo \xE9 demasiado longo."),
+  startDate: dateKeySchema,
+  endDate: z.union([dateKeySchema, z.literal("")]).optional().default(""),
+  repeat: z.enum(["none", "weekly", "yearly"], { message: "Repeti\xE7\xE3o inv\xE1lida." }).optional().default("none"),
+  note: z.string().trim().max(500, "A nota \xE9 demasiado longa.").optional().default("")
+}).strict().refine((value) => !value.endDate || value.endDate >= value.startDate, {
+  message: "A data final tem de ser igual ou posterior \xE0 data inicial.",
+  path: ["endDate"]
+});
 var adminReservationSchema = z.object({
   name: nameField,
   email: emailField,
@@ -779,6 +865,53 @@ function solveCheckExpression(expression) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
   return match[2] === "+" ? a + b : a - b;
 }
+function parseDateKey(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return { year, month, day };
+}
+function isDateBlocked(date, period) {
+  const end = period.end_date && period.end_date >= period.start_date ? period.end_date : period.start_date;
+  if (period.repeat === "weekly") {
+    const dayOfWeek = (dateKey) => {
+      const { year, month, day } = parseDateKey(dateKey);
+      return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    };
+    const startDow = dayOfWeek(period.start_date);
+    const spanDays = Math.round((new Date(Date.UTC(parseDateKey(end).year, parseDateKey(end).month - 1, parseDateKey(end).day)).getTime() - new Date(Date.UTC(parseDateKey(period.start_date).year, parseDateKey(period.start_date).month - 1, parseDateKey(period.start_date).day)).getTime()) / 864e5);
+    const rel = (dayOfWeek(date) - startDow + 7) % 7;
+    return rel <= spanDays;
+  }
+  if (period.repeat === "yearly") {
+    const { year, month, day } = parseDateKey(date);
+    const s = parseDateKey(period.start_date);
+    const e = parseDateKey(end);
+    const key = (m, d) => m * 100 + d;
+    const sd = key(s.month, s.day);
+    const ed = key(e.month, e.day);
+    const cd = key(month, day);
+    if (sd <= ed) return cd >= sd && cd <= ed;
+    return cd >= sd || cd <= ed;
+  }
+  return date >= period.start_date && date <= end;
+}
+async function getPublicClosedPeriods(storage) {
+  const rows = await storage.listClosedPeriods();
+  return rows.map((r) => ({
+    title: r.title,
+    startDate: r.start_date,
+    ...r.end_date && r.end_date !== r.start_date ? { endDate: r.end_date } : {},
+    repeat: r.repeat
+  }));
+}
+async function getClosedPeriodForDate(storage, date) {
+  const periods = await storage.listClosedPeriods();
+  for (const period of periods) {
+    if (isDateBlocked(date, period)) {
+      return { title: period.title };
+    }
+  }
+  return null;
+}
 var DEFAULT_RESERVATION_PROTECTION = {
   enabled: false,
   pauseForm: false,
@@ -900,10 +1033,12 @@ async function createApp() {
   app.get("/api/reservations-config", async (_req, res, next) => {
     try {
       const protection = await getReservationProtection(storage);
+      const closedPeriods = await getPublicClosedPeriods(storage);
       res.json({
         protectionEnabled: protection.enabled,
         paused: protection.enabled && protection.pauseForm,
-        requireCheck: protection.enabled && protection.requireCheck
+        requireCheck: protection.enabled && protection.requireCheck,
+        closedPeriods
       });
     } catch (err) {
       next(err);
@@ -914,6 +1049,12 @@ async function createApp() {
       const parsed = reservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const closed = await getClosedPeriodForDate(storage, parsed.data.date);
+      if (closed) {
+        return res.status(423).json({
+          error: `N\xE3o \xE9 poss\xEDvel reservar para esta data: ${closed.title}. Escolha outro dia ou ligue +351 253 031 890.`
+        });
       }
       const protection = await getReservationProtection(storage);
       let ip;
@@ -1285,6 +1426,39 @@ async function createApp() {
         return res.status(400).json({ error: "ID inv\xE1lido." });
       }
       res.json({ ok: await storage.deleteReview(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/closed-days", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      res.json({ items: await storage.listClosedPeriods() });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.post("/api/admin/closed-days", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      const parsed = closedPeriodSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const { id } = await storage.createClosedPeriod(parsed.data);
+      res.status(201).json({ id });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/closed-days/:id", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      res.json({ ok: await storage.deleteClosedPeriod(idResult.data) });
     } catch (err) {
       next(err);
     }

@@ -71,6 +71,29 @@ export const reservationProtectionSchema = z
   })
   .strict();
 
+const dateKeySchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.')
+  .refine((value) => {
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+  }, 'Data inválida.');
+
+export const closedPeriodSchema = z
+  .object({
+    title: z.string().trim().min(2, 'Indique um motivo (mínimo de 2 caracteres).').max(160, 'O motivo é demasiado longo.'),
+    startDate: dateKeySchema,
+    endDate: z.union([dateKeySchema, z.literal('')]).optional().default(''),
+    repeat: z.enum(['none', 'weekly', 'yearly'], { message: 'Repetição inválida.' }).optional().default('none'),
+    note: z.string().trim().max(500, 'A nota é demasiado longa.').optional().default(''),
+  })
+  .strict()
+  .refine((value) => !value.endDate || value.endDate >= value.startDate, {
+    message: 'A data final tem de ser igual ou posterior à data inicial.',
+    path: ['endDate'],
+  });
+
 export const adminReservationSchema = z
   .object({
     name: nameField,
@@ -232,6 +255,7 @@ export type NewsletterInput = z.infer<typeof newsletterSchema>;
 export type ReviewInput = z.infer<typeof reviewSchema>;
 export type ReviewStatusInput = z.infer<typeof reviewStatusSchema>;
 export type AdminTokenUpdateInput = z.infer<typeof adminTokenUpdateSchema>;
+export type ClosedPeriodInput = z.infer<typeof closedPeriodSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export type AssetOverrideInput = z.infer<typeof assetOverridesSchema>['overrides'][number];
 export type MenuItemInput = z.infer<typeof menuItemSchema>;

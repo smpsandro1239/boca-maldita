@@ -91,10 +91,13 @@ O código (`api/lib/storage.ts`) cria o esquema **automaticamente na primeira ut
 - `reservations` — reservas do site e listagem no painel.
 - `contacts` — mensagens do formulário de contactos.
 - `newsletter` — subscritores da newsletter.
+- `reviews` — avaliações dos clientes (ficam `pending` até aprovação no painel).
+- `closed_periods` — datas fechadas (dia único ou intervalo com repetição semanal/anual).
 - `settings` — pares `chave → JSON`, do painel de administração:
   - `menu_items` → o menu (pratos, preços, visibilidade, ordem);
   - `site_content` → contactos, textos, redes sociais, vídeo;
-  - `image_asset_overrides` → logótipo e ajustes (escala/posição) das imagens.
+  - `image_asset_overrides` → logótipo e ajustes (escala/posição) das imagens;
+  - `admin_token` → o token do painel (se definido, sobrepõe-se ao `ADMIN_TOKEN` do ambiente).
 
 > Acessório importante: se **não** houver `TURSO_URL`/`TURSO_AUTH_TOKEN`, em produção cai em memória (e avisa no log: `[storage] VERCEL sem Turso configurado — a usar armazenamento em memória (não persistente)`). **Sempre** configurar Turso para ter persistência.
 
@@ -474,4 +477,4 @@ turso db shell boca-maldita         # consultar a base (ver secção 4.4)
 1. **Nunca commitar** `.env`, `.env.local` nem segredos (estão no `.gitignore`; `.env.example` é o único modelo público).
 2. O `TURSO_AUTH_TOKEN` e a app password do Gmail são segredos — só no `.env`/Vercel.
 3. Se algum token vazar: **Turso** → *Invalidate tokens* (gira novos); **Gmail** → apagar a app password e criar outra.
-4. O `ADMIN_TOKEN` protege o painel; mantém-no longo e privado. O acesso é feito pela URL `https://<site>/admin` (gera um ecrã de login com o token); o site público **não mostra** nenhum botão de acesso ao painel.
+4. O `ADMIN_TOKEN` protege o painel; mantém-no longo e privado. O acesso é feito pela URL `https://<site>/admin` (gera um ecrã de login com o token); o site público **não mostra** nenhum botão de acesso ao painel. O token pode ser **trocado no próprio painel** (separador **Segurança**, exige o token atual e uma política forte) — o novo fica guardado na base Turso e sobrepõe-se ao `ADMIN_TOKEN` do ambiente.

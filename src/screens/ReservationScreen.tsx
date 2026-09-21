@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ReservationData, PublicReservationConfig } from '../types';
 import { createReservation, getReservationConfig } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
+import { findBlockedPeriod } from '../lib/closedDays';
 import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
 
 export default function ReservationScreen() {
@@ -33,7 +34,7 @@ export default function ReservationScreen() {
   useEffect(() => {
     getReservationConfig()
       .then(setConfig)
-      .catch(() => setConfig({ protectionEnabled: true, paused: false, requireCheck: true }));
+      .catch(() => setConfig({ protectionEnabled: true, paused: false, requireCheck: true, closedPeriods: [] }));
   }, []);
 
   const availableTimes = [
@@ -52,6 +53,11 @@ export default function ReservationScreen() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const blocked = findBlockedPeriod(formData.date, config?.closedPeriods ?? []);
+    if (blocked) {
+      setSubmitError(`Não é possível reservar para esta data (${blocked.title}). Escolha outro dia.`);
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
     try {
@@ -236,6 +242,18 @@ export default function ReservationScreen() {
                         onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                         className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
                       />
+                      {formData.date && config?.closedPeriods && (() => {
+                        const blocked = findBlockedPeriod(formData.date, config.closedPeriods);
+                        if (!blocked) return null;
+                        return (
+                          <p className="mt-2 flex items-start gap-1.5 text-[11px] text-amber-300 bg-amber-950/50 border border-amber-500/40 p-2">
+                            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                            <span>
+                              Encerrado: {blocked.title}. Escolha outro dia.
+                            </span>
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     <div>

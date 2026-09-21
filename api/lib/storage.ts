@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { AdminReservationInput, ContactInput, NewsletterInput, ReservationInput, ReviewInput } from './validation';
+import type { AdminReservationInput, ClosedPeriodInput, ContactInput, NewsletterInput, ReservationInput, ReviewInput } from './validation';
 
 export interface ReservationRecord {
   id: number;
@@ -50,6 +50,16 @@ export interface ReviewRow {
   created_at: string;
 }
 
+export interface ClosedPeriodRow {
+  id: number;
+  title: string;
+  start_date: string;
+  end_date: string | null;
+  repeat: string;
+  note: string;
+  created_at: string;
+}
+
 export interface Storage {
   init(): Promise<void>;
   createReservation(input: ReservationInput, meta?: { ip?: string }): Promise<ReservationRecord>;
@@ -69,6 +79,9 @@ export interface Storage {
   listReviews(onlyApproved?: boolean): Promise<ReviewRow[]>;
   setReviewStatus(id: number, status: string): Promise<boolean>;
   deleteReview(id: number): Promise<boolean>;
+  listClosedPeriods(): Promise<ClosedPeriodRow[]>;
+  createClosedPeriod(input: ClosedPeriodInput): Promise<{ id: number }>;
+  deleteClosedPeriod(id: number): Promise<boolean>;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
   deleteSetting(key: string): Promise<void>;
@@ -118,6 +131,16 @@ const TABLE_SCHEMA = `
     comment TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
     ip_address TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS closed_periods (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT,
+    repeat TEXT NOT NULL DEFAULT 'none',
+    note TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -270,6 +293,28 @@ async createReservation(input, meta) {
     },
     async deleteReview(id) {
       const info = db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
+      return Number(info.changes) > 0;
+    },
+    async listClosedPeriods() {
+      const rows = db
+        .prepare(
+          `SELECT id, title, start_date, end_date, repeat, note, created_at
+           FROM closed_periods ORDER BY start_date ASC, id ASC`,
+        )
+        .all() as unknown as ClosedPeriodRow[];
+      return rows;
+    },
+    async createClosedPeriod(input) {
+      const info = db
+        .prepare(
+          `INSERT INTO closed_periods (title, start_date, end_date, repeat, note)
+           VALUES (?, ?, ?, ?, ?)`,
+        )
+        .run(input.title, input.startDate, input.endDate || null, input.repeat, input.note);
+      return { id: Number(info.lastInsertRowid) };
+    },
+    async deleteClosedPeriod(id) {
+      const info = db.prepare('DELETE FROM closed_periods WHERE id = ?').run(id);
       return Number(info.changes) > 0;
     },
     async getSetting(key) {
@@ -436,6 +481,25 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
       await client.execute({ sql: 'DELETE FROM reviews WHERE id = ?', args: [id] });
       return true;
     },
+    async listClosedPeriods() {
+      const { rows } = await client.execute({
+        sql: `SELECT id, title, start_date, end_date, repeat, note, created_at
+              FROM closed_periods ORDER BY start_date ASC, id ASC`,
+      });
+      return rows as unknown as ClosedPeriodRow[];
+    },
+    async createClosedPeriod(input) {
+      const result = await client.execute({
+        sql: `INSERT INTO closed_periods (title, start_date, end_date, repeat, note)
+              VALUES (?, ?, ?, ?, ?)`,
+        args: [input.title, input.startDate, input.endDate || null, input.repeat, input.note],
+      });
+      return { id: Number(result.lastInsertRowid) };
+    },
+    async deleteClosedPeriod(id) {
+      await client.execute({ sql: 'DELETE FROM closed_periods WHERE id = ?', args: [id] });
+      return true;
+    },
     async getSetting(key) {
       const { rows } = await client.execute({
         sql: 'SELECT value FROM settings WHERE key = ?',
@@ -460,12 +524,13 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
 }
 
 export function createMemoryStorage(): Storage {
-  const maxId = { reservations: 0, contacts: 0, newsletters: 0, reviews: 0 };
+  const maxId = { reservations: 0, contacts: 0, newsletters: 0, reviews: 0, closedPeriods: 0 };
   const reservations: Array<ReservationRow> = [];
   const contacts: Array<ContactRow> = [];
   const newsletters: Array<NewsletterRow> = [];
   const newsletterEmails = new Set<string>();
   const reviews: Array<ReviewRow> = [];
+  const closedPeriods: Array<ClosedPeriodRow> = [];
   const settings = new Map<string, string>();
   const createdAt = () => new Date().toISOString();
 
@@ -595,6 +660,29 @@ export function createMemoryStorage(): Storage {
       const index = reviews.findIndex((r) => r.id === id);
       if (index === -1) return false;
       reviews.splice(index, 1);
+      return true;
+    },
+    async listClosedPeriods() {
+      return [...closedPeriods].sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : a.id - b.id));
+    },
+    async createClosedPeriod(input) {
+      maxId.closedPeriods += 1;
+      const id = maxId.closedPeriods;
+      closedPeriods.push({
+        id,
+        title: input.title,
+        start_date: input.startDate,
+        end_date: input.endDate || null,
+        repeat: input.repeat,
+        note: input.note,
+        created_at: createdAt(),
+      });
+      return { id };
+    },
+    async deleteClosedPeriod(id) {
+      const index = closedPeriods.findIndex((c) => c.id === id);
+      if (index === -1) return false;
+      closedPeriods.splice(index, 1);
       return true;
     },
     async getSetting(key) {

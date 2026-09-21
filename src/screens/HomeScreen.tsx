@@ -65,7 +65,7 @@ export default function HomeScreen({
   useEffect(() => {
     getReservationConfig()
       .then(setReservationConfig)
-      .catch(() => setReservationConfig({ protectionEnabled: true, paused: false, requireCheck: true }));
+      .catch(() => setReservationConfig({ protectionEnabled: true, paused: false, requireCheck: true, closedPeriods: [] }));
   }, []);
 
   const featuredDishes = activeMenuTab === 'carnes'
