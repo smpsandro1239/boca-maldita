@@ -55,6 +55,7 @@ export const reservationSchema = z
     occasion: z.string().trim().min(1, 'A ocasião é obrigatória.').max(120),
     notes: z.string().trim().max(1000, 'Notas demasiado longas.').optional().default(''),
     check: z.string().trim().max(20).optional().default(''),
+    checkQuestion: z.string().trim().max(40).optional().default(''),
     honeypot: z.string().trim().max(200).optional().default(''),
   })
   .strict();
@@ -103,6 +104,36 @@ export const contactSchema = z
 export const newsletterSchema = z
   .object({
     email: emailField,
+  })
+  .strict();
+
+export const reviewSchema = z
+  .object({
+    name: nameField,
+    serviceRating: z.number().int('Classificação inválida.').min(1).max(5),
+    foodRating: z.number().int('Classificação inválida.').min(1).max(5),
+    ambienceRating: z.number().int('Classificação inválida.').min(1).max(5),
+    comment: z.string().trim().min(5, 'A sua opinião é demasiado curta.').max(1000, 'A opinião é demasiado longa.'),
+  })
+  .strict();
+
+export const reviewStatusSchema = z
+  .object({
+    status: z.enum(['approved', 'pending', 'rejected'], { message: 'Estado inválido.' }),
+  })
+  .strict();
+
+export const adminTokenUpdateSchema = z
+  .object({
+    token: z
+      .string()
+      .trim()
+      .min(16, 'O token tem de ter pelo menos 16 caracteres.')
+      .max(200, 'O token é demasiado longo.')
+      .regex(/[A-Z]/, 'O token tem de conter pelo menos uma letra maiúscula.')
+      .regex(/[a-z]/, 'O token tem de conter pelo menos uma letra minúscula.')
+      .regex(/[0-9]/, 'O token tem de conter pelo menos um número.')
+      .regex(/[^A-Za-z0-9]/, 'O token tem de conter pelo menos um carácter especial.'),
   })
   .strict();
 
@@ -198,6 +229,9 @@ export type ReservationProtectionInput = z.infer<typeof reservationProtectionSch
 export type AdminReservationInput = z.infer<typeof adminReservationSchema>;
 export type ContactInput = z.infer<typeof contactSchema>;
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
+export type ReviewInput = z.infer<typeof reviewSchema>;
+export type ReviewStatusInput = z.infer<typeof reviewStatusSchema>;
+export type AdminTokenUpdateInput = z.infer<typeof adminTokenUpdateSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export type AssetOverrideInput = z.infer<typeof assetOverridesSchema>['overrides'][number];
 export type MenuItemInput = z.infer<typeof menuItemSchema>;

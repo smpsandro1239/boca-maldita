@@ -164,7 +164,7 @@ export default function Footer({ onNavigate, contactEmail }: FooterProps) {
 
         {/* Bottom Bar */}
         <div className="mt-16 pt-8 border-t border-[#282A30] flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#686B73]">
-          <p>© 2024 Boca Maldita Restaurante &amp; Grill. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} Boca Maldita Restaurante &amp; Grill. Todos os direitos reservados.</p>
           <div className="flex items-center gap-6">
             <a href="#privacidade" onClick={(e) => e.preventDefault()} className="hover:text-[#A6A8AD] transition-colors">
               Política de Privacidade

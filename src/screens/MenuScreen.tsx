@@ -25,6 +25,7 @@ export default function MenuScreen({
     { id: 'mar', label: 'Do Mar & Brasas' },
     { id: 'entradas', label: 'Entradas de Assinatura' },
     { id: 'acompanhamentos', label: 'Acompanhamentos' },
+    { id: 'vinhos', label: 'Carta de Vinhos' },
     { id: 'sobremesas', label: 'Sobremesas' }
   ];
 

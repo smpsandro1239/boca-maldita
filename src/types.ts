@@ -91,6 +91,27 @@ export interface NewsletterAdminRow {
   created_at: string;
 }
 
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ReviewAdminRow {
+  id: number;
+  name: string;
+  service_rating: number;
+  food_rating: number;
+  ambience_rating: number;
+  comment: string;
+  status: ReviewStatus;
+  created_at: string;
+}
+
+export interface ReviewInput {
+  name: string;
+  serviceRating: number;
+  foodRating: number;
+  ambienceRating: number;
+  comment: string;
+}
+
 export interface ReservationEditorData {
   name: string;
   email: string;
@@ -114,6 +135,7 @@ export interface ReservationData {
   occasion: string;
   notes?: string;
   check?: string;
+  checkQuestion?: string;
   honeypot?: string;
 }
 

@@ -22,31 +22,38 @@ import {
   ChevronLeft,
   ChevronRight,
   List,
+  Star,
+  KeyRound,
+  ShieldAlert,
 } from 'lucide-react';
-import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, SiteContent } from '../types';
+import type { AssetOverride, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewStatus, SiteContent } from '../types';
 import {
   createAdminReservation,
   deleteAdminContact,
   deleteAdminNewsletter,
   deleteAdminReservation,
+  deleteAdminReview,
   getAdminContacts,
   getAdminNewsletter,
   getAdminReservationProtection,
   getAdminReservations,
+  getAdminReviews,
   resetAdminAssets,
   resetAdminMenus,
   saveAdminAssets,
   saveAdminMenus,
   saveAdminReservationProtection,
   saveSiteContent,
+  setAdminReviewStatus,
   updateAdminReservation,
+  updateAdminToken,
 } from '../lib/api';
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 import { MENU_ITEMS } from '../data/menuData';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
-type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao';
+type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   logo: 'Logótipo',
@@ -65,7 +72,7 @@ const MENU_CATEGORY_LABELS: Record<string, string> = {
   entradas: 'Entradas de Assinatura',
   acompanhamentos: 'Acompanhamentos',
   sobremesas: 'Sobremesas',
-  vinhos: 'Vinhos',
+  vinhos: 'Carta de Vinhos',
 };
 
 const EMPTY_MENU_ITEM: MenuItem = {
@@ -162,6 +169,7 @@ export default function AdminPanel({
   const [reservations, setReservations] = useState<ReservationAdminRow[]>([]);
   const [contacts, setContacts] = useState<ContactAdminRow[]>([]);
   const [newsletter, setNewsletter] = useState<NewsletterAdminRow[]>([]);
+  const [reviews, setReviews] = useState<ReviewAdminRow[]>([]);
   const [protection, setProtection] = useState<ReservationProtectionConfig>(DEFAULT_PROTECTION);
   const [reservationEditor, setReservationEditor] = useState<{
     id: number | null;
@@ -196,11 +204,13 @@ export default function AdminPanel({
       getAdminContacts(token).catch(() => null),
       getAdminNewsletter(token).catch(() => null),
       getAdminReservationProtection(token).catch(() => null),
-    ]).then(([r, c, n, p]) => {
+      getAdminReviews(token).catch(() => null),
+    ]).then(([r, c, n, p, rv]) => {
       if (r) setReservations(r.items);
       if (c) setContacts(c.items);
       if (n) setNewsletter(n.items);
       if (p) setProtection(p);
+      if (rv) setReviews(rv.items);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, adminToken]);
@@ -509,10 +519,12 @@ export default function AdminPanel({
     { id: 'imagens', label: 'Imagens & Logótipo', icon: ImageIcon },
     { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
     { id: 'reservas', label: 'Reservas', icon: CalendarDays },
+    { id: 'avaliacoes', label: 'Avaliações', icon: Star },
     { id: 'contactos', label: 'Contactos', icon: Mail },
     { id: 'newsletter', label: 'Newsletter', icon: Rss },
     { id: 'conteudo', label: 'Conteúdo', icon: Settings },
     { id: 'protecao', label: 'Proteção', icon: ShieldCheck },
+    { id: 'seguranca', label: 'Segurança', icon: KeyRound },
   ];
 
   return (
@@ -593,6 +605,45 @@ export default function AdminPanel({
             <>
               <div>
                 <h3 className="font-serif text-lg text-[#F7F5F0] mb-3">Visão geral</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReservationsView('calendario');
+                      setSelectedDate(todayKey());
+                      setActiveTab('reservas');
+                    }}
+                    className="bg-[#141518] border border-[#D4A373]/40 p-4 text-left transition-colors hover:border-[#D4A373] hover:bg-[#1C1E22]"
+                    title="Abrir calendário de reservas de hoje"
+                  >
+                    <p className="text-3xl font-serif text-[#D4A373]">
+                      {reservations.filter((r) => r.date === todayKey()).length}
+                    </p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Reservas hoje · Calendário ›</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReservationsView('calendario');
+                      setSelectedDate(todayKey());
+                      setActiveTab('reservas');
+                    }}
+                    className="bg-[#141518] border border-[#282A30] p-4 text-left transition-colors hover:border-[#D4A373]/60 hover:bg-[#1C1E22]"
+                    title="Abrir calendário de reservas"
+                  >
+                    <p className="text-3xl font-serif text-[#F7F5F0]">
+                      {
+                        reservations.filter((r) => {
+                          const raw = r.created_at ?? '';
+                          const iso = raw.includes(' ') ? `${raw.replace(' ', 'T')}Z` : raw;
+                          const ms = Date.parse(iso);
+                          return !Number.isNaN(ms) && Date.now() - ms <= 24 * 60 * 60 * 1000;
+                        }).length
+                      }
+                    </p>
+                    <p className="text-[10px] uppercase tracking-widest text-[#F7F5F0]/60 mt-1 font-mono">Novas reservas · últimas 24h ›</p>
+                  </button>
+                </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <button
                     type="button"
@@ -995,6 +1046,143 @@ export default function AdminPanel({
             </div>
           )}
 
+          {activeTab === 'avaliacoes' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60">
+                  Avaliações deixadas pelos clientes no site. Só aparecem publicamente depois de <strong className="text-[#F7F5F0]">Apresentar</strong>.
+                  {reviews.filter((r) => r.status === 'pending').length > 0 && (
+                    <span className="ml-1 text-amber-400">
+                      {reviews.filter((r) => r.status === 'pending').length} por aprovar.
+                    </span>
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReviews([...reviews])}
+                  className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Recarregar
+                </button>
+              </div>
+
+              {reviews.length === 0 ? (
+                <div className="bg-[#141518] border border-[#282A30] p-5 text-sm text-[#F7F5F0]/60">
+                  Ainda não há avaliações. Quando um cliente submeter uma avaliação no site, ela aparece aqui para aprovação.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((review) => (
+                    <div key={review.id} className="bg-[#141518] border border-[#282A30] p-4 space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-3">
+                          <span className="font-serif text-[#F7F5F0]">{review.name}</span>
+                          <span
+                            className={`text-[10px] uppercase tracking-wider font-mono px-2 py-0.5 border ${
+                              review.status === 'approved'
+                                ? 'text-emerald-300 border-emerald-500/40 bg-emerald-950/40'
+                                : review.status === 'rejected'
+                                  ? 'text-red-300 border-red-500/40 bg-red-950/40'
+                                  : 'text-amber-300 border-amber-500/40 bg-amber-950/40'
+                            }`}
+                          >
+                            {review.status === 'approved' ? 'Apresentada' : review.status === 'rejected' ? 'Rejeitada' : 'Por aprovar'}
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono text-[#F7F5F0]/40">
+                          {new Date(review.created_at.includes(' ') ? `${review.created_at.replace(' ', 'T')}Z` : review.created_at).toLocaleString('pt-PT')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-[11px] text-[#A6A8AD]">
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-[#D4A373]" /> Serviço: {review.service_rating}/5
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-[#D4A373]" /> Comida: {review.food_rating}/5
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-[#D4A373]" /> Ambiente: {review.ambience_rating}/5
+                        </span>
+                      </div>
+                      <p className="text-sm text-[#F7F5F0]/85 leading-relaxed">{review.comment}</p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {review.status !== 'approved' && (
+                          <button
+                            type="button"
+                            disabled={busy === 'avaliacoes'}
+                            onClick={() =>
+                              void run(
+                                'avaliacoes',
+                                async () => {
+                                  await setAdminReviewStatus(review.id, 'approved', token);
+                                  setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, status: 'approved' } : r)));
+                                },
+                                'Avaliação apresentada publicamente.',
+                              )
+                            }
+                            className="flex items-center gap-1.5 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-3 py-1.5 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Apresentar
+                          </button>
+                        )}
+                        {review.status !== 'rejected' && (
+                          <button
+                            type="button"
+                            disabled={busy === 'avaliacoes'}
+                            onClick={() =>
+                              void run(
+                                'avaliacoes',
+                                async () => {
+                                  await setAdminReviewStatus(review.id, 'rejected', token);
+                                  setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, status: 'rejected' } : r)));
+                                },
+                                'Avaliação rejeitada.',
+                              )
+                            }
+                            className="flex items-center gap-1.5 bg-[#141518] border border-[#282A30] hover:border-red-500/60 text-[#F7F5F0]/80 px-3 py-1.5 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50"
+                          >
+                            <ShieldAlert className="w-3.5 h-3.5" />
+                            Rejeitar
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          disabled={busy === 'avaliacoes'}
+                          onClick={() =>
+                            void run(
+                              'avaliacoes',
+                              async () => {
+                                await deleteAdminReview(review.id, token);
+                                setReviews((prev) => prev.filter((r) => r.id !== review.id));
+                              },
+                              'Avaliação eliminada.',
+                            )
+                          }
+                          className="flex items-center gap-1.5 bg-[#141518] border border-[#282A30] hover:border-red-500/60 text-red-300 px-3 py-1.5 text-[11px] uppercase tracking-wider font-semibold disabled:opacity-50 ml-auto"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          Eliminar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'seguranca' && (
+            <SecurityTabContent
+              adminToken={adminToken}
+              busy={busy}
+              run={run}
+              onAdminTokenChange={onAdminTokenChange}
+              onClose={onClose}
+            />
+          )}
+
           {activeTab === 'protecao' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between gap-3">
@@ -1033,7 +1221,7 @@ export default function AdminPanel({
                   checked={protection.requireCheck}
                   onChange={(v) => setProtectionField('requireCheck', v)}
                   label="Pergunta anti-robô no formulário"
-                  hint="Mostra «Quanto é 3+4?» + campo escondido (honeypot) para travar bots."
+                  hint="Mostra uma pergunta de aritmética aleatória (ex.: «quanto é 7 mais 5?») + campo escondido (honeypot) para travar bots."
                 />
                 <ProtectionSwitch
                   checked={protection.rateLimit}
@@ -1833,6 +2021,112 @@ function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProp
             {item.id ? 'Guardar alterações' : 'Adicionar prato'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+type RunFn = (action: string, fn: () => Promise<void>, successMessage: string) => Promise<void>;
+
+function generateStrongToken(): string {
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const special = '!@#$%^&*_-+=';
+  const all = upper + lower + digits + special;
+  const random = () => window.crypto.getRandomValues(new Uint32Array(1))[0];
+  const pick = (s: string) => s[random() % s.length];
+  const parts = [pick(upper), pick(lower), pick(digits), pick(special)];
+  for (let i = 0; i < 20; i += 1) parts.push(all[random() % all.length]);
+  for (let i = parts.length - 1; i > 0; i -= 1) {
+    const j = random() % (i + 1);
+    const tmp = parts[i];
+    parts[i] = parts[j];
+    parts[j] = tmp;
+  }
+  return parts.join('');
+}
+
+function SecurityTabContent({
+  adminToken,
+  busy,
+  run,
+  onAdminTokenChange,
+  onClose,
+}: {
+  adminToken: string;
+  busy: string | null;
+  run: RunFn;
+  onAdminTokenChange: (token: string) => void;
+  onClose: () => void;
+}) {
+  const [newToken, setNewToken] = useState('');
+  const [showToken, setShowToken] = useState(false);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="font-serif text-lg text-[#F7F5F0] mb-2">Alterar token de administrador</h3>
+        <p className="text-xs text-[#F7F5F0]/60">
+          O token protege todo o painel. Para ser aceite tem de cumprir: pelo menos <strong className="text-[#F7F5F0]">16 caracteres</strong>, uma letra <strong className="text-[#F7F5F0]">maiúscula</strong>, uma <strong className="text-[#F7F5F0]">minúscula</strong>, um <strong className="text-[#F7F5F0]">número</strong> e um <strong className="text-[#F7F5F0]">carácter especial</strong>. Depois de alterar, a sessão atual termina e terá de iniciar sessão com o novo token.
+        </p>
+      </div>
+
+      <div className="bg-[#141518] border border-[#282A30] p-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">
+            Novo token
+          </label>
+          <button
+            type="button"
+            onClick={() => setNewToken(generateStrongToken())}
+            className="text-[11px] text-[#D4A373] hover:text-[#e0b585] underline uppercase tracking-wider"
+          >
+            Gerar token forte
+          </button>
+        </div>
+        <div className="flex gap-2">
+          <input
+            type={showToken ? 'text' : 'password'}
+            value={newToken}
+            onChange={(e) => setNewToken(e.target.value)}
+            placeholder="Cole o novo token aqui"
+            className="flex-1 bg-[#1C1E22] border border-[#282A30] px-3.5 py-2.5 text-xs font-mono text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
+          />
+          <button
+            type="button"
+            onClick={() => setShowToken((v) => !v)}
+            className="px-3 py-2 bg-[#0C0D0E] border border-[#282A30] text-[#F7F5F0]/70 text-xs uppercase tracking-wider hover:border-[#D4A373]/60"
+          >
+            {showToken ? 'Ocultar' : 'Ver'}
+          </button>
+        </div>
+        {newToken && !/^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{16,}$/.test(newToken.trim()) && (
+          <p className="text-[11px] text-amber-400">
+            Este token ainda não cumpre todos os requisitos de segurança.
+          </p>
+        )}
+        <button
+          type="button"
+          disabled={busy === 'seguranca' || !adminToken.trim()}
+          onClick={() =>
+            void run(
+              'seguranca',
+              async () => {
+                await updateAdminToken(newToken.trim(), adminToken.trim());
+                setNewToken('');
+                setShowToken(false);
+                onAdminTokenChange('');
+                onClose();
+              },
+              'Token alterado com sucesso. Inicie sessão com o novo token.',
+            )
+          }
+          className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2.5 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+        >
+          <KeyRound className="w-4 h-4" />
+          Alterar token
+        </button>
       </div>
     </div>
   );

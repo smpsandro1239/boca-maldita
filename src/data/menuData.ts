@@ -195,5 +195,85 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Experiência Telúrica',
     description: 'Ganache de cacau de origem única, crumble de avelã tostada e gelado artesanal com infusão subtil de fumo de carvalho.',
     imageUrl: getAssetUrl('dish-costelao')
+  },
+
+  // Carta de Vinhos
+  {
+    id: 'vinho-quinta-do-porto-reserva',
+    name: 'Quinta do Porto Reserva Tinto',
+    price: 38.0,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Reserva',
+    tagline: 'Douro DOC',
+    description: 'Baga de Touriga Franca e Touriga Nacional, 18 meses em barrica de carvalho francês. Taninos sedosos, notas de ameixa negra, especiaria e cacau. Ideal com carnes na brasa.',
+    imageUrl: '',
+    origin: 'Douro DOC',
+    pairingWine: 'Touriga Franca > Touriga Nacional'
+  },
+  {
+    id: 'vinho-pontes-tinto',
+    name: 'Ponte da Barca Tinto de Talha',
+    price: 28.5,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Vinho de Talha',
+    tagline: 'Alentejo DOC',
+    description: 'Vinificação ancestral em ânfora de barro. Fruta madura, textura terrosa e final fresco. Companheiro direto do Costelão no Fogo.',
+    imageUrl: '',
+    origin: 'Alentejo DOC',
+    pairingWine: 'Alicante Bouschet > Trincadeira'
+  },
+  {
+    id: 'vinho-bairrada-espumante',
+    name: 'Bairrada Espumante Brut Nature',
+    price: 32.0,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Espumante',
+    tagline: 'Método Clássico',
+    description: 'Baga Baião de longa maturação, bolha fina e vivaz. Entrada obrigatória: acompanha o Tutano Assado e o Carpaccio 45D.',
+    imageUrl: '',
+    origin: 'Bairrada DOC',
+    pairingWine: 'Baga'
+  },
+  {
+    id: 'vinho-alvarinho-moncao',
+    name: 'Alvarinho da Monção e Melgaço',
+    price: 24.0,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Branco',
+    tagline: 'Monção e Melgaço DOC',
+    description: 'Citrino, mineral e vibrante, com tensão de mar e granito. Perfeito para o Polvo no Carvão e o Gambão Tigre.',
+    imageUrl: '',
+    origin: 'Monção e Melgaço DOC',
+    pairingWine: 'Alvarinho'
+  },
+  {
+    id: 'vinho-loureiro-vinho-verde',
+    name: 'Loureiro da Região dos Vinhos Verdes',
+    price: 16.5,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Vinho Verde',
+    tagline: 'Vinho Verde DOC',
+    description: 'Fresco, floral e ligeiramente frisante, direto das vinhas do Cávado. Prova da casa para o início da noite.',
+    imageUrl: '',
+    origin: 'Vinho Verde DOC',
+    pairingWine: 'Loureiro'
+  },
+  {
+    id: 'vinho-rose-quinta-das-asas',
+    name: 'Quinta das Aves Rosé de Pinot Noir',
+    price: 27.0,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Rosé',
+    tagline: 'Terras de Lisboa DOC',
+    description: 'Rosé delicado de Pinot Noir com notas de morango, framboesa e flor de laranjeira. Leve e gastronómico.',
+    imageUrl: '',
+    origin: 'Terras de Lisboa DOC',
+    pairingWine: 'Pinot Noir'
   }
 ];

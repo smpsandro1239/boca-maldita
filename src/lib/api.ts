@@ -1,4 +1,4 @@
-import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, SiteContent } from '../types';
+import type { AssetOverride, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
@@ -38,6 +38,7 @@ export interface ReservationPayload {
   occasion: string;
   notes?: string;
   check?: string;
+  checkQuestion?: string;
   honeypot?: string;
 }
 
@@ -207,5 +208,42 @@ export function deleteAdminNewsletter(id: number, token: string): Promise<{ ok: 
   return request<{ ok: boolean }>(`/admin/newsletter/${id}`, {
     method: 'DELETE',
     headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function createReview(payload: ReviewInput): Promise<{ id: number }> {
+  return post<{ id: number }>('/reviews', payload);
+}
+
+export function getReviews(): Promise<{ items: ReviewAdminRow[] }> {
+  return request<{ items: ReviewAdminRow[] }>('/reviews');
+}
+
+export function getAdminReviews(token: string): Promise<{ items: ReviewAdminRow[] }> {
+  return request<{ items: ReviewAdminRow[] }>('/admin/reviews', {
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function setAdminReviewStatus(id: number, status: ReviewStatus, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/reviews/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function deleteAdminReview(id: number, token: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/reviews/${id}`, {
+    method: 'DELETE',
+    headers: { 'X-Admin-Token': token },
+  });
+}
+
+export function updateAdminToken(newToken: string, currentToken: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>('/admin/security/token', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': currentToken },
+    body: JSON.stringify({ token: newToken }),
   });
 }

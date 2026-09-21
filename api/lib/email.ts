@@ -77,3 +77,38 @@ export async function sendReservationConfirmation(payload: ConfirmationPayload):
     return false;
   }
 }
+
+function buildWelcomeHtml(): string {
+  return [
+    `<div style="font-family:Georgia,serif;background:#0C0D0E;padding:32px 16px;color:#F7F5F0;">`,
+    `  <div style="max-width:560px;margin:0 auto;border:1px solid #282A30;background:#141518;padding:32px;">`,
+    `    <p style="font-family:monospace;letter-spacing:0.2em;color:#D4A373;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita · Boletim Exclusivo</p>`,
+    `    <h1 style="font-size:28px;margin:0 0 16px;">Bem-vindo ao clube exclusivo</h1>`,
+    `    <p style="color:#A6A8AD;margin:0 0 16px;font-size:14px;line-height:1.6;">Receberá convites prioritários para experiências gastronómicas sazonais, cortes raros e acesso antecipado às datas mais desejadas.</p>`,
+    `    <p style="color:#A6A8AD;margin:0;font-size:14px;line-height:1.6;">Fique atento à caixa de entrada — o próximo convite chega em breve.</p>`,
+    `    <p style="color:#686B73;font-size:12px;margin:24px 0 0;">Boca Maldita · Fine Dining &amp; Grill · Avenida do Cávado, Vila de Prado, Vila Verde</p>`,
+    `  </div>`,
+    `</div>`,
+  ].join('\n');
+}
+
+export async function sendNewsletterWelcome(email: string): Promise<boolean> {
+  const transporter = await getTransporter();
+  if (!transporter) {
+    console.warn('[email] SMTP não configurado — boas-vindas do boletim não enviada.');
+    return false;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: (process.env.MAIL_FROM ?? '').trim() || 'Boca Maldita <smpsandro1239@gmail.com>',
+      to: email,
+      subject: 'Bem-vindo ao Boletim Exclusivo — Boca Maldita',
+      html: buildWelcomeHtml(),
+    });
+    return true;
+  } catch (err) {
+    console.error('[email] Erro ao enviar boas-vindas do boletim:', err);
+    return false;
+  }
+}

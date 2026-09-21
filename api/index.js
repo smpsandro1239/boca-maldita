@@ -42,6 +42,18 @@ var TABLE_SCHEMA = `
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    service_rating INTEGER NOT NULL,
+    food_rating INTEGER NOT NULL,
+    ambience_rating INTEGER NOT NULL,
+    comment TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    ip_address TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -139,6 +151,31 @@ ${TABLE_SCHEMA}`);
     },
     async deleteNewsletter(id) {
       const info = db.prepare("DELETE FROM newsletter_subscriptions WHERE id = ?").run(id);
+      return Number(info.changes) > 0;
+    },
+    async createReview(input, meta) {
+      const info = db.prepare(
+        `INSERT INTO reviews (name, service_rating, food_rating, ambience_rating, comment, status, ip_address)
+           VALUES (?, ?, ?, ?, ?, 'pending', ?)`
+      ).run(input.name, input.serviceRating, input.foodRating, input.ambienceRating, input.comment, meta?.ip ?? null);
+      return { id: Number(info.lastInsertRowid) };
+    },
+    async listReviews(onlyApproved) {
+      const rows = onlyApproved ? db.prepare(
+        `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+               FROM reviews WHERE status = 'approved' ORDER BY id DESC`
+      ).all() : db.prepare(
+        `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+               FROM reviews ORDER BY id DESC`
+      ).all();
+      return rows;
+    },
+    async setReviewStatus(id, status) {
+      const info = db.prepare("UPDATE reviews SET status = ? WHERE id = ?").run(status, id);
+      return Number(info.changes) > 0;
+    },
+    async deleteReview(id) {
+      const info = db.prepare("DELETE FROM reviews WHERE id = ?").run(id);
       return Number(info.changes) > 0;
     },
     async getSetting(key) {
@@ -259,6 +296,37 @@ function createTursoStorage(client) {
       await client.execute({ sql: "DELETE FROM newsletter_subscriptions WHERE id = ?", args: [id] });
       return true;
     },
+    async createReview(input, meta) {
+      const result = await client.execute({
+        sql: `INSERT INTO reviews (name, service_rating, food_rating, ambience_rating, comment, status, ip_address)
+              VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+        args: [input.name, input.serviceRating, input.foodRating, input.ambienceRating, input.comment, meta?.ip ?? null]
+      });
+      return { id: Number(result.lastInsertRowid) };
+    },
+    async listReviews(onlyApproved) {
+      const { rows } = await client.execute(
+        onlyApproved ? {
+          sql: `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+                    FROM reviews WHERE status = 'approved' ORDER BY id DESC`
+        } : {
+          sql: `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+                    FROM reviews ORDER BY id DESC`
+        }
+      );
+      return rows;
+    },
+    async setReviewStatus(id, status) {
+      await client.execute({
+        sql: "UPDATE reviews SET status = ? WHERE id = ?",
+        args: [status, id]
+      });
+      return true;
+    },
+    async deleteReview(id) {
+      await client.execute({ sql: "DELETE FROM reviews WHERE id = ?", args: [id] });
+      return true;
+    },
     async getSetting(key) {
       const { rows } = await client.execute({
         sql: "SELECT value FROM settings WHERE key = ?",
@@ -282,11 +350,12 @@ function createTursoStorage(client) {
   };
 }
 function createMemoryStorage() {
-  const maxId = { reservations: 0, contacts: 0, newsletters: 0 };
+  const maxId = { reservations: 0, contacts: 0, newsletters: 0, reviews: 0 };
   const reservations = [];
   const contacts = [];
   const newsletters = [];
   const newsletterEmails = /* @__PURE__ */ new Set();
+  const reviews = [];
   const settings = /* @__PURE__ */ new Map();
   const createdAt = () => (/* @__PURE__ */ new Date()).toISOString();
   return {
@@ -385,6 +454,36 @@ function createMemoryStorage() {
       newsletters.splice(index, 1);
       return true;
     },
+    async createReview(input, meta) {
+      maxId.reviews += 1;
+      const id = maxId.reviews;
+      reviews.push({
+        id,
+        name: input.name,
+        service_rating: input.serviceRating,
+        food_rating: input.foodRating,
+        ambience_rating: input.ambienceRating,
+        comment: input.comment,
+        status: "pending",
+        created_at: createdAt()
+      });
+      return { id };
+    },
+    async listReviews(onlyApproved) {
+      return reviews.filter((r) => !onlyApproved || r.status === "approved").map((r) => ({ ...r })).reverse();
+    },
+    async setReviewStatus(id, status) {
+      const found = reviews.find((r) => r.id === id);
+      if (!found) return false;
+      found.status = status;
+      return true;
+    },
+    async deleteReview(id) {
+      const index = reviews.findIndex((r) => r.id === id);
+      if (index === -1) return false;
+      reviews.splice(index, 1);
+      return true;
+    },
     async getSetting(key) {
       return settings.get(key) ?? null;
     },
@@ -463,6 +562,7 @@ var reservationSchema = z.object({
   occasion: z.string().trim().min(1, "A ocasi\xE3o \xE9 obrigat\xF3ria.").max(120),
   notes: z.string().trim().max(1e3, "Notas demasiado longas.").optional().default(""),
   check: z.string().trim().max(20).optional().default(""),
+  checkQuestion: z.string().trim().max(40).optional().default(""),
   honeypot: z.string().trim().max(200).optional().default("")
 }).strict();
 var reservationProtectionSchema = z.object({
@@ -496,6 +596,19 @@ var contactSchema = z.object({
 }).strict();
 var newsletterSchema = z.object({
   email: emailField
+}).strict();
+var reviewSchema = z.object({
+  name: nameField,
+  serviceRating: z.number().int("Classifica\xE7\xE3o inv\xE1lida.").min(1).max(5),
+  foodRating: z.number().int("Classifica\xE7\xE3o inv\xE1lida.").min(1).max(5),
+  ambienceRating: z.number().int("Classifica\xE7\xE3o inv\xE1lida.").min(1).max(5),
+  comment: z.string().trim().min(5, "A sua opini\xE3o \xE9 demasiado curta.").max(1e3, "A opini\xE3o \xE9 demasiado longa.")
+}).strict();
+var reviewStatusSchema = z.object({
+  status: z.enum(["approved", "pending", "rejected"], { message: "Estado inv\xE1lido." })
+}).strict();
+var adminTokenUpdateSchema = z.object({
+  token: z.string().trim().min(16, "O token tem de ter pelo menos 16 caracteres.").max(200, "O token \xE9 demasiado longo.").regex(/[A-Z]/, "O token tem de conter pelo menos uma letra mai\xFAscula.").regex(/[a-z]/, "O token tem de conter pelo menos uma letra min\xFAscula.").regex(/[0-9]/, "O token tem de conter pelo menos um n\xFAmero.").regex(/[^A-Za-z0-9]/, "O token tem de conter pelo menos um car\xE1cter especial.")
 }).strict();
 var siteSettingsSchema = z.object({
   contactEmail: emailField
@@ -611,6 +724,38 @@ async function sendReservationConfirmation(payload) {
     return false;
   }
 }
+function buildWelcomeHtml() {
+  return [
+    `<div style="font-family:Georgia,serif;background:#0C0D0E;padding:32px 16px;color:#F7F5F0;">`,
+    `  <div style="max-width:560px;margin:0 auto;border:1px solid #282A30;background:#141518;padding:32px;">`,
+    `    <p style="font-family:monospace;letter-spacing:0.2em;color:#D4A373;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita \xB7 Boletim Exclusivo</p>`,
+    `    <h1 style="font-size:28px;margin:0 0 16px;">Bem-vindo ao clube exclusivo</h1>`,
+    `    <p style="color:#A6A8AD;margin:0 0 16px;font-size:14px;line-height:1.6;">Receber\xE1 convites priorit\xE1rios para experi\xEAncias gastron\xF3micas sazonais, cortes raros e acesso antecipado \xE0s datas mais desejadas.</p>`,
+    `    <p style="color:#A6A8AD;margin:0;font-size:14px;line-height:1.6;">Fique atento \xE0 caixa de entrada \u2014 o pr\xF3ximo convite chega em breve.</p>`,
+    `    <p style="color:#686B73;font-size:12px;margin:24px 0 0;">Boca Maldita \xB7 Fine Dining &amp; Grill \xB7 Avenida do C\xE1vado, Vila de Prado, Vila Verde</p>`,
+    `  </div>`,
+    `</div>`
+  ].join("\n");
+}
+async function sendNewsletterWelcome(email) {
+  const transporter = await getTransporter();
+  if (!transporter) {
+    console.warn("[email] SMTP n\xE3o configurado \u2014 boas-vindas do boletim n\xE3o enviada.");
+    return false;
+  }
+  try {
+    await transporter.sendMail({
+      from: (process.env.MAIL_FROM ?? "").trim() || "Boca Maldita <smpsandro1239@gmail.com>",
+      to: email,
+      subject: "Bem-vindo ao Boletim Exclusivo \u2014 Boca Maldita",
+      html: buildWelcomeHtml()
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] Erro ao enviar boas-vindas do boletim:", err);
+    return false;
+  }
+}
 
 // api/lib/app.ts
 var distDir = "";
@@ -622,10 +767,18 @@ var SITE_CONTACT_EMAIL_KEY = "site_contact_email";
 var MENU_ITEMS_KEY = "menu_items";
 var SITE_CONTENT_KEY = "site_content";
 var RESERVATION_PROTECTION_KEY = "reservation_protection";
+var ADMIN_TOKEN_KEY = "admin_token";
 var DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? "").trim() || "smpsandro1239@gmail.com";
-var CHECK_ANSWER = "7";
 var RATE_WINDOW_MS = 15 * 60 * 1e3;
 var RATE_MAX_HITS = 5;
+function solveCheckExpression(expression) {
+  const match = /^\s*(\d{1,3})\s*([+-])\s*(\d{1,3})\s*$/.exec(expression);
+  if (!match) return null;
+  const a = Number(match[1]);
+  const b = Number(match[3]);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return match[2] === "+" ? a + b : a - b;
+}
 var DEFAULT_RESERVATION_PROTECTION = {
   enabled: false,
   pauseForm: false,
@@ -680,14 +833,26 @@ async function getReservationProtection(storage) {
   return parseReservationProtection(raw);
 }
 var adminToken = (process.env.ADMIN_TOKEN ?? "").trim();
-function adminUnauthorized(res) {
-  if (adminToken) {
+async function getEffectiveAdminToken(storage) {
+  const stored = await storage.getSetting(ADMIN_TOKEN_KEY);
+  return stored?.trim() || adminToken;
+}
+function adminUnauthorized(res, hasToken) {
+  if (hasToken) {
     res.status(401).json({ error: "Token de administrador inv\xE1lido." });
   } else {
     res.status(503).json({
       error: "Administra\xE7\xE3o desativada: defina a vari\xE1vel ADMIN_TOKEN no servidor."
     });
   }
+}
+async function isAuthorized(req, res, storage) {
+  const effective = await getEffectiveAdminToken(storage);
+  if (!effective || req.headers["x-admin-token"] !== effective) {
+    adminUnauthorized(res, effective !== "");
+    return false;
+  }
+  return true;
 }
 async function createApp() {
   let storage;
@@ -760,7 +925,8 @@ async function createApp() {
           });
         }
         if (protection.requireCheck) {
-          const checkOk = parsed.data.check === CHECK_ANSWER;
+          const answer = solveCheckExpression(parsed.data.checkQuestion);
+          const checkOk = answer !== null && Number(parsed.data.check) === answer;
           const honeypotEmpty = !parsed.data.honeypot;
           if (!checkOk || !honeypotEmpty) {
             return res.status(400).json({ error: "Verifica\xE7\xE3o anti-rob\xF4 incorreta. Tente de novo." });
@@ -807,6 +973,9 @@ async function createApp() {
         return res.status(409).json({ error: "Este email j\xE1 est\xE1 subscrito no boletim." });
       }
       const { id } = await storage.createNewsletter(parsed.data);
+      sendNewsletterWelcome(parsed.data.email).catch((err) => {
+        console.error("[email] Falha no envio de boas-vindas do boletim:", err);
+      });
       res.status(201).json({ id });
     } catch (err) {
       next(err);
@@ -822,9 +991,7 @@ async function createApp() {
   });
   app.put("/api/site", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const parsed = siteSettingsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -835,30 +1002,27 @@ async function createApp() {
       next(err);
     }
   });
-  app.get("/api/admin/verify-token", (_req, res) => {
-    if (!adminToken || _req.headers["x-admin-token"] !== adminToken) {
-      return adminUnauthorized(res);
-    }
+  app.get("/api/admin/verify-token", async (req, res) => {
+    if (!await isAuthorized(req, res, storage)) return;
     res.json({ ok: true });
   });
   app.get("/api/admin/assets", async (_req, res, next) => {
     try {
+      const effective = await getEffectiveAdminToken(storage);
       const raw = await storage.getSetting(IMAGE_OVERRIDES_KEY);
       const stored = parseStoredJson(raw);
       const overrides = {};
       for (const [id, value] of Object.entries(stored)) {
         overrides[id] = typeof value === "string" ? { url: value } : value;
       }
-      res.json({ enabled: adminToken !== "", overrides });
+      res.json({ enabled: effective !== "", overrides });
     } catch (err) {
       next(err);
     }
   });
   app.put("/api/admin/assets", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const parsed = assetOverridesSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -879,9 +1043,7 @@ async function createApp() {
   });
   app.delete("/api/admin/assets", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       await storage.deleteSetting(IMAGE_OVERRIDES_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -908,9 +1070,7 @@ async function createApp() {
   });
   app.put("/api/admin/menus", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const parsed = menuItemsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -926,9 +1086,7 @@ async function createApp() {
   });
   app.delete("/api/admin/menus", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       await storage.deleteSetting(MENU_ITEMS_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -946,9 +1104,7 @@ async function createApp() {
   });
   app.put("/api/admin/site-content", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const parsed = siteContentSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -962,9 +1118,7 @@ async function createApp() {
   });
   app.get("/api/admin/reservation-protection", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       res.json(await getReservationProtection(storage));
     } catch (err) {
       next(err);
@@ -972,9 +1126,7 @@ async function createApp() {
   });
   app.put("/api/admin/reservation-protection", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const parsed = reservationProtectionSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -987,9 +1139,7 @@ async function createApp() {
   });
   app.get("/api/admin/reservations", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       res.json({ items: await storage.listReservations() });
     } catch (err) {
       next(err);
@@ -997,9 +1147,7 @@ async function createApp() {
   });
   app.delete("/api/admin/reservations/:id", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1011,9 +1159,7 @@ async function createApp() {
   });
   app.post("/api/admin/reservations", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const parsed = adminReservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1026,9 +1172,7 @@ async function createApp() {
   });
   app.put("/api/admin/reservations/:id", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1048,9 +1192,7 @@ async function createApp() {
   });
   app.get("/api/admin/contacts", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       res.json({ items: await storage.listContacts() });
     } catch (err) {
       next(err);
@@ -1058,9 +1200,7 @@ async function createApp() {
   });
   app.delete("/api/admin/contacts/:id", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1072,9 +1212,7 @@ async function createApp() {
   });
   app.get("/api/admin/newsletter", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       res.json({ items: await storage.listNewsletter() });
     } catch (err) {
       next(err);
@@ -1082,14 +1220,90 @@ async function createApp() {
   });
   app.delete("/api/admin/newsletter/:id", async (req, res, next) => {
     try {
-      if (!adminToken || req.headers["x-admin-token"] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!await isAuthorized(req, res, storage)) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
       }
       res.json({ ok: await storage.deleteNewsletter(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.post("/api/reviews", async (req, res, next) => {
+    try {
+      const parsed = reviewSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const { id } = await storage.createReview(parsed.data, { ip: getClientIp(req) });
+      res.status(201).json({ id });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/reviews", async (_req, res, next) => {
+    try {
+      res.json({ items: await storage.listReviews(true) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/reviews", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      res.json({ items: await storage.listReviews() });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/reviews/:id", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      const parsed = reviewStatusSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const ok = await storage.setReviewStatus(idResult.data, parsed.data.status);
+      if (!ok) {
+        return res.status(404).json({ error: "Avalia\xE7\xE3o n\xE3o encontrada." });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/reviews/:id", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: "ID inv\xE1lido." });
+      }
+      res.json({ ok: await storage.deleteReview(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/security/token", async (req, res, next) => {
+    try {
+      if (!await isAuthorized(req, res, storage)) return;
+      const parsed = adminTokenUpdateSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "O token n\xE3o cumpre os requisitos. Necessita de: pelo menos 16 caracteres, mai\xFAsculas, min\xFAsculas, um n\xFAmero e um car\xE1cter especial.",
+          issues: parsed.error.issues.map((issue) => issue.message)
+        });
+      }
+      if (parsed.data.token === await getEffectiveAdminToken(storage)) {
+        return res.status(400).json({ error: "O novo token \xE9 igual ao atual." });
+      }
+      await storage.setSetting(ADMIN_TOKEN_KEY, parsed.data.token);
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }

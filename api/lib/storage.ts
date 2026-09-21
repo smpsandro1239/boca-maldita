@@ -1,6 +1,6 @@
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
-import type { AdminReservationInput, ContactInput, NewsletterInput, ReservationInput } from './validation';
+import type { AdminReservationInput, ContactInput, NewsletterInput, ReservationInput, ReviewInput } from './validation';
 
 export interface ReservationRecord {
   id: number;
@@ -39,6 +39,17 @@ export interface NewsletterRow {
   created_at: string;
 }
 
+export interface ReviewRow {
+  id: number;
+  name: string;
+  service_rating: number;
+  food_rating: number;
+  ambience_rating: number;
+  comment: string;
+  status: string;
+  created_at: string;
+}
+
 export interface Storage {
   init(): Promise<void>;
   createReservation(input: ReservationInput, meta?: { ip?: string }): Promise<ReservationRecord>;
@@ -54,6 +65,10 @@ export interface Storage {
   createNewsletter(input: NewsletterInput): Promise<{ id: number }>;
   listNewsletter(): Promise<NewsletterRow[]>;
   deleteNewsletter(id: number): Promise<boolean>;
+  createReview(input: ReviewInput, meta?: { ip?: string }): Promise<{ id: number }>;
+  listReviews(onlyApproved?: boolean): Promise<ReviewRow[]>;
+  setReviewStatus(id: number, status: string): Promise<boolean>;
+  deleteReview(id: number): Promise<boolean>;
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
   deleteSetting(key: string): Promise<void>;
@@ -91,6 +106,18 @@ const TABLE_SCHEMA = `
   CREATE TABLE IF NOT EXISTS newsletter_subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    service_rating INTEGER NOT NULL,
+    food_rating INTEGER NOT NULL,
+    ambience_rating INTEGER NOT NULL,
+    comment TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    ip_address TEXT,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -210,6 +237,39 @@ async createReservation(input, meta) {
     },
     async deleteNewsletter(id) {
       const info = db.prepare('DELETE FROM newsletter_subscriptions WHERE id = ?').run(id);
+      return Number(info.changes) > 0;
+    },
+    async createReview(input, meta) {
+      const info = db
+        .prepare(
+          `INSERT INTO reviews (name, service_rating, food_rating, ambience_rating, comment, status, ip_address)
+           VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+        )
+        .run(input.name, input.serviceRating, input.foodRating, input.ambienceRating, input.comment, meta?.ip ?? null);
+      return { id: Number(info.lastInsertRowid) };
+    },
+    async listReviews(onlyApproved) {
+      const rows = (onlyApproved
+        ? db
+            .prepare(
+              `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+               FROM reviews WHERE status = 'approved' ORDER BY id DESC`,
+            )
+            .all()
+        : db
+            .prepare(
+              `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+               FROM reviews ORDER BY id DESC`,
+            )
+            .all()) as unknown as ReviewRow[];
+      return rows;
+    },
+    async setReviewStatus(id, status) {
+      const info = db.prepare('UPDATE reviews SET status = ? WHERE id = ?').run(status, id);
+      return Number(info.changes) > 0;
+    },
+    async deleteReview(id) {
+      const info = db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
       return Number(info.changes) > 0;
     },
     async getSetting(key) {
@@ -343,6 +403,39 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
       await client.execute({ sql: 'DELETE FROM newsletter_subscriptions WHERE id = ?', args: [id] });
       return true;
     },
+    async createReview(input, meta) {
+      const result = await client.execute({
+        sql: `INSERT INTO reviews (name, service_rating, food_rating, ambience_rating, comment, status, ip_address)
+              VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
+        args: [input.name, input.serviceRating, input.foodRating, input.ambienceRating, input.comment, meta?.ip ?? null],
+      });
+      return { id: Number(result.lastInsertRowid) };
+    },
+    async listReviews(onlyApproved) {
+      const { rows } = await client.execute(
+        onlyApproved
+          ? {
+              sql: `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+                    FROM reviews WHERE status = 'approved' ORDER BY id DESC`,
+            }
+          : {
+              sql: `SELECT id, name, service_rating, food_rating, ambience_rating, comment, status, created_at
+                    FROM reviews ORDER BY id DESC`,
+            },
+      );
+      return rows as unknown as ReviewRow[];
+    },
+    async setReviewStatus(id, status) {
+      await client.execute({
+        sql: 'UPDATE reviews SET status = ? WHERE id = ?',
+        args: [status, id],
+      });
+      return true;
+    },
+    async deleteReview(id) {
+      await client.execute({ sql: 'DELETE FROM reviews WHERE id = ?', args: [id] });
+      return true;
+    },
     async getSetting(key) {
       const { rows } = await client.execute({
         sql: 'SELECT value FROM settings WHERE key = ?',
@@ -367,11 +460,12 @@ function createTursoStorage(client: MinimalLibsqlClient): Storage {
 }
 
 export function createMemoryStorage(): Storage {
-  const maxId = { reservations: 0, contacts: 0, newsletters: 0 };
+  const maxId = { reservations: 0, contacts: 0, newsletters: 0, reviews: 0 };
   const reservations: Array<ReservationRow> = [];
   const contacts: Array<ContactRow> = [];
   const newsletters: Array<NewsletterRow> = [];
   const newsletterEmails = new Set<string>();
+  const reviews: Array<ReviewRow> = [];
   const settings = new Map<string, string>();
   const createdAt = () => new Date().toISOString();
 
@@ -468,6 +562,39 @@ export function createMemoryStorage(): Storage {
       if (index === -1) return false;
       newsletterEmails.delete(newsletters[index].email.toLowerCase());
       newsletters.splice(index, 1);
+      return true;
+    },
+    async createReview(input, meta) {
+      maxId.reviews += 1;
+      const id = maxId.reviews;
+      reviews.push({
+        id,
+        name: input.name,
+        service_rating: input.serviceRating,
+        food_rating: input.foodRating,
+        ambience_rating: input.ambienceRating,
+        comment: input.comment,
+        status: 'pending',
+        created_at: createdAt(),
+      });
+      return { id };
+    },
+    async listReviews(onlyApproved) {
+      return reviews
+        .filter((r) => !onlyApproved || r.status === 'approved')
+        .map((r) => ({ ...r }))
+        .reverse();
+    },
+    async setReviewStatus(id, status) {
+      const found = reviews.find((r) => r.id === id);
+      if (!found) return false;
+      found.status = status;
+      return true;
+    },
+    async deleteReview(id) {
+      const index = reviews.findIndex((r) => r.id === id);
+      if (index === -1) return false;
+      reviews.splice(index, 1);
       return true;
     },
     async getSetting(key) {

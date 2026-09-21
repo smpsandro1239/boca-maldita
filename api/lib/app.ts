@@ -3,8 +3,8 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
-import { adminReservationSchema, assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
-import { sendReservationConfirmation } from './email';
+import { adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
+import { sendNewsletterWelcome, sendReservationConfirmation } from './email';
 import type { NextFunction, Request, Response } from 'express';
 
 let distDir = '';
@@ -17,11 +17,20 @@ const SITE_CONTACT_EMAIL_KEY = 'site_contact_email';
 const MENU_ITEMS_KEY = 'menu_items';
 const SITE_CONTENT_KEY = 'site_content';
 const RESERVATION_PROTECTION_KEY = 'reservation_protection';
+const ADMIN_TOKEN_KEY = 'admin_token';
 const DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? '').trim() || 'smpsandro1239@gmail.com';
 
-const CHECK_ANSWER = '7';
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_MAX_HITS = 5;
+
+function solveCheckExpression(expression: string): number | null {
+  const match = /^\s*(\d{1,3})\s*([+-])\s*(\d{1,3})\s*$/.exec(expression);
+  if (!match) return null;
+  const a = Number(match[1]);
+  const b = Number(match[3]);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return match[2] === '+' ? a + b : a - b;
+}
 
 const DEFAULT_RESERVATION_PROTECTION: ReservationProtectionInput = {
   enabled: false,
@@ -89,14 +98,28 @@ export interface AppInstance {
   storage: Storage;
 }
 
-function adminUnauthorized(res: Response): void {
-  if (adminToken) {
+async function getEffectiveAdminToken(storage: Storage): Promise<string> {
+  const stored = await storage.getSetting(ADMIN_TOKEN_KEY);
+  return (stored?.trim() || adminToken);
+}
+
+function adminUnauthorized(res: Response, hasToken: boolean): void {
+  if (hasToken) {
     res.status(401).json({ error: 'Token de administrador inválido.' });
   } else {
     res.status(503).json({
       error: 'Administração desativada: defina a variável ADMIN_TOKEN no servidor.',
     });
   }
+}
+
+async function isAuthorized(req: Request, res: Response, storage: Storage): Promise<boolean> {
+  const effective = await getEffectiveAdminToken(storage);
+  if (!effective || req.headers['x-admin-token'] !== effective) {
+    adminUnauthorized(res, effective !== '');
+    return false;
+  }
+  return true;
 }
 
 export async function createApp(): Promise<AppInstance> {
@@ -176,7 +199,8 @@ export async function createApp(): Promise<AppInstance> {
           });
         }
         if (protection.requireCheck) {
-          const checkOk = parsed.data.check === CHECK_ANSWER;
+          const answer = solveCheckExpression(parsed.data.checkQuestion);
+          const checkOk = answer !== null && Number(parsed.data.check) === answer;
           const honeypotEmpty = !parsed.data.honeypot;
           if (!checkOk || !honeypotEmpty) {
             return res.status(400).json({ error: 'Verificação anti-robô incorreta. Tente de novo.' });
@@ -225,6 +249,9 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(409).json({ error: 'Este email já está subscrito no boletim.' });
       }
       const { id } = await storage.createNewsletter(parsed.data);
+      sendNewsletterWelcome(parsed.data.email).catch((err) => {
+        console.error('[email] Falha no envio de boas-vindas do boletim:', err);
+      });
       res.status(201).json({ id });
     } catch (err) {
       next(err);
@@ -242,9 +269,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/site', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const parsed = siteSettingsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -256,22 +281,21 @@ export async function createApp(): Promise<AppInstance> {
     }
   });
 
-  app.get('/api/admin/verify-token', (_req: Request, res: Response) => {
-    if (!adminToken || _req.headers['x-admin-token'] !== adminToken) {
-      return adminUnauthorized(res);
-    }
+  app.get('/api/admin/verify-token', async (req: Request, res: Response) => {
+    if (!(await isAuthorized(req, res, storage))) return;
     res.json({ ok: true });
   });
 
   app.get('/api/admin/assets', async (_req: Request, res: Response, next: NextFunction) => {
     try {
+      const effective = await getEffectiveAdminToken(storage);
       const raw = await storage.getSetting(IMAGE_OVERRIDES_KEY);
       const stored = parseStoredJson(raw);
       const overrides: Record<string, unknown> = {};
       for (const [id, value] of Object.entries(stored)) {
         overrides[id] = typeof value === 'string' ? { url: value } : value;
       }
-      res.json({ enabled: adminToken !== '', overrides });
+      res.json({ enabled: effective !== '', overrides });
     } catch (err) {
       next(err);
     }
@@ -279,9 +303,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/assets', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const parsed = assetOverridesSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -303,9 +325,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/assets', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       await storage.deleteSetting(IMAGE_OVERRIDES_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -335,9 +355,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/menus', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const parsed = menuItemsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -354,9 +372,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/menus', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       await storage.deleteSetting(MENU_ITEMS_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -376,9 +392,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/site-content', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const parsed = siteContentSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -393,9 +407,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/reservation-protection', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       res.json(await getReservationProtection(storage));
     } catch (err) {
       next(err);
@@ -404,9 +416,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/reservation-protection', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const parsed = reservationProtectionSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -420,9 +430,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/reservations', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       res.json({ items: await storage.listReservations() });
     } catch (err) {
       next(err);
@@ -431,9 +439,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/reservations/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -446,9 +452,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.post('/api/admin/reservations', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const parsed = adminReservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -462,9 +466,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/reservations/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -485,9 +487,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/contacts', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       res.json({ items: await storage.listContacts() });
     } catch (err) {
       next(err);
@@ -496,9 +496,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/contacts/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -511,9 +509,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/newsletter', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       res.json({ items: await storage.listNewsletter() });
     } catch (err) {
       next(err);
@@ -522,14 +518,96 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/newsletter/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!adminToken || req.headers['x-admin-token'] !== adminToken) {
-        return adminUnauthorized(res);
-      }
+      if (!(await isAuthorized(req, res, storage))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
       }
       res.json({ ok: await storage.deleteNewsletter(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/reviews', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parsed = reviewSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const { id } = await storage.createReview(parsed.data, { ip: getClientIp(req) });
+      res.status(201).json({ id });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/reviews', async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json({ items: await storage.listReviews(true) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/admin/reviews', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      res.json({ items: await storage.listReviews() });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/admin/reviews/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: 'ID inválido.' });
+      }
+      const parsed = reviewStatusSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const ok = await storage.setReviewStatus(idResult.data, parsed.data.status);
+      if (!ok) {
+        return res.status(404).json({ error: 'Avaliação não encontrada.' });
+      }
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.delete('/api/admin/reviews/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      const idResult = idParamSchema.safeParse(req.params.id);
+      if (!idResult.success) {
+        return res.status(400).json({ error: 'ID inválido.' });
+      }
+      res.json({ ok: await storage.deleteReview(idResult.data) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/admin/security/token', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await isAuthorized(req, res, storage))) return;
+      const parsed = adminTokenUpdateSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'O token não cumpre os requisitos. Necessita de: pelo menos 16 caracteres, maiúsculas, minúsculas, um número e um carácter especial.',
+          issues: parsed.error.issues.map((issue) => issue.message),
+        });
+      }
+      if (parsed.data.token === (await getEffectiveAdminToken(storage))) {
+        return res.status(400).json({ error: 'O novo token é igual ao atual.' });
+      }
+      await storage.setSetting(ADMIN_TOKEN_KEY, parsed.data.token);
+      res.json({ ok: true });
     } catch (err) {
       next(err);
     }

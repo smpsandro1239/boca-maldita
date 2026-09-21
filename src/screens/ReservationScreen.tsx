@@ -1,12 +1,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ReservationData, PublicReservationConfig } from '../types';
 import { createReservation, getReservationConfig } from '../lib/api';
+import { generateCheckQuestion } from '../lib/checkQuestion';
 import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
 
 export default function ReservationScreen() {
   const [config, setConfig] = useState<PublicReservationConfig | null>(null);
   const [checkValue, setCheckValue] = useState('');
   const [honeypotValue, setHoneypotValue] = useState('');
+  const [checkQuestion, setCheckQuestion] = useState(() => generateCheckQuestion());
 
   const [formData, setFormData] = useState<ReservationData>({
     name: '',
@@ -31,7 +33,7 @@ export default function ReservationScreen() {
   useEffect(() => {
     getReservationConfig()
       .then(setConfig)
-      .catch(() => setConfig({ protectionEnabled: false, paused: false, requireCheck: false }));
+      .catch(() => setConfig({ protectionEnabled: true, paused: false, requireCheck: true }));
   }, []);
 
   const availableTimes = [
@@ -64,6 +66,7 @@ export default function ReservationScreen() {
         occasion: formData.occasion,
         notes: formData.notes,
         check: config?.requireCheck ? checkValue : '',
+        checkQuestion: config?.requireCheck ? checkQuestion.expression : '',
         honeypot: config?.requireCheck ? honeypotValue : '',
       });
       setConfirmedReservation({
@@ -82,6 +85,7 @@ export default function ReservationScreen() {
     setConfirmedReservation(null);
     setCheckValue('');
     setHoneypotValue('');
+    setCheckQuestion(generateCheckQuestion());
     setFormData({
       name: '',
       email: '',
@@ -186,7 +190,7 @@ export default function ReservationScreen() {
 
             <div className="text-xs text-[#A6A8AD] space-y-2 bg-[#1C1E22]/50 p-4 border border-[#282A30]">
               <p>
-                • O pedido de reserva foi registado em nome de <strong className="text-[#F7F5F0]">{confirmedReservation.data.email}</strong>. A nossa receção entrará em contacto através de <strong className="text-[#F7F5F0]">{confirmedReservation.data.phone}</strong> para confirmar os detalhes.
+                • O pedido de reserva foi registado em nome de <strong className="text-[#F7F5F0]">{confirmedReservation.data.name}</strong>. A nossa receção entrará em contacto consigo para confirmar os detalhes.
               </p>
               <p>
                 • Tolerância de mesa: 15 minutos. Em caso de atraso ou alteração, contacte diretamente a nossa recepção através do número <a href="tel:+351253031890" className="text-[#D4A373] underline">+351 253 031 890</a>.
@@ -378,7 +382,7 @@ export default function ReservationScreen() {
                       </div>
                       <div>
                         <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
-                          Verificação anti-robô: quanto é 3+4?
+                          Verificação anti-robô: quanto é {checkQuestion.label}?
                         </label>
                         <input
                           type="text"

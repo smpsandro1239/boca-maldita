@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
-import { ScreenType, MenuItem } from '../types';
+import { useEffect, useState, type FormEvent } from 'react';
+import { ScreenType, MenuItem, PublicReservationConfig, ReviewAdminRow } from '../types';
 import { useSite } from '../context/SiteContext';
 import AssetImage from '../components/AssetImage';
-import { createReservation } from '../lib/api';
+import { createReservation, createReview, getReservationConfig, getReviews } from '../lib/api';
+import { generateCheckQuestion } from '../lib/checkQuestion';
 import { 
   Play, 
   Flame, 
@@ -48,6 +49,10 @@ export default function HomeScreen({
   const [quickBookingSuccess, setQuickBookingSuccess] = useState(false);
   const [isQuickBookingLoading, setIsQuickBookingLoading] = useState(false);
   const [quickBookingError, setQuickBookingError] = useState<string | null>(null);
+  const [reservationConfig, setReservationConfig] = useState<PublicReservationConfig | null>(null);
+  const [checkQuestion, setCheckQuestion] = useState(() => generateCheckQuestion());
+  const [checkValue, setCheckValue] = useState('');
+  const [honeypotValue, setHoneypotValue] = useState('');
   const [bookingFormData, setBookingFormData] = useState({
     nome: '',
     email: '',
@@ -57,6 +62,12 @@ export default function HomeScreen({
   });
   const { menuItems } = useSite();
 
+  useEffect(() => {
+    getReservationConfig()
+      .then(setReservationConfig)
+      .catch(() => setReservationConfig({ protectionEnabled: true, paused: false, requireCheck: true }));
+  }, []);
+
   const featuredDishes = activeMenuTab === 'carnes'
     ? menuItems.filter(i => i.category === 'carnes').slice(0, 4)
     : menuItems.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
@@ -64,6 +75,13 @@ export default function HomeScreen({
   const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
     if (!bookingFormData.nome || !bookingFormData.email || !bookingFormData.telefone) return;
+    const requireCheck = reservationConfig?.requireCheck ?? true;
+    if (requireCheck) {
+      if (honeypotValue || checkValue.trim() !== String(checkQuestion.answer)) {
+        setQuickBookingError('Verificação anti-robô incorreta. Tente de novo.');
+        return;
+      }
+    }
     setIsQuickBookingLoading(true);
     setQuickBookingError(null);
     try {
@@ -77,10 +95,16 @@ export default function HomeScreen({
         guests,
         area: 'Salão Nobre da Brasa',
         occasion: 'Pré-Reserva Rápida',
+        check: requireCheck ? checkValue : '',
+        checkQuestion: requireCheck ? checkQuestion.expression : '',
+        honeypot: requireCheck ? honeypotValue : '',
       });
       setQuickBookingSuccess(true);
       setTimeout(() => {
         setQuickBookingSuccess(false);
+        setCheckValue('');
+        setHoneypotValue('');
+        setCheckQuestion(generateCheckQuestion());
         setBookingFormData({
           nome: '',
           email: '',
@@ -638,6 +662,32 @@ export default function HomeScreen({
                         className="w-full bg-[#1C1E22] text-[#F7F5F0] px-3.5 py-2.5 text-xs border border-[#282A30] focus:border-[#D4A373] focus:outline-none font-mono"
                       />
                     </div>
+
+                    <input
+                      type="text"
+                      value={honeypotValue}
+                      onChange={(e) => setHoneypotValue(e.target.value)}
+                      placeholder="Website"
+                      className="hidden"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                    />
+
+                    <div>
+                      <label className="block text-[11px] uppercase text-[#A6A8AD] tracking-wider mb-1 font-sans">
+                        Quanto é {checkQuestion.label}?
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        required
+                        value={checkValue}
+                        onChange={(e) => setCheckValue(e.target.value)}
+                        placeholder="Resposta da verificação"
+                        className="w-full bg-[#1C1E22] text-[#F7F5F0] px-3.5 py-2.5 text-xs border border-[#282A30] focus:border-[#D4A373] focus:outline-none font-mono"
+                      />
+                    </div>
                   </div>
 
                   <button
@@ -678,6 +728,9 @@ export default function HomeScreen({
           </div>
         </div>
       </section>
+
+      {/* ================= REVIEWS SECTION ================= */}
+      <ReviewsSection />
 
       {/* ================= LOCATION & HORÁRIOS SECTION ================= */}
       <section className="w-full py-20 lg:py-24 bg-[#0C0D0E]">
@@ -794,5 +847,216 @@ export default function HomeScreen({
       </section>
 
     </div>
+  );
+}
+
+const STARS = [1, 2, 3, 4, 5];
+
+function StarPicker({ value, onChange, label }: { value: number; onChange: (v: number) => void; label: string }) {
+  return (
+    <div className="space-y-1.5">
+      <span className="block text-[11px] uppercase text-[#A6A8AD] tracking-wider font-sans">{label}</span>
+      <div className="flex gap-1">
+        {STARS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            aria-label={`${label}: ${n} de 5`}
+            className={`p-1 transition-colors ${n <= value ? 'text-[#D4A373]' : 'text-[#3A3D44] hover:text-[#D4A373]/50'}`}
+          >
+            <Star className="w-5 h-5 fill-current" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReviewsSection() {
+  const [reviews, setReviews] = useState<ReviewAdminRow[]>([]);
+  const [name, setName] = useState('');
+  const [comment, setComment] = useState('');
+  const [serviceRating, setServiceRating] = useState(5);
+  const [foodRating, setFoodRating] = useState(5);
+  const [ambienceRating, setAmbienceRating] = useState(5);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [openForm, setOpenForm] = useState(false);
+
+  useEffect(() => {
+    getReviews()
+      .then((r) => setReviews(r.items))
+      .catch(() => {
+        setReviews([]);
+      });
+  }, []);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (name.trim().length < 2 || comment.trim().length < 5) return;
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await createReview({
+        name: name.trim(),
+        serviceRating,
+        foodRating,
+        ambienceRating,
+        comment: comment.trim(),
+      });
+      setSubmitSuccess(true);
+      setName('');
+      setComment('');
+      setServiceRating(5);
+      setFoodRating(5);
+      setAmbienceRating(5);
+      setTimeout(() => setSubmitSuccess(false), 6000);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : 'Ocorreu um erro ao enviar a avaliação.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const average = (r: ReviewAdminRow) =>
+    ((r.service_rating + r.food_rating + r.ambience_rating) / 3).toFixed(1);
+
+  return (
+    <section className="w-full py-20 lg:py-24 bg-[#0C0D0E] border-t border-[#282A30]">
+      <div className="max-w-7xl mx-auto px-5 lg:px-12">
+        <div className="text-center space-y-2 mb-12">
+          <span className="text-xs uppercase text-[#D4A373] tracking-[0.25em] font-sans font-semibold">
+            A Vossa Palavra
+          </span>
+          <h2 className="font-serif text-3xl sm:text-4xl text-[#F7F5F0]">
+            Experiências dos Nossos Clientes
+          </h2>
+          <p className="text-sm text-[#A6A8AD] max-w-xl mx-auto">
+            Partilhe a sua experiência connosco. As avaliações são moderadas pela equipa antes de serem publicadas.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-serif text-xl text-[#F7F5F0]">Avaliações publicadas</h3>
+              <button
+                type="button"
+                onClick={() => setOpenForm((v) => !v)}
+                className="text-[11px] text-[#D4A373] hover:text-[#e0b585] underline uppercase tracking-wider"
+              >
+                {openForm ? 'Ocultar formulário' : 'Deixar avaliação ›'}
+              </button>
+            </div>
+
+            {reviews.length === 0 ? (
+              <div className="bg-[#141518] border border-[#282A30] p-6 text-sm text-[#F7F5F0]/60">
+                Ainda não há avaliações publicadas. Seja o primeiro a deixar a sua experiência.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div key={review.id} className="bg-[#141518] border border-[#282A30] p-5 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="font-serif text-[#F7F5F0]">{review.name}</span>
+                        <span className="flex gap-0.5">
+                          {STARS.map((n) => (
+                            <Star
+                              key={n}
+                              className={`w-3.5 h-3.5 ${n <= Math.round(Number(average(review))) ? 'text-[#D4A373] fill-current' : 'text-[#3A3D44]'}`}
+                            />
+                          ))}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono text-[#F7F5F0]/40">{average(review)} / 5</span>
+                    </div>
+                    <p className="text-sm text-[#F7F5F0]/85 leading-relaxed">“{review.comment}”</p>
+                    <div className="text-[11px] text-[#A6A8AD] flex flex-wrap gap-4">
+                      <span>Serviço {review.service_rating}/5</span>
+                      <span>Comida {review.food_rating}/5</span>
+                      <span>Ambiente {review.ambience_rating}/5</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="bg-[#141518] border border-[#282A30] p-6 h-fit">
+            {openForm ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <h3 className="font-serif text-lg text-[#F7F5F0]">Deixar avaliação</h3>
+                <div>
+                  <label className="block text-[11px] uppercase text-[#A6A8AD] tracking-wider mb-1 font-sans">
+                    O seu nome
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    minLength={2}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Ex.: Maria Fernandes"
+                    className="w-full bg-[#1C1E22] text-[#F7F5F0] px-3.5 py-2.5 text-xs border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <StarPicker label="Serviço" value={serviceRating} onChange={setServiceRating} />
+                  <StarPicker label="Comida" value={foodRating} onChange={setFoodRating} />
+                  <StarPicker label="Ambiente" value={ambienceRating} onChange={setAmbienceRating} />
+                </div>
+                <div>
+                  <label className="block text-[11px] uppercase text-[#A6A8AD] tracking-wider mb-1 font-sans">
+                    A sua opinião
+                  </label>
+                  <textarea
+                    required
+                    minLength={5}
+                    rows={4}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Conte-nos como foi a sua experiência… (mín. 5 caracteres)"
+                    className="w-full bg-[#1C1E22] text-[#F7F5F0] px-3.5 py-2.5 text-xs border border-[#282A30] focus:border-[#D4A373] focus:outline-none resize-y"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] text-xs uppercase tracking-[0.18em] font-sans font-semibold py-3 transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'A enviar…' : 'Enviar avaliação'}
+                </button>
+                {submitError && (
+                  <p className="text-xs text-red-300 bg-red-950/60 border border-red-500/40 px-3 py-2">{submitError}</p>
+                )}
+                {submitSuccess && (
+                  <p className="text-xs text-emerald-300 bg-emerald-950/60 border border-emerald-500/40 px-3 py-2">
+                    Avaliação recebida! Ficará visível depois da aprovação da equipa.
+                  </p>
+                )}
+              </form>
+            ) : (
+              <div className="text-center py-8">
+                <Star className="w-8 h-8 text-[#D4A373] fill-current mx-auto mb-3" />
+                <h3 className="font-serif text-lg text-[#F7F5F0]">Visitou-nos recentemente?</h3>
+                <p className="text-sm text-[#A6A8AD] mt-2 mb-5">
+                  Conta-nos como foi a experiência. Em poucos minutos fica a sua avaliação, sujeita a aprovação.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setOpenForm(true)}
+                  className="inline-block bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-6 py-3 text-xs uppercase tracking-[0.18em] font-sans font-semibold transition-colors"
+                >
+                  Deixar avaliação
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
