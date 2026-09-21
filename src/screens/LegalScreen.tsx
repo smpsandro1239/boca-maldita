@@ -59,7 +59,7 @@ const CONTENT: Record<LegalDoc, { title: string; sections: { heading: string; bo
       {
         heading: '1. Como reservar',
         body: [
-          'As reservas podem ser efetuadas pelo formulário online, por telefone (+351 253 031 890) ou email. A reserva online fica registada com uma referência própria (ex.: BM-0001) e é confirmada pela nossa receção, que entra em contacto consigo para confirmar os detalhes.',
+          'As reservas podem ser efetuadas pelo formulário online, por telefone (+351 253 031 890) ou email. A reserva online fica registada com uma referência própria (ex.: BM-0001); a receção só entra em contacto consigo caso seja necessário, por exemplo se existir algum problema com a reserva.',
           'Em datas com grande procura, a confirmação da mesa fica sujeita à disponibilidade e à resposta da nossa equipa.',
         ],
       },

@@ -196,7 +196,7 @@ export default function ReservationScreen() {
 
             <div className="text-xs text-[#A6A8AD] space-y-2 bg-[#1C1E22]/50 p-4 border border-[#282A30]">
               <p>
-                • O pedido de reserva foi registado em nome de <strong className="text-[#F7F5F0]">{confirmedReservation.data.name}</strong>. A nossa receção entrará em contacto consigo para confirmar os detalhes.
+                • O pedido de reserva foi registado em nome de <strong className="text-[#F7F5F0]">{confirmedReservation.data.name}</strong>. A nossa receção só entrará em contacto consigo caso seja necessário (por exemplo, se existir algum problema com a reserva).
               </p>
               <p>
                 • Tolerância de mesa: 15 minutos. Em caso de atraso ou alteração, contacte diretamente a nossa recepção através do número <a href="tel:+351253031890" className="text-[#D4A373] underline">+351 253 031 890</a>.

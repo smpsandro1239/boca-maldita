@@ -708,7 +708,7 @@ export default function HomeScreen({
                   {quickBookingSuccess && (
                     <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs flex items-center gap-2">
                       <Check className="w-4 h-4 shrink-0" />
-                      <span>Pedido de reserva recebido com sucesso! A equipa entrará em contacto imediato.</span>
+                      <span>Pedido de reserva recebido com sucesso! A equipa só entrará em contacto caso seja necessário.</span>
                     </div>
                   )}
 
