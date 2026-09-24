@@ -12,8 +12,8 @@ const DEFAULT_SITE_CONTENT: SiteContent = {
   heroSubtitle: '',
   aboutTitle: '',
   aboutText: '',
-  instagram: '',
-  facebook: '',
+  instagram: 'https://www.instagram.com/bocamaldita/',
+  facebook: 'https://web.facebook.com/malditaboca',
   videoUrl: '',
 };
 

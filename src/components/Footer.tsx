@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { LegalDoc, ScreenType } from '../types';
 import { subscribeNewsletter } from '../lib/api';
 import { useSite, telHref } from '../context/SiteContext';
-import { Camera, Globe, Share2, Check, Flame, AlertCircle } from 'lucide-react';
+import { Instagram, Facebook, Share2, Check, Flame, AlertCircle } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (screen: ScreenType) => void;
@@ -55,22 +55,28 @@ export default function Footer({ onNavigate, onOpenLegal, contactEmail }: Footer
               Teatro culinário com mestria no fogo nobre, carnes maturadas seletas e alta hospitalidade no coração do Minho, em Vila de Prado.
             </p>
             <div className="flex items-center gap-3 pt-2">
-              <a
-                href="#instagram"
-                onClick={(e) => e.preventDefault()}
-                className="w-9 h-9 flex items-center justify-center bg-[#1C1E22] text-[#D4A373] hover:text-[#F7F5F0] hover:bg-[#282A30] border border-[#282A30] transition-colors"
-                title="Instagram"
-              >
-                <Camera className="w-4 h-4" />
-              </a>
-              <a
-                href="#site"
-                onClick={(e) => e.preventDefault()}
-                className="w-9 h-9 flex items-center justify-center bg-[#1C1E22] text-[#D4A373] hover:text-[#F7F5F0] hover:bg-[#282A30] border border-[#282A30] transition-colors"
-                title="Website Oficial"
-              >
-                <Globe className="w-4 h-4" />
-              </a>
+              {siteContent.instagram.trim() && (
+                <a
+                  href={siteContent.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 flex items-center justify-center bg-[#1C1E22] text-[#D4A373] hover:text-[#F7F5F0] hover:bg-[#282A30] border border-[#282A30] transition-colors"
+                  title="Instagram"
+                >
+                  <Instagram className="w-4 h-4" />
+                </a>
+              )}
+              {siteContent.facebook.trim() && (
+                <a
+                  href={siteContent.facebook}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 flex items-center justify-center bg-[#1C1E22] text-[#D4A373] hover:text-[#F7F5F0] hover:bg-[#282A30] border border-[#282A30] transition-colors"
+                  title="Facebook"
+                >
+                  <Facebook className="w-4 h-4" />
+                </a>
+              )}
             </div>
           </div>
 

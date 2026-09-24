@@ -932,8 +932,8 @@ var DEFAULT_SITE_CONTENT = {
   heroSubtitle: "",
   aboutTitle: "",
   aboutText: "",
-  instagram: "",
-  facebook: "",
+  instagram: "https://www.instagram.com/bocamaldita/",
+  facebook: "https://web.facebook.com/malditaboca",
   videoUrl: ""
 };
 function parseStoredJson(raw) {
