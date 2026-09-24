@@ -1251,9 +1251,15 @@ async function createApp() {
   });
   app.get("/api/site-content", async (_req, res, next) => {
     try {
-      const stored = await storage.getSetting(SITE_CONTENT_KEY);
+      const stored = parseStoredJson(await storage.getSetting(SITE_CONTENT_KEY));
       const contactEmail = await storage.getSetting(SITE_CONTACT_EMAIL_KEY) ?? DEFAULT_CONTACT_EMAIL;
-      res.json({ ...DEFAULT_SITE_CONTENT, ...parseStoredJson(stored), contactEmail });
+      const merged = {};
+      for (const key of Object.keys(DEFAULT_SITE_CONTENT)) {
+        const value = stored?.[key];
+        merged[key] = typeof value === "string" && value.trim() ? value : DEFAULT_SITE_CONTENT[key];
+      }
+      merged.contactEmail = contactEmail || DEFAULT_SITE_CONTENT.contactEmail;
+      res.json(merged);
     } catch (err) {
       next(err);
     }
