@@ -53,6 +53,7 @@ import {
   updateAdminToken,
 } from '../lib/api';
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
+import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
@@ -70,15 +71,6 @@ const CATEGORY_LABELS: Record<string, string> = {
   pessoas: 'Pessoas',
 };
 
-const MENU_CATEGORY_LABELS: Record<string, string> = {
-  carnes: 'Carnes Nobres & Dry-Aged',
-  mar: 'Do Mar & Brasas',
-  entradas: 'Entradas de Assinatura',
-  acompanhamentos: 'Acompanhamentos',
-  sobremesas: 'Sobremesas',
-  vinhos: 'Carta de Vinhos',
-};
-
 const EMPTY_MENU_ITEM: MenuItem = {
   id: '',
   name: '',
@@ -93,6 +85,8 @@ const EMPTY_MENU_ITEM: MenuItem = {
   servesCount: '',
   origin: '',
   pairingWine: '',
+  producer: '',
+  vintage: '',
   isChefSpecial: false,
   visible: true,
 };
@@ -1937,6 +1931,18 @@ const ITEM_FIELDS: { key: keyof MenuItem; label: string; type: string; desc?: st
   { key: 'pairingWine', label: 'Sugestão de vinho', type: 'text' },
 ];
 
+function itemFieldsFor(category: MenuItem['category']): { key: keyof MenuItem; label: string; type: string; desc?: string }[] {
+  if (category !== 'vinhos') return ITEM_FIELDS;
+  const wineFields: { key: keyof MenuItem; label: string; type: string }[] = [
+    { key: 'producer', label: 'Produtor', type: 'text' },
+    { key: 'vintage', label: 'Ano / Colheita', type: 'text' },
+  ];
+  return ITEM_FIELDS
+    .filter((field) => !['servesCount', 'dryAgedDays', 'pairingWine'].includes(field.key))
+    .flatMap((field) => (field.key === 'origin' ? [field, ...wineFields] : [field]))
+    .map((field) => (field.key === 'origin' ? { ...field, label: 'Região' } : field));
+}
+
 function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProps) {
   return (
     <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 p-4" onClick={onCancel}>
@@ -1952,7 +1958,7 @@ function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProp
         </div>
 
         <div className="p-5 space-y-4">
-          {ITEM_FIELDS.map((field) => (
+          {itemFieldsFor(item.category).map((field) => (
             <div key={field.key as string}>
               <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">{field.label}</label>
               <input

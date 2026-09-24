@@ -726,6 +726,8 @@ var menuItemSchema = z.object({
   servesCount: z.string().trim().max(80).optional().default(""),
   origin: z.string().trim().max(200).optional().default(""),
   pairingWine: z.string().trim().max(200).optional().default(""),
+  producer: z.string().trim().max(200).optional().default(""),
+  vintage: z.string().trim().max(80).optional().default(""),
   isChefSpecial: z.boolean().optional().default(false),
   visible: z.boolean().optional().default(true),
   order: z.number().int().min(0).optional()

@@ -1,3 +1,5 @@
+import { MenuCategory } from './data/menuCategories';
+
 export type ScreenType = 
   | 'inicio' 
   | 'o-restaurante' 
@@ -26,7 +28,7 @@ export interface MenuItem {
   name: string;
   price: number;
   currency: string;
-  category: 'carnes' | 'mar' | 'entradas' | 'acompanhamentos' | 'sobremesas' | 'vinhos';
+  category: MenuCategory;
   badge?: string;
   tagline?: string;
   description: string;
@@ -35,6 +37,8 @@ export interface MenuItem {
   servesCount?: string;
   origin?: string;
   pairingWine?: string;
+  producer?: string;
+  vintage?: string;
   isChefSpecial?: boolean;
   visible?: boolean;
   order?: number;

@@ -2,6 +2,7 @@ import { useState, type MouseEvent } from 'react';
 import { MenuItem } from '../types';
 import { useSite } from '../context/SiteContext';
 import { Search, Flame, Wine, Clock, Award, ArrowRight, Copy, Check } from 'lucide-react';
+import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 
 interface MenuScreenProps {
   onSelectDish: (dish: MenuItem) => void;
@@ -21,12 +22,7 @@ export default function MenuScreen({
 
   const categories = [
     { id: 'todas', label: 'Toda a Carta' },
-    { id: 'carnes', label: 'Carnes Nobres & Dry-Aged' },
-    { id: 'mar', label: 'Do Mar & Brasas' },
-    { id: 'entradas', label: 'Entradas de Assinatura' },
-    { id: 'acompanhamentos', label: 'Acompanhamentos' },
-    { id: 'vinhos', label: 'Carta de Vinhos' },
-    { id: 'sobremesas', label: 'Sobremesas' }
+    ...Object.entries(MENU_CATEGORY_LABELS).map(([id, label]) => ({ id, label }))
   ];
 
   const filteredItems = menuItems.filter(item => {
@@ -174,6 +170,14 @@ export default function MenuScreen({
 
                     {/* Specifications */}
                     <div className="space-y-1.5 pt-2 border-t border-[#282A30]/60 text-[11px] text-[#A6A8AD]">
+                      {item.category === 'vinhos' && (item.producer || item.vintage) && (
+                        <div className="flex items-center gap-2">
+                          <Wine className="w-3.5 h-3.5 text-[#D4A373] shrink-0" />
+                          <span className="truncate">
+                            {[item.producer, item.vintage].filter(Boolean).join(' · ')}
+                          </span>
+                        </div>
+                      )}
                       {item.origin && (
                         <div className="flex items-center gap-2">
                           <Award className="w-3.5 h-3.5 text-[#D4A373] shrink-0" />
