@@ -55,6 +55,7 @@ export interface AssetOverride {
 export interface SiteContent {
   contactEmail: string;
   phone: string;
+  whatsapp: string;
   address: string;
   hours: string;
   headline: string;

@@ -4,6 +4,7 @@ import { useSite, telHref } from '../context/SiteContext';
 import AssetImage from '../components/AssetImage';
 import { createReservation, createReview, getReservationConfig, getReviews } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
+import { GMAPS_URL } from '../data/contact';
 import { 
   Play, 
   Flame, 
@@ -17,6 +18,7 @@ import {
   Car, 
   Check, 
   Copy,
+  Navigation,
   AlertCircle
 } from 'lucide-react';
 
@@ -756,11 +758,19 @@ export default function HomeScreen({
               {/* Map Preview Container */}
               <div className="w-full h-80 lg:h-96 bg-[#141518] border border-[#282A30] shadow-2xl relative overflow-hidden group">
                 {mapUrl ? (
-                  <AssetImage
-                    src={mapUrl}
-                    alt="Mapa de localização do Boca Maldita em Vila de Prado"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
+                  <a
+                    href={GMAPS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Abrir localização exata no Google Maps"
+                    className="block w-full h-full"
+                  >
+                    <AssetImage
+                      src={mapUrl}
+                      alt="Mapa de localização do Boca Maldita em Vila de Prado"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                  </a>
                 ) : null}
                 
                 {/* Floating Info Overlay */}
@@ -774,6 +784,15 @@ export default function HomeScreen({
                   <p className="text-xs text-[#A6A8AD] mt-1 leading-relaxed">
                     A apenas 10 minutos do centro de Braga, junto à ponte histórica de Prado e às margens do Cávado.
                   </p>
+                  <a
+                    href={GMAPS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] text-xs uppercase font-sans font-semibold px-4 py-2.5 tracking-[0.14em] transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    Abrir no Google Maps
+                  </a>
                 </div>
 
                 <button

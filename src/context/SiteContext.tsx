@@ -6,6 +6,7 @@ import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 const DEFAULT_SITE_CONTENT: SiteContent = {
   contactEmail: 'smpsandro1239@gmail.com',
   phone: '+351 253 031 890',
+  whatsapp: '',
   address: '',
   hours: '',
   headline: '',
@@ -21,6 +22,11 @@ export { DEFAULT_SITE_CONTENT };
 
 export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^+\d]/g, '')}`;
+}
+
+export function waHref(whatsapp: string, phone: string): string {
+  const number = (whatsapp.trim() || phone).replace(/[^0-9]/g, '');
+  return `https://wa.me/${number}`;
 }
 
 interface AssetMatch {

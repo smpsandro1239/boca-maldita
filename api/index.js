@@ -738,6 +738,7 @@ var menuItemsSchema = z.object({
 var siteContentSchema = z.object({
   contactEmail: emailField,
   phone: z.string().trim().max(40).optional().default(""),
+  whatsapp: z.string().trim().max(40).optional().default(""),
   address: z.string().trim().max(200).optional().default(""),
   hours: z.string().trim().max(240).optional().default(""),
   headline: z.string().trim().max(160).optional().default(""),
@@ -930,6 +931,7 @@ var DEFAULT_RESERVATION_PROTECTION = {
 var DEFAULT_SITE_CONTENT = {
   contactEmail: DEFAULT_CONTACT_EMAIL,
   phone: "+351 253 031 890",
+  whatsapp: "",
   address: "",
   hours: "",
   headline: "",

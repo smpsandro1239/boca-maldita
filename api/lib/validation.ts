@@ -235,6 +235,7 @@ export const siteContentSchema = z
   .object({
     contactEmail: emailField,
     phone: z.string().trim().max(40).optional().default(''),
+    whatsapp: z.string().trim().max(40).optional().default(''),
     address: z.string().trim().max(200).optional().default(''),
     hours: z.string().trim().max(240).optional().default(''),
     headline: z.string().trim().max(160).optional().default(''),

@@ -1024,6 +1024,7 @@ export default function AdminPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <ContentField label="Email de contacto" value={contentDraft.contactEmail} onChange={(v) => setContentField('contactEmail', v)} />
                 <ContentField label="Telefone" value={contentDraft.phone} onChange={(v) => setContentField('phone', v)} />
+                <ContentField label="WhatsApp (número)" value={contentDraft.whatsapp} onChange={(v) => setContentField('whatsapp', v)} helper="Só dígitos com indicativo (ex.: 351253031890). Vazio usa o telefone. Aplica-se em todo o site." />
                 <ContentField label="Morada" value={contentDraft.address} onChange={(v) => setContentField('address', v)} />
                 <ContentField label="Horário" value={contentDraft.hours} onChange={(v) => setContentField('hours', v)} />
                 <ContentField label="Título principal (hero)" value={contentDraft.headline} onChange={(v) => setContentField('headline', v)} />

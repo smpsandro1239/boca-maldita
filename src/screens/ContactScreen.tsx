@@ -1,8 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { createContact } from '../lib/api';
-import { useSite, telHref } from '../context/SiteContext';
+import { useSite, telHref, waHref } from '../context/SiteContext';
 import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Copy, AlertCircle } from 'lucide-react';
 import AssetImage from '../components/AssetImage';
+import { GMAPS_URL } from '../data/contact';
 
 interface ContactScreenProps {
   mapUrl: string;
@@ -13,7 +14,6 @@ interface ContactScreenProps {
 export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: ContactScreenProps) {
   const { siteContent } = useSite();
   const phone = siteContent.phone;
-  const waPhone = phone.replace(/[^0-9]/g, '');
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -108,7 +108,7 @@ export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: 
                 {phone}
               </a>
               <a
-                href={`https://wa.me/${waPhone}`}
+                href={waHref(siteContent.whatsapp, phone)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:underline pt-1"
@@ -145,13 +145,21 @@ export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: 
           <div className="lg:col-span-6 space-y-4">
             <div className="h-80 sm:h-96 bg-[#141518] border border-[#282A30] relative overflow-hidden group">
               {mapUrl ? (
-                <AssetImage
-                  src={mapUrl}
-                  alt="Mapa Boca Maldita"
-                  className="w-full h-full object-cover"
-                />
+                <a
+                  href={GMAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Abrir localização exata no Google Maps"
+                  className="block w-full h-full"
+                >
+                  <AssetImage
+                    src={mapUrl}
+                    alt="Mapa Boca Maldita"
+                    className="w-full h-full object-cover"
+                  />
+                </a>
               ) : null}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none"></div>
               
               <div className="absolute bottom-4 left-4 right-4 bg-[#0C0D0E]/95 p-4 border border-[#282A30]">
                 <div className="flex items-center gap-2 text-[#D4A373]">
@@ -162,6 +170,15 @@ export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: 
                   <p>• <strong>De Braga:</strong> 10 min pela EN101 / Variante de Prado.</p>
                   <p>• <strong>Do Porto / Aeroporto:</strong> 45 min pela A3, saída Braga Norte.</p>
                 </div>
+                <a
+                  href={GMAPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex items-center gap-2 bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] text-xs uppercase font-sans font-semibold px-4 py-2.5 tracking-[0.14em] transition-colors"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Abrir no Google Maps
+                </a>
               </div>
 
               <button

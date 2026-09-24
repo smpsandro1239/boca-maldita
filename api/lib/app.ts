@@ -99,6 +99,7 @@ const DEFAULT_RESERVATION_PROTECTION: ReservationProtectionInput = {
 const DEFAULT_SITE_CONTENT: Record<string, string> = {
   contactEmail: DEFAULT_CONTACT_EMAIL,
   phone: '+351 253 031 890',
+  whatsapp: '',
   address: '',
   hours: '',
   headline: '',
