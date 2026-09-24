@@ -23,6 +23,7 @@ import {
 interface HomeScreenProps {
   onNavigate: (screen: ScreenType) => void;
   onOpenVideo: () => void;
+  videoAvailable: boolean;
   onSelectDish: (dish: MenuItem) => void;
   heroChefUrl: string;
   reviewerUrl: string;
@@ -36,6 +37,7 @@ interface HomeScreenProps {
 export default function HomeScreen({
   onNavigate,
   onOpenVideo,
+  videoAvailable,
   onSelectDish,
   heroChefUrl,
   reviewerUrl,
@@ -227,24 +229,26 @@ export default function HomeScreen({
                 </button>
 
                 {/* Round video play button with warm gold aura */}
-                <button
-                  type="button"
-                  onClick={onOpenVideo}
-                  className="group flex items-center gap-3.5 cursor-pointer text-left focus:outline-none"
-                  aria-label="Assistir ao vídeo da experiência do restaurante"
-                >
-                  <div className="relative w-13 h-13 sm:w-14 sm:h-14 bg-[#D4A373] flex items-center justify-center shadow-lg group-hover:scale-105 group-hover:bg-[#C59D5F] transition-all duration-300">
-                    <Play className="w-6 h-6 text-[#0C0D0E] translate-x-0.5 fill-current" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs uppercase text-[#F7F5F0] tracking-widest font-semibold group-hover:text-[#D4A373] transition-colors">
-                      Assistir ao Vídeo
-                    </span>
-                    <span className="text-[11px] text-[#686B73]">
-                      A Arte da Brasa (01:45)
-                    </span>
-                  </div>
-                </button>
+                {videoAvailable && (
+                  <button
+                    type="button"
+                    onClick={onOpenVideo}
+                    className="group flex items-center gap-3.5 cursor-pointer text-left focus:outline-none"
+                    aria-label="Assistir ao vídeo da experiência do restaurante"
+                  >
+                    <div className="relative w-13 h-13 sm:w-14 sm:h-14 bg-[#D4A373] flex items-center justify-center shadow-lg group-hover:scale-105 group-hover:bg-[#C59D5F] transition-all duration-300">
+                      <Play className="w-6 h-6 text-[#0C0D0E] translate-x-0.5 fill-current" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs uppercase text-[#F7F5F0] tracking-widest font-semibold group-hover:text-[#D4A373] transition-colors">
+                        Assistir ao Vídeo
+                      </span>
+                      <span className="text-[11px] text-[#686B73]">
+                        A Arte da Brasa
+                      </span>
+                    </div>
+                  </button>
+                )}
               </div>
 
               {/* Quick Badges Metric Strip (45+ Dry-aged, 100% Azinho, 180+ Rótulos) */}

@@ -1036,7 +1036,7 @@ export default function AdminPanel({
                 <ContentField label="Título da secção sobre o restaurante" value={contentDraft.aboutTitle} onChange={(v) => setContentField('aboutTitle', v)} />
                 <ContentField label="Instagram" value={contentDraft.instagram} onChange={(v) => setContentField('instagram', v)} />
                 <ContentField label="Facebook" value={contentDraft.facebook} onChange={(v) => setContentField('facebook', v)} />
-                <ContentField label="Link do vídeo (mp4)" value={contentDraft.videoUrl} onChange={(v) => setContentField('videoUrl', v)} helper="Ativa o vídeo do documentário no site." />
+                <ContentField label="Link do vídeo (Facebook, mp4, webm)" value={contentDraft.videoUrl} onChange={(v) => setContentField('videoUrl', v)} helper="Aceita link do Facebook (reproduz em embed), ficheiro .mp4/.webm/.m3u8 ou outro URL a abrir em nova aba." />
               </div>
 
               <div>

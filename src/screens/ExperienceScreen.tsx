@@ -5,6 +5,7 @@ import AssetImage from '../components/AssetImage';
 interface ExperienceScreenProps {
   onNavigate: (screen: ScreenType) => void;
   onOpenVideo: () => void;
+  videoAvailable: boolean;
   heroChefUrl: string;
   diningRoomUrl: string;
 }
@@ -12,6 +13,7 @@ interface ExperienceScreenProps {
 export default function ExperienceScreen({
   onNavigate,
   onOpenVideo,
+  videoAvailable,
   heroChefUrl,
   diningRoomUrl
 }: ExperienceScreenProps) {
@@ -82,13 +84,15 @@ export default function ExperienceScreen({
               </h2>
               
               <div className="pt-2">
-                <button
-                  onClick={onOpenVideo}
-                  className="inline-flex items-center gap-3 bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] text-xs uppercase font-sans font-semibold px-6 py-3.5 tracking-wider transition-all"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Assistir ao Filme (01:45)</span>
-                </button>
+                {videoAvailable && (
+                  <button
+                    onClick={onOpenVideo}
+                    className="inline-flex items-center gap-3 bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] text-xs uppercase font-sans font-semibold px-6 py-3.5 tracking-wider transition-all"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    <span>Assistir ao Filme</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

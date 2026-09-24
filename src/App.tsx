@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { LegalDoc, ScreenType, ImageAsset, MenuItem, SiteContent } from './types';
-import { DEFAULT_IMAGE_ASSETS, DOCUMENTARY_VIDEO_URL } from './data/assets';
+import { DEFAULT_IMAGE_ASSETS } from './data/assets';
 import { MENU_ITEMS } from './data/menuData';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -43,6 +43,7 @@ export default function App() {
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [adminToken, setAdminToken] = useState<string>(() => sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '');
+  const hasVideo = !!siteContent.videoUrl.trim();
 
   useEffect(() => {
     const token = adminToken.trim();
@@ -175,6 +176,7 @@ export default function App() {
             <HomeScreen
               onNavigate={handleNavigate}
               onOpenVideo={() => setIsVideoModalOpen(true)}
+              videoAvailable={hasVideo}
               onSelectDish={(dish) => setSelectedDish(dish)}
               heroChefUrl={getUrl('hero-chef')}
               reviewerUrl={getUrl('reviewer-goncalo')}
@@ -208,6 +210,7 @@ export default function App() {
             <ExperienceScreen
               onNavigate={handleNavigate}
               onOpenVideo={() => setIsVideoModalOpen(true)}
+              videoAvailable={hasVideo}
               heroChefUrl={getUrl('hero-chef')}
               diningRoomUrl={getUrl('dining-room')}
             />
@@ -266,7 +269,7 @@ export default function App() {
           isOpen={isVideoModalOpen}
           onClose={() => setIsVideoModalOpen(false)}
           posterUrl={getUrl('hero-chef')}
-          videoUrl={siteContent.videoUrl || DOCUMENTARY_VIDEO_URL}
+          videoUrl={siteContent.videoUrl}
         />
 
         <DishDetailModal

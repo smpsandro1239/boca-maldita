@@ -14,7 +14,7 @@ const DEFAULT_SITE_CONTENT: SiteContent = {
   aboutText: '',
   instagram: 'https://www.instagram.com/bocamaldita/',
   facebook: 'https://web.facebook.com/malditaboca',
-  videoUrl: '',
+  videoUrl: 'https://www.facebook.com/malditaboca/videos/at%C3%A9-j%C3%A1-/758681031592904/',
 };
 
 export { DEFAULT_SITE_CONTENT };
