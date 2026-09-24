@@ -22,7 +22,7 @@ export default function ReservationScreen() {
     time: '20:00',
     guests: 2,
     area: 'Salão Nobre da Brasa',
-    occasion: 'Jantar Gastronómico',
+    occasion: 'Jantar romântico',
     notes: ''
   });
 
@@ -53,6 +53,8 @@ export default function ReservationScreen() {
     { id: 'Terraço do Cávado', desc: 'Espaço climatizado com vista serena para o vale do rio' },
     { id: 'Sala Privada Garrafeira', desc: 'Reserva exclusiva para grupos a partir de 6 pessoas' }
   ];
+
+  const occasionOptions = ['Jantar romântico', 'Aniversário', 'Negócios', 'Família', 'Outro'];
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -103,7 +105,7 @@ export default function ReservationScreen() {
       time: '20:00',
       guests: 2,
       area: 'Salão Nobre da Brasa',
-      occasion: 'Jantar Gastronómico',
+      occasion: 'Jantar romântico',
       notes: ''
     });
   };
@@ -370,6 +372,23 @@ export default function ReservationScreen() {
                         className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none"
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider text-[#A6A8AD] mb-1">
+                      Ocasião da Visita
+                    </label>
+                    <select
+                      value={formData.occasion}
+                      onChange={(e) => setFormData({ ...formData, occasion: e.target.value })}
+                      className="w-full bg-[#1C1E22] text-xs text-[#F7F5F0] p-3 border border-[#282A30] focus:border-[#D4A373] focus:outline-none appearance-none"
+                    >
+                      {occasionOptions.map((option) => (
+                        <option key={option} value={option} className="bg-[#1C1E22]">
+                          {option}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
                   <div>
