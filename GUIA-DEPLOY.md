@@ -72,16 +72,18 @@ Faz fail-closed e arranca a API local (`server/index.ts`) numa porta livre com:
 Verifica health, reservations-config, menus, site-content, e faz round-trips
 (create + read + delete) de reservas, contactos e newsletter.
 
-### Turso de teste (opcional, quando quiseres a prova com a BD da cloud)
-1. `turso auth login` (tu, uma vez).
-2. `turso db create boca-maldita-test`
-3. `turso db tokens create boca-maldita-test`
-4. Correr o smoke apontado à BD de teste:
-   ```bash
-   SMOKE_TURSO_URL="libsql://boca-maldita-test-<org>.turso.io" SMOKE_TURSO_AUTH_TOKEN="<token>" npm run smoke
-   ```
-   O script **aborta** se a URL não contiver `test`/`smoke`/`local`, ou se for igual à
-   `TURSO_URL` de produção. Nunca corre smoke contra `TURSO_URL` da produção.
+### Turso de teste (opcional — o smoke em SQLite efémero já cobre o que interessa)
+O CLI `turso` **não tem build nativa para Windows** (daí o `command not found`), pelo que
+`turso auth login` / `turso db create` **não funcionam nesta máquina**. Para uma BD cloud de
+teste, criá-la pelo **dashboard da Turso** (https://turso.tech — "Databases" → "Create
+database", sugestão de nome `boca-maldita-test`) e gerar um token para essa BD em "Tokens".
+Só com WSL ou Docker (com o CLI Turso instalado) é que `turso` funciona em linha de comandos.
+Depois de criar a BD:
+```bash
+SMOKE_TURSO_URL="libsql://boca-maldita-test-<org>.turso.io" SMOKE_TURSO_AUTH_TOKEN="<token>" npm run smoke
+```
+O script **aborta** se a URL não contiver `test`/`smoke`/`local`, ou se for igual à
+`TURSO_URL` de produção. Nunca corre smoke contra a produção.
 
 ## 5. Checklist pós-deploy (conforme o que foi tocado)
 
