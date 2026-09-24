@@ -848,6 +848,16 @@ async function sendNewsletterWelcome(email) {
   }
 }
 
+// api/lib/checkExpression.ts
+function solveCheckExpression(expression) {
+  const match = /^\s*(\d{1,3})\s*([+-])\s*(\d{1,3})\s*$/.exec(expression);
+  if (!match) return null;
+  const a = Number(match[1]);
+  const b = Number(match[3]);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
+  return match[2] === "+" ? a + b : a - b;
+}
+
 // api/lib/app.ts
 var distDir = "";
 if (!process.env.VERCEL) {
@@ -862,14 +872,6 @@ var ADMIN_TOKEN_KEY = "admin_token";
 var DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? "").trim() || "smpsandro1239@gmail.com";
 var RATE_WINDOW_MS = 15 * 60 * 1e3;
 var RATE_MAX_HITS = 5;
-function solveCheckExpression(expression) {
-  const match = /^\s*(\d{1,3})\s*([+-])\s*(\d{1,3})\s*$/.exec(expression);
-  if (!match) return null;
-  const a = Number(match[1]);
-  const b = Number(match[3]);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  return match[2] === "+" ? a + b : a - b;
-}
 function parseDateKey(key) {
   const [year, month, day] = key.split("-").map(Number);
   return { year, month, day };

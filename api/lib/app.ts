@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
 import { adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
 import { sendNewsletterWelcome, sendReservationConfirmation } from './email';
+import { solveCheckExpression } from './checkExpression';
 import type { NextFunction, Request, Response } from 'express';
 
 let distDir = '';
@@ -22,15 +23,6 @@ const DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? '').trim() || '
 
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_MAX_HITS = 5;
-
-function solveCheckExpression(expression: string): number | null {
-  const match = /^\s*(\d{1,3})\s*([+-])\s*(\d{1,3})\s*$/.exec(expression);
-  if (!match) return null;
-  const a = Number(match[1]);
-  const b = Number(match[3]);
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return null;
-  return match[2] === '+' ? a + b : a - b;
-}
 
 function parseDateKey(key: string): { year: number; month: number; day: number } {
   const [year, month, day] = key.split('-').map(Number);
