@@ -113,9 +113,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    refreshAssets();
-    refreshMenus();
-    refreshSiteContent();
+    void Promise.all([refreshAssets(), refreshMenus(), refreshSiteContent()]);
   }, [refreshAssets, refreshMenus, refreshSiteContent]);
 
   const getUrl = (id: string): string => {
