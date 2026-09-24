@@ -15,7 +15,8 @@
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
