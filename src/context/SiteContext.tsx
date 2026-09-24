@@ -5,7 +5,7 @@ import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 
 const DEFAULT_SITE_CONTENT: SiteContent = {
   contactEmail: 'smpsandro1239@gmail.com',
-  phone: '',
+  phone: '+351 253 031 890',
   address: '',
   hours: '',
   headline: '',
@@ -18,6 +18,10 @@ const DEFAULT_SITE_CONTENT: SiteContent = {
 };
 
 export { DEFAULT_SITE_CONTENT };
+
+export function telHref(phone: string): string {
+  return `tel:${phone.replace(/[^+\d]/g, '')}`;
+}
 
 interface AssetMatch {
   id: string;
@@ -102,6 +106,11 @@ export function SiteProvider({
   onRefreshMenus,
   onRefreshSiteContent,
 }: SiteProviderProps) {
+  const effectiveSiteContent = useMemo<SiteContent>(
+    () => ({ ...siteContent, phone: siteContent.phone.trim() || DEFAULT_SITE_CONTENT.phone }),
+    [siteContent],
+  );
+
   const byId = useMemo(() => {
     const map = new Map<string, ImageAsset>();
     for (const asset of assets) map.set(asset.id, asset);
@@ -122,7 +131,7 @@ export function SiteProvider({
 
   const contextValue = useMemo<SiteContextValue>(
     () => ({
-      siteContent,
+      siteContent: effectiveSiteContent,
       assets,
       menuItems,
       adminEnabled,
@@ -139,7 +148,7 @@ export function SiteProvider({
       refreshMenus: onRefreshMenus,
       refreshSiteContent: onRefreshSiteContent,
     }),
-    [siteContent, assets, menuItems, adminEnabled, byId, byUrl, byDefaultUrl, onRefreshAssets, onRefreshMenus, onRefreshSiteContent],
+    [effectiveSiteContent, assets, menuItems, adminEnabled, byId, byUrl, byDefaultUrl, onRefreshAssets, onRefreshMenus, onRefreshSiteContent],
   );
 
   return <SiteContext.Provider value={contextValue}>{children}</SiteContext.Provider>;

@@ -1,4 +1,6 @@
+import { useMemo } from 'react';
 import { LegalDoc } from '../types';
+import { useSite } from '../context/SiteContext';
 import { ArrowLeft } from 'lucide-react';
 
 interface LegalScreenProps {
@@ -6,7 +8,10 @@ interface LegalScreenProps {
   onBack: () => void;
 }
 
-const CONTENT: Record<LegalDoc, { title: string; sections: { heading: string; body: string[] }[]; updated: string }> = {
+type LegalContent = Record<LegalDoc, { title: string; sections: { heading: string; body: string[] }[]; updated: string }>;
+
+function buildContent(phone: string): LegalContent {
+  return {
   privacidade: {
     title: 'Política de Privacidade',
     updated: 'Atualizada em outubro de 2026',
@@ -34,7 +39,7 @@ const CONTENT: Record<LegalDoc, { title: string; sections: { heading: string; bo
       {
         heading: '4. Os seus direitos',
         body: [
-          'Pode, a qualquer momento, pedir o acesso, retificação, apagamento, limitação do tratamento, portabilidade dos dados ou opor-se ao tratamento dos seus dados pessoais, bem como retirar o consentimento de subscrição do boletim. Para o efeito, contacte-nos por email em smpsandro1239@gmail.com ou telefone +351 253 031 890.',
+          `Pode, a qualquer momento, pedir o acesso, retificação, apagamento, limitação do tratamento, portabilidade dos dados ou opor-se ao tratamento dos seus dados pessoais, bem como retirar o consentimento de subscrição do boletim. Para o efeito, contacte-nos por email em smpsandro1239@gmail.com ou telefone ${phone}.`,
           'Tem ainda o direito de apresentar uma reclamação junto da Comissão Nacional de Proteção de Dados (CNPD) — www.cnpd.pt.',
         ],
       },
@@ -59,7 +64,7 @@ const CONTENT: Record<LegalDoc, { title: string; sections: { heading: string; bo
       {
         heading: '1. Como reservar',
         body: [
-          'As reservas podem ser efetuadas pelo formulário online, por telefone (+351 253 031 890) ou email. A reserva online fica registada com uma referência própria (ex.: BM-0001); a receção só entra em contacto consigo caso seja necessário, por exemplo se existir algum problema com a reserva.',
+          `As reservas podem ser efetuadas pelo formulário online, por telefone (${phone}) ou email. A reserva online fica registada com uma referência própria (ex.: BM-0001); a receção só entra em contacto consigo caso seja necessário, por exemplo se existir algum problema com a reserva.`,
           'Em datas com grande procura, a confirmação da mesa fica sujeita à disponibilidade e à resposta da nossa equipa.',
         ],
       },
@@ -113,16 +118,19 @@ const CONTENT: Record<LegalDoc, { title: string; sections: { heading: string; bo
       {
         heading: 'Contactos',
         body: [
-          'Boca Maldita Restaurante & Grill · Avenida do Cávado, Vila de Prado, Vila Verde 4730-460 · +351 253 031 890 · smpsandro1239@gmail.com',
+          `Boca Maldita Restaurante & Grill · Avenida do Cávado, Vila de Prado, Vila Verde 4730-460 · ${phone} · smpsandro1239@gmail.com`,
           'Autoridade de fiscalização do setor: Direção-Geral do Consumidor (dgcon.pt).',
         ],
       },
     ],
   },
 };
+}
 
 export default function LegalScreen({ doc, onBack }: LegalScreenProps) {
-  const data = CONTENT[doc];
+  const { siteContent } = useSite();
+  const phone = siteContent.phone;
+  const data = useMemo(() => buildContent(phone), [phone]);
   return (
     <div className="w-full bg-[#0C0D0E] py-12 lg:py-20">
       <div className="max-w-3xl mx-auto px-5 lg:px-12 space-y-8">

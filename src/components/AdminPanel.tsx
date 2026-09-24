@@ -1224,7 +1224,7 @@ export default function AdminPanel({
                   checked={protection.pauseForm}
                   onChange={(v) => setProtectionField('pauseForm', v)}
                   label="Pausar reservas online"
-                  hint="Desliga o formulário e mostra «ligue +351 253 031 890» aos visitantes."
+                  hint="Desliga o formulário e mostra aos visitantes um aviso com o telefone de contacto."
                 />
                 <ProtectionSwitch
                   checked={protection.requireCheck}

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { createContact } from '../lib/api';
+import { useSite, telHref } from '../context/SiteContext';
 import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Copy, AlertCircle } from 'lucide-react';
 import AssetImage from '../components/AssetImage';
 
@@ -10,6 +11,9 @@ interface ContactScreenProps {
 }
 
 export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: ContactScreenProps) {
+  const { siteContent } = useSite();
+  const phone = siteContent.phone;
+  const waPhone = phone.replace(/[^0-9]/g, '');
   const [formData, setFormData] = useState({
     nome: '',
     email: '',
@@ -98,13 +102,13 @@ export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: 
             </p>
             <div className="space-y-1 pt-1">
               <a
-                href="tel:+351253031890"
+                href={telHref(phone)}
                 className="font-mono text-base text-[#D4A373] hover:underline block font-semibold"
               >
-                +351 253 031 890
+                {phone}
               </a>
               <a
-                href="https://wa.me/351253031890"
+                href={`https://wa.me/${waPhone}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:underline pt-1"

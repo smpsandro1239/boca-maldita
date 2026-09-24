@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { LegalDoc, ScreenType } from '../types';
 import { subscribeNewsletter } from '../lib/api';
+import { useSite, telHref } from '../context/SiteContext';
 import { Camera, Globe, Share2, Check, Flame, AlertCircle } from 'lucide-react';
 
 interface FooterProps {
@@ -14,6 +15,8 @@ export default function Footer({ onNavigate, onOpenLegal, contactEmail }: Footer
   const [subscribed, setSubscribed] = useState(false);
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
+  const { siteContent } = useSite();
+  const phone = siteContent.phone;
 
   const handleSubscribe = async (e: FormEvent) => {
     e.preventDefault();
@@ -83,10 +86,10 @@ export default function Footer({ onNavigate, onOpenLegal, contactEmail }: Footer
             </address>
             <div className="pt-2 space-y-1">
               <a
-                href="tel:+351253031890"
+                href={telHref(phone)}
                 className="text-sm text-[#D4A373] hover:underline block font-mono"
               >
-                +351 253 031 890
+                {phone}
               </a>
               <a
                 href={`mailto:${contactEmail}`}

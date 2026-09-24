@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ScreenType } from '../types';
 import { Phone, Calendar, Menu, X, Sparkles } from 'lucide-react';
 import AssetImage from './AssetImage';
+import { useSite, telHref } from '../context/SiteContext';
 
 interface HeaderProps {
   currentScreen: ScreenType;
@@ -11,6 +12,8 @@ interface HeaderProps {
 
 export default function Header({ currentScreen, onNavigate, logoUrl }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { siteContent } = useSite();
+  const phone = siteContent.phone;
 
   const navItems: { id: ScreenType; label: string }[] = [
     { id: 'inicio', label: 'Início' },
@@ -83,11 +86,11 @@ export default function Header({ currentScreen, onNavigate, logoUrl }: HeaderPro
         <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
           {/* Telephone Contact (Hidden on very small screens) */}
           <a
-            href="tel:+351253031890"
+            href={telHref(phone)}
             className="hidden lg:flex items-center gap-2 text-xs text-[#A6A8AD] hover:text-[#D4A373] transition-colors font-mono"
           >
             <Phone className="w-3.5 h-3.5 text-[#D4A373]" />
-            <span>+351 253 031 890</span>
+            <span>{phone}</span>
           </a>
 
           {/* Reservar Mesa Button */}
@@ -136,11 +139,11 @@ export default function Header({ currentScreen, onNavigate, logoUrl }: HeaderPro
 
           <div className="pt-4 border-t border-[#282A30] space-y-3">
             <a
-              href="tel:+351253031890"
+              href={telHref(phone)}
               className="flex items-center justify-center gap-2 text-xs text-[#A6A8AD] py-2 border border-[#282A30]"
             >
               <Phone className="w-3.5 h-3.5 text-[#D4A373]" />
-              <span>+351 253 031 890</span>
+              <span>{phone}</span>
             </a>
           </div>
         </div>

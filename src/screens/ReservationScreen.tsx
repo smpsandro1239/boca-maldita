@@ -3,9 +3,12 @@ import { ReservationData, PublicReservationConfig } from '../types';
 import { createReservation, getReservationConfig } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
 import { findBlockedPeriod } from '../lib/closedDays';
+import { useSite, telHref } from '../context/SiteContext';
 import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
 
 export default function ReservationScreen() {
+  const { siteContent } = useSite();
+  const phone = siteContent.phone;
   const [config, setConfig] = useState<PublicReservationConfig | null>(null);
   const [checkValue, setCheckValue] = useState('');
   const [honeypotValue, setHoneypotValue] = useState('');
@@ -140,10 +143,10 @@ export default function ReservationScreen() {
               reserva, contacte a nossa receção por telefone:
             </p>
             <a
-              href="tel:+351253031890"
+              href={telHref(phone)}
               className="inline-block bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] font-sans text-sm uppercase font-semibold px-8 py-4 tracking-[0.2em] transition-colors"
             >
-              +351 253 031 890
+              {phone}
             </a>
             <p className="text-[11px] text-[#686B73]">
               Linha de reservas aberta das 11h00 às 23h30
@@ -199,7 +202,7 @@ export default function ReservationScreen() {
                 • O pedido de reserva foi registado em nome de <strong className="text-[#F7F5F0]">{confirmedReservation.data.name}</strong>. A nossa receção só entrará em contacto consigo caso seja necessário (por exemplo, se existir algum problema com a reserva).
               </p>
               <p>
-                • Tolerância de mesa: 15 minutos. Em caso de atraso ou alteração, contacte diretamente a nossa recepção através do número <a href="tel:+351253031890" className="text-[#D4A373] underline">+351 253 031 890</a>.
+                • Tolerância de mesa: 15 minutos. Em caso de atraso ou alteração, contacte diretamente a nossa recepção através do número <a href={telHref(phone)} className="text-[#D4A373] underline">{phone}</a>.
               </p>
             </div>
 
@@ -444,10 +447,10 @@ export default function ReservationScreen() {
                   Para mesas de grupos com mais de 8 pessoas ou pedidos com menos de 2 horas de antecedência, ligue diretamente:
                 </p>
                 <a
-                  href="tel:+351253031890"
+                  href={telHref(phone)}
                   className="block font-serif text-2xl text-[#F7F5F0] hover:text-[#D4A373] transition-colors font-semibold"
                 >
-                  +351 253 031 890
+                  {phone}
                 </a>
                 <span className="text-[11px] text-[#686B73] block">
                   Linha de reservas aberta das 11h00 às 23h30

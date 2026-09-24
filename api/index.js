@@ -925,7 +925,7 @@ var DEFAULT_RESERVATION_PROTECTION = {
 };
 var DEFAULT_SITE_CONTENT = {
   contactEmail: DEFAULT_CONTACT_EMAIL,
-  phone: "",
+  phone: "+351 253 031 890",
   address: "",
   hours: "",
   headline: "",
@@ -1056,7 +1056,7 @@ async function createApp() {
       const closed = await getClosedPeriodForDate(storage, parsed.data.date);
       if (closed) {
         return res.status(423).json({
-          error: `N\xE3o \xE9 poss\xEDvel reservar para esta data: ${closed.title}. Escolha outro dia ou ligue +351 253 031 890.`
+          error: `N\xE3o \xE9 poss\xEDvel reservar para esta data: ${closed.title}. Escolha outro dia ou ligue ${DEFAULT_SITE_CONTENT.phone}.`
         });
       }
       const protection = await getReservationProtection(storage);
@@ -1065,7 +1065,7 @@ async function createApp() {
         ip = getClientIp(req);
         if (protection.pauseForm) {
           return res.status(423).json({
-            error: "As reservas online est\xE3o temporariamente pausadas. Ligue +351 253 031 890 para reservar."
+            error: `As reservas online est\xE3o temporariamente pausadas. Ligue ${DEFAULT_SITE_CONTENT.phone} para reservar.`
           });
         }
         if (protection.requireCheck) {
@@ -1080,7 +1080,7 @@ async function createApp() {
           return res.status(429).json({ error: "Demasiados pedidos de reserva. Aguarde alguns minutos." });
         }
         if (await storage.countByDate(parsed.data.date) >= protection.dailyCapacity) {
-          return res.status(409).json({ error: "Lota\xE7\xE3o esgotada para esta data. Tente outra data ou ligue +351 253 031 890." });
+          return res.status(409).json({ error: `Lota\xE7\xE3o esgotada para esta data. Tente outra data ou ligue ${DEFAULT_SITE_CONTENT.phone}.` });
         }
         if (await storage.countByClientOnDate(parsed.data.date, parsed.data.email, parsed.data.phone) >= protection.maxPerClient) {
           return res.status(409).json({ error: "J\xE1 existem reservas para esta data com este contacto." });

@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ScreenType, MenuItem, PublicReservationConfig, ReviewAdminRow } from '../types';
-import { useSite } from '../context/SiteContext';
+import { useSite, telHref } from '../context/SiteContext';
 import AssetImage from '../components/AssetImage';
 import { createReservation, createReview, getReservationConfig, getReviews } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
@@ -60,7 +60,8 @@ export default function HomeScreen({
     convidados: '2 Pessoas',
     telefone: ''
   });
-  const { menuItems } = useSite();
+  const { menuItems, siteContent } = useSite();
+  const phone = siteContent.phone;
 
   useEffect(() => {
     getReservationConfig()
@@ -282,11 +283,11 @@ export default function HomeScreen({
             </div>
             <div className="flex items-center gap-6">
               <a
-                href="tel:+351253031890"
+                href={telHref(phone)}
                 className="flex items-center gap-2 text-[#F7F5F0] hover:text-[#D4A373] transition-colors font-mono"
               >
                 <Phone className="w-3.5 h-3.5 text-[#D4A373]" />
-                <span>+351 253 031 890</span>
+                <span>{phone}</span>
               </a>
               <span className="hidden sm:inline text-[#686B73]">•</span>
               <span className="text-[#D4A373] font-medium">
@@ -548,7 +549,7 @@ export default function HomeScreen({
 
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pt-2">
                   <a
-                    href="tel:+351253031890"
+                    href={telHref(phone)}
                     className="flex items-center gap-3.5 text-[#F7F5F0] hover:text-[#D4A373] transition-colors"
                   >
                     <div className="w-12 h-12 bg-[#D4A373] text-[#0C0D0E] flex items-center justify-center font-bold">
@@ -559,7 +560,7 @@ export default function HomeScreen({
                         Linha Direta de Reserva
                       </div>
                       <div className="font-serif text-xl font-semibold text-[#D4A373]">
-                        +351 253 031 890
+                        {phone}
                       </div>
                     </div>
                   </a>
@@ -826,10 +827,10 @@ export default function HomeScreen({
                 </p>
                 <div className="pt-2 space-y-1">
                   <a
-                    href="tel:+351253031890"
+                    href={telHref(phone)}
                     className="font-serif text-lg text-[#F7F5F0] hover:text-[#D4A373] transition-colors block"
                   >
-                    +351 253 031 890
+                    {phone}
                   </a>
                   <a
                     href={`mailto:${contactEmail}`}
