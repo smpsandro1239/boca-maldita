@@ -1520,6 +1520,12 @@ async function createApp() {
 }
 
 // scripts/api-entry.ts
+process.removeAllListeners("warning");
+process.on("warning", (warning) => {
+  if (warning.name === "DeprecationWarning" && warning.message.includes("url.parse")) return;
+  if (warning.stack) console.error(warning.stack);
+  else console.error(`${warning.name}: ${warning.message}`);
+});
 var instance = null;
 async function handler(req, res, next) {
   try {
