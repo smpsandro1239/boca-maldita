@@ -17,6 +17,7 @@ import * as api from './lib/api';
 import { SiteProvider, DEFAULT_SITE_CONTENT, computeAssets } from './context/SiteContext';
 import AdminPanel from './components/AdminPanel';
 import { Check, X } from 'lucide-react';
+import { readSession, writeSession } from './lib/storage';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
@@ -42,7 +43,7 @@ export default function App() {
   const [isAdminVerifying, setIsAdminVerifying] = useState(true);
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [adminToken, setAdminToken] = useState<string>(() => sessionStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) ?? '');
+  const [adminToken, setAdminToken] = useState<string>(() => readSession(ADMIN_TOKEN_STORAGE_KEY) ?? '');
   const hasVideo = !!siteContent.videoUrl.trim();
 
   useEffect(() => {
@@ -307,7 +308,7 @@ function AdminLoginModal({
     setBusy(true);
     try {
       await api.verifyAdminToken(value);
-      sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, value);
+      writeSession(ADMIN_TOKEN_STORAGE_KEY, value);
       onTokenChange(value);
       onSuccess();
     } catch (err) {

@@ -55,6 +55,7 @@ import {
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
+import { writeSession } from '../lib/storage';
 
 const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
@@ -226,7 +227,7 @@ export default function AdminPanel({
     setError(null);
     try {
       await fn();
-      sessionStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, token);
+      writeSession(ADMIN_TOKEN_STORAGE_KEY, token);
       showToast(successMessage);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro inesperado.');
