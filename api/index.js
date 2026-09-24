@@ -1101,6 +1101,9 @@ async function createApp() {
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
       }
+      if (!allowIpHit(getClientIp(req))) {
+        return res.status(429).json({ error: "Demasiados pedidos de contacto. Aguarde alguns minutos." });
+      }
       const { id } = await storage.createContact(parsed.data);
       res.status(201).json({ id });
     } catch (err) {
@@ -1115,6 +1118,9 @@ async function createApp() {
       }
       if (await storage.hasNewsletter(parsed.data.email)) {
         return res.status(409).json({ error: "Este email j\xE1 est\xE1 subscrito no boletim." });
+      }
+      if (!allowIpHit(getClientIp(req))) {
+        return res.status(429).json({ error: "Demasiadas subscri\xE7\xF5es. Aguarde alguns minutos." });
       }
       const { id } = await storage.createNewsletter(parsed.data);
       sendNewsletterWelcome(parsed.data.email).catch((err) => {
@@ -1379,6 +1385,9 @@ async function createApp() {
       const parsed = reviewSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      if (!allowIpHit(getClientIp(req))) {
+        return res.status(429).json({ error: "Demasiadas avalia\xE7\xF5es. Aguarde alguns minutos." });
       }
       const { id } = await storage.createReview(parsed.data, { ip: getClientIp(req) });
       res.status(201).json({ id });
