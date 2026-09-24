@@ -4,6 +4,15 @@ export interface ConfirmationPayload extends ReservationInput {
   reference: string;
 }
 
+function escapeHtml(value: string | number | undefined): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 interface EmailTransporter {
   sendMail(options: { from: string; to: string; subject: string; html: string }): Promise<unknown>;
 }
@@ -37,17 +46,17 @@ function buildConfirmationHtml(payload: ConfirmationPayload): string {
     `  <div style="max-width:560px;margin:0 auto;border:1px solid #282A30;background:#141518;padding:32px;">`,
     `    <p style="font-family:monospace;letter-spacing:0.2em;color:#D4A373;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita · Fine Dining &amp; Grill</p>`,
     `    <h1 style="font-size:28px;margin:0 0 16px;">Confirmação de reserva</h1>`,
-    `    <p style="color:#A6A8AD;margin:0 0 24px;">A sua reserva foi registada. Guarde a referência <strong style="color:#D4A373;">${payload.reference}</strong> e apresente-a ao chegar.</p>`,
+    `    <p style="color:#A6A8AD;margin:0 0 24px;">A sua reserva foi registada. Guarde a referência <strong style="color:#D4A373;">${escapeHtml(payload.reference)}</strong> e apresente-a ao chegar.</p>`,
     `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:14px;">`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;width:38%;">Nome</td><td style="padding:8px 0;">${payload.name}</td></tr>`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Telefone</td><td style="padding:8px 0;">${payload.phone}</td></tr>`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Data</td><td style="padding:8px 0;">${payload.date}</td></tr>`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Hora</td><td style="padding:8px 0;">${payload.time}</td></tr>`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Convidados</td><td style="padding:8px 0;">${payload.guests}</td></tr>`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Área</td><td style="padding:8px 0;">${payload.area}</td></tr>`,
-    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Ocasião</td><td style="padding:8px 0;">${payload.occasion}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;width:38%;">Nome</td><td style="padding:8px 0;">${escapeHtml(payload.name)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Telefone</td><td style="padding:8px 0;">${escapeHtml(payload.phone)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Data</td><td style="padding:8px 0;">${escapeHtml(payload.date)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Hora</td><td style="padding:8px 0;">${escapeHtml(payload.time)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Convidados</td><td style="padding:8px 0;">${escapeHtml(payload.guests)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Área</td><td style="padding:8px 0;">${escapeHtml(payload.area)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Ocasião</td><td style="padding:8px 0;">${escapeHtml(payload.occasion)}</td></tr>`,
     payload.notes
-      ? `      <tr><td style="padding:8px 0;color:#A6A8AD;vertical-align:top;">Notas</td><td style="padding:8px 0;">${payload.notes}</td></tr>`
+      ? `      <tr><td style="padding:8px 0;color:#A6A8AD;vertical-align:top;">Notas</td><td style="padding:8px 0;">${escapeHtml(payload.notes)}</td></tr>`
       : '',
     `    </table>`,
     `    <p style="color:#A6A8AD;font-size:13px;margin:24px 0 0;">Rua de Vila de Prado, Vila Verde · geral@bocamaldita.pt</p>`,
