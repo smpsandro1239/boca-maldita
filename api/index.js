@@ -693,6 +693,9 @@ var reviewSchema = z.object({
 var reviewStatusSchema = z.object({
   status: z.enum(["approved", "pending", "rejected"], { message: "Estado inv\xE1lido." })
 }).strict();
+var adminLoginSchema = z.object({
+  token: z.string().trim().min(1, "Introduza o token de administrador.").max(200, "Token demasiado longo.")
+}).strict();
 var adminTokenUpdateSchema = z.object({
   token: z.string().trim().min(16, "O token tem de ter pelo menos 16 caracteres.").max(200, "O token \xE9 demasiado longo.").regex(/[A-Z]/, "O token tem de conter pelo menos uma letra mai\xFAscula.").regex(/[a-z]/, "O token tem de conter pelo menos uma letra min\xFAscula.").regex(/[0-9]/, "O token tem de conter pelo menos um n\xFAmero.").regex(/[^A-Za-z0-9]/, "O token tem de conter pelo menos um car\xE1cter especial.")
 }).strict();
@@ -859,6 +862,118 @@ function solveCheckExpression(expression) {
   return match[2] === "+" ? a + b : a - b;
 }
 
+// api/lib/auth.ts
+import { randomBytes, timingSafeEqual } from "node:crypto";
+var SESSION_COOKIE = "bmtauth";
+var CSRF_COOKIE = "bmcsrf";
+var SESSIONS_KEY = "admin_sessions";
+var SESSION_TTL_MS = 14 * 24 * 60 * 60 * 1e3;
+function parseCookies(header) {
+  const out = {};
+  if (!header) return out;
+  for (const part of header.split(";")) {
+    const eq = part.indexOf("=");
+    if (eq === -1) continue;
+    const key = part.slice(0, eq).trim();
+    const raw = part.slice(eq + 1).trim();
+    if (!key || !raw) continue;
+    try {
+      out[key] = decodeURIComponent(raw);
+    } catch {
+      out[key] = raw;
+    }
+  }
+  return out;
+}
+function timingSafeEqualStr(a, b) {
+  const ba = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ba.length !== bb.length) return false;
+  return timingSafeEqual(ba, bb);
+}
+async function purgeExpiredSessions(store) {
+  const stored = await store.getSetting(SESSIONS_KEY);
+  if (!stored) return {};
+  let map;
+  try {
+    map = JSON.parse(stored);
+  } catch {
+    await store.deleteSetting(SESSIONS_KEY);
+    return {};
+  }
+  const now = Date.now();
+  const live = {};
+  let changed = false;
+  for (const [sid, entry] of Object.entries(map)) {
+    if (entry && typeof entry.createdAt === "number" && now - entry.createdAt < SESSION_TTL_MS) {
+      live[sid] = entry;
+    } else {
+      changed = true;
+    }
+  }
+  if (changed) {
+    if (Object.keys(live).length === 0) await store.deleteSetting(SESSIONS_KEY);
+    else await store.setSetting(SESSIONS_KEY, JSON.stringify(live));
+  }
+  return live;
+}
+async function getSession(store, sid) {
+  const map = await purgeExpiredSessions(store);
+  const entry = map[sid];
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt >= SESSION_TTL_MS) return null;
+  return entry;
+}
+async function createSession(store) {
+  const map = await purgeExpiredSessions(store);
+  const sid = randomBytes(24).toString("base64url");
+  const csrf = randomBytes(24).toString("base64url");
+  map[sid] = { csrf, createdAt: Date.now() };
+  await store.setSetting(SESSIONS_KEY, JSON.stringify(map));
+  return { sid, csrf };
+}
+async function deleteSession(store, sid) {
+  const map = await purgeExpiredSessions(store);
+  if (!map[sid]) return;
+  delete map[sid];
+  await store.setSetting(SESSIONS_KEY, JSON.stringify(map));
+}
+async function destroyAllSessions(store) {
+  await store.deleteSetting(SESSIONS_KEY);
+}
+async function requireAdmin(req, res, store, getEffectiveToken, opts) {
+  const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+  if (sid) {
+    const session = await getSession(store, sid);
+    if (session) {
+      if (opts.requireCsrf) {
+        const csrf = req.headers["x-csrf-token"];
+        if (typeof csrf !== "string" || !csrf || !timingSafeEqualStr(csrf, session.csrf)) {
+          res.status(403).json({ error: "Token CSRF inv\xE1lido." });
+          return null;
+        }
+      }
+      return { via: "cookie" };
+    }
+  }
+  const header = req.headers["x-admin-token"];
+  if (typeof header === "string" && header.trim()) {
+    const effectiveToken2 = await getEffectiveToken();
+    if (timingSafeEqualStr(header.trim(), effectiveToken2)) {
+      return { via: "header" };
+    }
+  }
+  const effectiveToken = await getEffectiveToken();
+  if (effectiveToken) {
+    res.status(401).json({ error: "Sess\xE3o expirada ou token inv\xE1lido." });
+  } else {
+    res.status(503).json({
+      error: "Administra\xE7\xE3o desativada: defina a vari\xE1vel ADMIN_TOKEN no servidor."
+    });
+  }
+  return null;
+}
+
 // api/lib/app.ts
 var distDir = "";
 if (!process.env.VERCEL) {
@@ -979,23 +1094,6 @@ async function getEffectiveAdminToken(storage) {
   const stored = await storage.getSetting(ADMIN_TOKEN_KEY);
   return stored?.trim() || adminToken;
 }
-function adminUnauthorized(res, hasToken) {
-  if (hasToken) {
-    res.status(401).json({ error: "Token de administrador inv\xE1lido." });
-  } else {
-    res.status(503).json({
-      error: "Administra\xE7\xE3o desativada: defina a vari\xE1vel ADMIN_TOKEN no servidor."
-    });
-  }
-}
-async function isAuthorized(req, res, storage) {
-  const effective = await getEffectiveAdminToken(storage);
-  if (!effective || req.headers["x-admin-token"] !== effective) {
-    adminUnauthorized(res, effective !== "");
-    return false;
-  }
-  return true;
-}
 async function createApp() {
   let storage;
   try {
@@ -1015,6 +1113,18 @@ async function createApp() {
     const entry = ipHits.get(ip);
     if (!entry || now - entry.startedAt >= RATE_WINDOW_MS) {
       ipHits.set(ip, { count: 1, startedAt: now });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= RATE_MAX_HITS;
+  }
+  const loginHits = /* @__PURE__ */ new Map();
+  function allowLoginHit(ip) {
+    if (!ip) return true;
+    const now = Date.now();
+    const entry = loginHits.get(ip);
+    if (!entry || now - entry.startedAt >= RATE_WINDOW_MS) {
+      loginHits.set(ip, { count: 1, startedAt: now });
       return true;
     }
     entry.count += 1;
@@ -1147,7 +1257,7 @@ async function createApp() {
   });
   app.put("/api/site", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = siteSettingsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1158,8 +1268,54 @@ async function createApp() {
       next(err);
     }
   });
+  app.post("/api/admin/login", async (req, res, next) => {
+    try {
+      const ip = getClientIp(req);
+      if (!allowLoginHit(ip)) {
+        return res.status(429).json({ error: "Demasiadas tentativas de login. Aguarde alguns minutos." });
+      }
+      const parsed = adminLoginSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Introduza o token de administrador." });
+      }
+      const effective = await getEffectiveAdminToken(storage);
+      if (!effective || !timingSafeEqualStr(parsed.data.token, effective)) {
+        return res.status(401).json({ error: "Token de administrador inv\xE1lido." });
+      }
+      const { sid, csrf } = await createSession(storage);
+      res.cookie(SESSION_COOKIE, sid, {
+        httpOnly: true,
+        secure: true,
+        sameSite: "strict",
+        path: "/",
+        maxAge: SESSION_TTL_MS
+      });
+      res.cookie(CSRF_COOKIE, csrf, {
+        httpOnly: false,
+        secure: true,
+        sameSite: "strict",
+        path: "/",
+        maxAge: SESSION_TTL_MS
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/session", async (req, res) => {
+    const identity = await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: false });
+    if (!identity) return;
+    res.json({ authenticated: true });
+  });
+  app.post("/api/admin/logout", async (req, res) => {
+    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    if (sid) await deleteSession(storage, sid);
+    res.cookie(SESSION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: 0, expires: /* @__PURE__ */ new Date(0) });
+    res.cookie(CSRF_COOKIE, "", { httpOnly: false, secure: true, sameSite: "strict", path: "/", maxAge: 0, expires: /* @__PURE__ */ new Date(0) });
+    res.json({ ok: true });
+  });
   app.get("/api/admin/verify-token", async (req, res) => {
-    if (!await isAuthorized(req, res, storage)) return;
+    if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: false })) return;
     res.json({ ok: true });
   });
   app.get("/api/admin/assets", async (_req, res, next) => {
@@ -1178,7 +1334,7 @@ async function createApp() {
   });
   app.put("/api/admin/assets", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = assetOverridesSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1199,7 +1355,7 @@ async function createApp() {
   });
   app.delete("/api/admin/assets", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       await storage.deleteSetting(IMAGE_OVERRIDES_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -1226,7 +1382,7 @@ async function createApp() {
   });
   app.put("/api/admin/menus", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = menuItemsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1242,7 +1398,7 @@ async function createApp() {
   });
   app.delete("/api/admin/menus", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       await storage.deleteSetting(MENU_ITEMS_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -1266,7 +1422,7 @@ async function createApp() {
   });
   app.put("/api/admin/site-content", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = siteContentSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1280,7 +1436,7 @@ async function createApp() {
   });
   app.get("/api/admin/reservation-protection", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       res.json(await getReservationProtection(storage));
     } catch (err) {
       next(err);
@@ -1288,7 +1444,7 @@ async function createApp() {
   });
   app.put("/api/admin/reservation-protection", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = reservationProtectionSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1301,7 +1457,7 @@ async function createApp() {
   });
   app.get("/api/admin/reservations", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       res.json({ items: await storage.listReservations() });
     } catch (err) {
       next(err);
@@ -1309,7 +1465,7 @@ async function createApp() {
   });
   app.delete("/api/admin/reservations/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1321,7 +1477,7 @@ async function createApp() {
   });
   app.post("/api/admin/reservations", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = adminReservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1334,7 +1490,7 @@ async function createApp() {
   });
   app.put("/api/admin/reservations/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1354,7 +1510,7 @@ async function createApp() {
   });
   app.get("/api/admin/contacts", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       res.json({ items: await storage.listContacts() });
     } catch (err) {
       next(err);
@@ -1362,7 +1518,7 @@ async function createApp() {
   });
   app.delete("/api/admin/contacts/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1374,7 +1530,7 @@ async function createApp() {
   });
   app.get("/api/admin/newsletter", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       res.json({ items: await storage.listNewsletter() });
     } catch (err) {
       next(err);
@@ -1382,7 +1538,7 @@ async function createApp() {
   });
   app.delete("/api/admin/newsletter/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1416,7 +1572,7 @@ async function createApp() {
   });
   app.get("/api/admin/reviews", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       res.json({ items: await storage.listReviews() });
     } catch (err) {
       next(err);
@@ -1424,7 +1580,7 @@ async function createApp() {
   });
   app.put("/api/admin/reviews/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1444,7 +1600,7 @@ async function createApp() {
   });
   app.delete("/api/admin/reviews/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1456,7 +1612,7 @@ async function createApp() {
   });
   app.get("/api/admin/closed-days", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       res.json({ items: await storage.listClosedPeriods() });
     } catch (err) {
       next(err);
@@ -1464,7 +1620,7 @@ async function createApp() {
   });
   app.post("/api/admin/closed-days", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = closedPeriodSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -1477,7 +1633,7 @@ async function createApp() {
   });
   app.delete("/api/admin/closed-days/:id", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: "ID inv\xE1lido." });
@@ -1489,7 +1645,7 @@ async function createApp() {
   });
   app.put("/api/admin/security/token", async (req, res, next) => {
     try {
-      if (!await isAuthorized(req, res, storage)) return;
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       const parsed = adminTokenUpdateSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({
@@ -1501,6 +1657,9 @@ async function createApp() {
         return res.status(400).json({ error: "O novo token \xE9 igual ao atual." });
       }
       await storage.setSetting(ADMIN_TOKEN_KEY, parsed.data.token);
+      await destroyAllSessions(storage);
+      res.cookie(SESSION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "strict", path: "/", maxAge: 0, expires: /* @__PURE__ */ new Date(0) });
+      res.cookie(CSRF_COOKIE, "", { httpOnly: false, secure: true, sameSite: "strict", path: "/", maxAge: 0, expires: /* @__PURE__ */ new Date(0) });
       res.json({ ok: true });
     } catch (err) {
       next(err);

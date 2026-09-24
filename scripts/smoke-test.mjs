@@ -170,6 +170,83 @@ async function main() {
     } else {
       fail('POST /api/newsletter id', JSON.stringify(nl));
     }
+
+    // ---- D-3: autenticação por cookie (bmtauth + bmcsrf) + CSRF + logout ----
+    const parseSetCookies = (headers) => {
+      const setCookies = typeof headers.getSetCookie === 'function' ? headers.getSetCookie() : [];
+      return setCookies.map((line) => {
+        const eq = line.indexOf('=');
+        const name = line.slice(0, eq).trim();
+        const value = line.slice(eq + 1).split(';')[0].trim();
+        return { name, value };
+      });
+    };
+    const cookieJar = (list) => list.map((c) => `${c.name}=${c.value}`).join('; ');
+
+    const login = await fetch(`${base}/api/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: ADMIN_TOKEN }),
+    });
+    const loginBody = await login.json();
+    const loginCookies = parseSetCookies(login.headers);
+    const jar = loginCookies.length ? `${cookieJar(loginCookies)}; ` : '';
+    const csrfCookie = loginCookies.find((c) => c.name === 'bmcsrf');
+    const sidCookie = loginCookies.find((c) => c.name === 'bmtauth');
+    if (login.status === 200 && loginBody.ok && sidCookie && csrfCookie) {
+      pass('POST /api/admin/login (cookies bmtauth+bmcsrf)');
+    } else {
+      fail('POST /api/admin/login', `${login.status} ${JSON.stringify(loginBody)}`);
+    }
+
+    if (jar && csrfCookie) {
+      const session = await fetch(`${base}/api/admin/session`, { headers: { cookie: jar } });
+      const sessionBody = await session.json();
+      session.status === 200 && sessionBody.authenticated
+        ? pass('GET /api/admin/session com cookie → 200 autenticado')
+        : fail('GET /api/admin/session', `${session.status} ${JSON.stringify(sessionBody)}`);
+
+      const iso2 = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
+      const csrfHeaders = { 'Content-Type': 'application/json', cookie: jar, 'x-csrf-token': csrfCookie.value };
+      const addDay = await fetch(`${base}/api/admin/closed-days`, {
+        method: 'POST',
+        headers: csrfHeaders,
+        body: JSON.stringify({ title: 'Smoke período', startDate: iso2, repeat: 'none', note: 'd3' }),
+      });
+      const addDayBody = await addDay.json();
+      if ((addDay.status === 200 || addDay.status === 201) && addDayBody.id) {
+        pass('POST /api/admin/closed-days com X-Csrf-Token (cookie) → 200/201');
+        const delDay = await fetch(`${base}/api/admin/closed-days/${addDayBody.id}`, {
+          method: 'DELETE',
+          headers: { cookie: jar, 'x-csrf-token': csrfCookie.value },
+        });
+        delDay.status === 200
+          ? pass('DELETE /api/admin/closed-days/:id (cookie+csrf) → 200')
+          : fail('DELETE closed-days cookie+csrf', `${delDay.status}`);
+      } else {
+        fail('POST closed-days cookie+csrf', `${addDay.status} ${JSON.stringify(addDayBody)}`);
+      }
+
+      const noCsrf = await fetch(`${base}/api/admin/closed-days`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie: jar },
+        body: JSON.stringify({ title: 'Smoke sem CSRF', startDate: iso2, repeat: 'none', note: 'x' }),
+      });
+      noCsrf.status === 403
+        ? pass('POST admin sem X-Csrf-Token com cookie → 403')
+        : fail('CSRF ausente', `${noCsrf.status}`);
+
+      const logout = await fetch(`${base}/api/admin/logout`, { method: 'POST', headers: { cookie: jar } });
+      const sectionAfter = await fetch(`${base}/api/admin/session`, { headers: { cookie: jar } });
+      logout.status === 200 && sectionAfter.status === 401
+        ? pass('POST /api/admin/logout → session 401 (idempotente)')
+        : fail('logout/expiração sessão', `logout=${logout.status} session=${sectionAfter.status}`);
+
+      const logoutAgain = await fetch(`${base}/api/admin/logout`, { method: 'POST', headers: { cookie: jar } });
+      logoutAgain.status === 200
+        ? pass('POST /api/admin/logout repetido → 200 (idempotente)')
+        : fail('logout repetido', `${logoutAgain.status}`);
+    }
   } catch (err) {
     fail('smoke execução', err.message);
   } finally {

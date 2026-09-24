@@ -1,5 +1,14 @@
 import type { AssetOverride, ClosedPeriod, ClosedPeriodInput, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
 
+export class HttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, init);
 
@@ -8,7 +17,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     const message =
       data && typeof data.error === 'string' ? data.error : 'Erro ao comunicar com o servidor. Tente novamente.';
-    throw new Error(message);
+    throw new HttpError(message, response.status);
   }
 
   return data as T;
@@ -20,6 +29,29 @@ function post<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+function readCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  for (const part of document.cookie.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() !== name) continue;
+    const raw = part.slice(eq + 1).trim();
+    try {
+      return decodeURIComponent(raw);
+    } catch {
+      return raw;
+    }
+  }
+  return null;
+}
+
+function mutationHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const csrf = readCookie('bmcsrf');
+  if (csrf) headers['X-Csrf-Token'] = csrf;
+  return headers;
 }
 
 export interface CreateReservationResult {
@@ -73,12 +105,24 @@ export function getSite(): Promise<SiteSettings> {
   return request<SiteSettings>('/site');
 }
 
-export function saveSiteSettings(contactEmail: string, token: string): Promise<{ ok: boolean }> {
+export function saveSiteSettings(contactEmail: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/site', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify({ contactEmail }),
   });
+}
+
+export function adminLogin(token: string): Promise<{ ok: boolean }> {
+  return post<{ ok: boolean }>('/admin/login', { token });
+}
+
+export function adminSession(): Promise<{ authenticated: boolean }> {
+  return request<{ authenticated: boolean }>('/admin/session');
+}
+
+export function adminLogout(): Promise<{ ok: boolean }> {
+  return post<{ ok: boolean }>('/admin/logout', {});
 }
 
 export interface AdminAssetsStatus {
@@ -86,28 +130,21 @@ export interface AdminAssetsStatus {
   overrides: Record<string, { url: string; scale?: number; px?: number; py?: number }>;
 }
 
-export function verifyAdminToken(token: string): Promise<{ ok: boolean }> {
-  return request<{ ok: boolean }>('/admin/verify-token', {
-    headers: { 'X-Admin-Token': token },
-  });
-}
-
 export function getAdminAssets(): Promise<AdminAssetsStatus> {
   return request<AdminAssetsStatus>('/admin/assets');
 }
 
-export function saveAdminAssets(overrides: AssetOverride[], token: string): Promise<{ ok: boolean }> {
+export function saveAdminAssets(overrides: AssetOverride[]): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/assets', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify({ overrides }),
   });
 }
 
-export function resetAdminAssets(token: string): Promise<{ ok: boolean }> {
+export function resetAdminAssets(): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/assets', {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }
 
@@ -115,18 +152,17 @@ export function getMenus(): Promise<{ items: MenuItem[] | null }> {
   return request<{ items: MenuItem[] | null }>('/menus');
 }
 
-export function saveAdminMenus(items: MenuItem[], token: string): Promise<{ ok: boolean }> {
+export function saveAdminMenus(items: MenuItem[]): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/menus', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify({ items }),
   });
 }
 
-export function resetAdminMenus(token: string): Promise<{ ok: boolean }> {
+export function resetAdminMenus(): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/menus', {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }
 
@@ -134,80 +170,69 @@ export function getSiteContent(): Promise<SiteContent> {
   return request<SiteContent>('/site-content');
 }
 
-export function saveSiteContent(content: SiteContent, token: string): Promise<{ ok: boolean }> {
+export function saveSiteContent(content: SiteContent): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/site-content', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify(content),
   });
 }
 
-export function getAdminReservations(token: string): Promise<{ items: ReservationAdminRow[] }> {
-  return request<{ items: ReservationAdminRow[] }>('/admin/reservations', {
-    headers: { 'X-Admin-Token': token },
-  });
+export function getAdminReservations(): Promise<{ items: ReservationAdminRow[] }> {
+  return request<{ items: ReservationAdminRow[] }>('/admin/reservations');
 }
 
-export function getAdminReservationProtection(token: string): Promise<ReservationProtectionConfig> {
-  return request<ReservationProtectionConfig>('/admin/reservation-protection', {
-    headers: { 'X-Admin-Token': token },
-  });
+export function getAdminReservationProtection(): Promise<ReservationProtectionConfig> {
+  return request<ReservationProtectionConfig>('/admin/reservation-protection');
 }
 
-export function saveAdminReservationProtection(config: ReservationProtectionConfig, token: string): Promise<{ ok: boolean }> {
+export function saveAdminReservationProtection(config: ReservationProtectionConfig): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/reservation-protection', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify(config),
   });
 }
 
-export function deleteAdminReservation(id: number, token: string): Promise<{ ok: boolean }> {
+export function deleteAdminReservation(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/reservations/${id}`, {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }
 
-export function createAdminReservation(payload: ReservationEditorData, token: string): Promise<{ id: number; reference: string }> {
+export function createAdminReservation(payload: ReservationEditorData): Promise<{ id: number; reference: string }> {
   return request<{ id: number; reference: string }>('/admin/reservations', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify(payload),
   });
 }
 
-export function updateAdminReservation(id: number, payload: ReservationEditorData, token: string): Promise<{ ok: boolean }> {
+export function updateAdminReservation(id: number, payload: ReservationEditorData): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/reservations/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify(payload),
   });
 }
 
-export function getAdminContacts(token: string): Promise<{ items: ContactAdminRow[] }> {
-  return request<{ items: ContactAdminRow[] }>('/admin/contacts', {
-    headers: { 'X-Admin-Token': token },
-  });
+export function getAdminContacts(): Promise<{ items: ContactAdminRow[] }> {
+  return request<{ items: ContactAdminRow[] }>('/admin/contacts');
 }
 
-export function deleteAdminContact(id: number, token: string): Promise<{ ok: boolean }> {
+export function deleteAdminContact(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/contacts/${id}`, {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }
 
-export function getAdminNewsletter(token: string): Promise<{ items: NewsletterAdminRow[] }> {
-  return request<{ items: NewsletterAdminRow[] }>('/admin/newsletter', {
-    headers: { 'X-Admin-Token': token },
-  });
+export function getAdminNewsletter(): Promise<{ items: NewsletterAdminRow[] }> {
+  return request<{ items: NewsletterAdminRow[] }>('/admin/newsletter');
 }
 
-export function deleteAdminNewsletter(id: number, token: string): Promise<{ ok: boolean }> {
+export function deleteAdminNewsletter(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/newsletter/${id}`, {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }
 
@@ -219,52 +244,46 @@ export function getReviews(): Promise<{ items: ReviewAdminRow[] }> {
   return request<{ items: ReviewAdminRow[] }>('/reviews');
 }
 
-export function getAdminReviews(token: string): Promise<{ items: ReviewAdminRow[] }> {
-  return request<{ items: ReviewAdminRow[] }>('/admin/reviews', {
-    headers: { 'X-Admin-Token': token },
-  });
+export function getAdminReviews(): Promise<{ items: ReviewAdminRow[] }> {
+  return request<{ items: ReviewAdminRow[] }>('/admin/reviews');
 }
 
-export function setAdminReviewStatus(id: number, status: ReviewStatus, token: string): Promise<{ ok: boolean }> {
+export function setAdminReviewStatus(id: number, status: ReviewStatus): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/reviews/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify({ status }),
   });
 }
 
-export function deleteAdminReview(id: number, token: string): Promise<{ ok: boolean }> {
+export function deleteAdminReview(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/reviews/${id}`, {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }
 
-export function updateAdminToken(newToken: string, currentToken: string): Promise<{ ok: boolean }> {
+export function updateAdminToken(newToken: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/security/token', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': currentToken },
+    headers: mutationHeaders(),
     body: JSON.stringify({ token: newToken }),
   });
 }
 
-export function getAdminClosedDays(token: string): Promise<{ items: ClosedPeriod[] }> {
-  return request<{ items: ClosedPeriod[] }>('/admin/closed-days', {
-    headers: { 'X-Admin-Token': token },
-  });
+export function getAdminClosedDays(): Promise<{ items: ClosedPeriod[] }> {
+  return request<{ items: ClosedPeriod[] }>('/admin/closed-days');
 }
 
-export function createAdminClosedDay(input: ClosedPeriodInput, token: string): Promise<{ id: number }> {
+export function createAdminClosedDay(input: ClosedPeriodInput): Promise<{ id: number }> {
   return request<{ id: number }>('/admin/closed-days', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Admin-Token': token },
+    headers: mutationHeaders(),
     body: JSON.stringify(input),
   });
 }
 
-export function deleteAdminClosedDay(id: number, token: string): Promise<{ ok: boolean }> {
+export function deleteAdminClosedDay(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/closed-days/${id}`, {
     method: 'DELETE',
-    headers: { 'X-Admin-Token': token },
   });
 }

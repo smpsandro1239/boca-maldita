@@ -146,6 +146,12 @@ export const reviewStatusSchema = z
   })
   .strict();
 
+export const adminLoginSchema = z
+  .object({
+    token: z.string().trim().min(1, 'Introduza o token de administrador.').max(200, 'Token demasiado longo.'),
+  })
+  .strict();
+
 export const adminTokenUpdateSchema = z
   .object({
     token: z

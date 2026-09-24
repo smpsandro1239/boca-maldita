@@ -29,6 +29,9 @@ import {
 } from 'lucide-react';
 import type { AssetOverride, ClosedPeriod, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewStatus, SiteContent } from '../types';
 import {
+  adminLogin,
+  adminLogout,
+  adminSession,
   createAdminClosedDay,
   createAdminReservation,
   deleteAdminClosedDay,
@@ -42,6 +45,7 @@ import {
   getAdminReservationProtection,
   getAdminReservations,
   getAdminReviews,
+  HttpError,
   resetAdminAssets,
   resetAdminMenus,
   saveAdminAssets,
@@ -55,9 +59,6 @@ import {
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
-import { writeSession } from '../lib/storage';
-
-const ADMIN_TOKEN_STORAGE_KEY = 'boca-maldita:admin-token';
 
 type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'dias' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
 
@@ -128,8 +129,6 @@ export interface AdminPanelProps {
   isOpen: boolean;
   onClose: () => void;
   adminEnabled: boolean;
-  adminToken: string;
-  onAdminTokenChange: (token: string) => void;
   assets: ImageAsset[];
   onAssetsChange: (assets: ImageAsset[]) => void;
   menus: MenuItem[];
@@ -143,8 +142,6 @@ export default function AdminPanel({
   isOpen,
   onClose,
   adminEnabled,
-  adminToken,
-  onAdminTokenChange,
   assets,
   onAssetsChange,
   menus,
@@ -178,6 +175,24 @@ export default function AdminPanel({
   } | null>(null);
   const [reservationsView, setReservationsView] = useState<'calendario' | 'lista'>('calendario');
   const [selectedDate, setSelectedDate] = useState<string>(() => todayKey());
+  const [authed, setAuthed] = useState(false);
+  const [loginToken, setLoginToken] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  const reloadAdminData = () =>
+    Promise.all([
+      getAdminReservations().catch(() => null),
+      getAdminContacts().catch(() => null),
+      getAdminNewsletter().catch(() => null),
+      getAdminReservationProtection().catch(() => null),
+      getAdminReviews().catch(() => null),
+    ]).then(([r, c, n, p, rv]) => {
+      if (r) setReservations(r.items);
+      if (c) setContacts(c.items);
+      if (n) setNewsletter(n.items);
+      if (p) setProtection(p);
+      if (rv) setReviews(rv.items);
+    });
 
   useEffect(() => {
     if (isOpen) setImageDrafts(assets);
@@ -194,43 +209,133 @@ export default function AdminPanel({
   useEffect(() => {
     if (!isOpen) return;
     setError(null);
-
-    const token = adminToken.trim();
-    if (!token) return;
-
-    Promise.all([
-      getAdminReservations(token).catch(() => null),
-      getAdminContacts(token).catch(() => null),
-      getAdminNewsletter(token).catch(() => null),
-      getAdminReservationProtection(token).catch(() => null),
-      getAdminReviews(token).catch(() => null),
-    ]).then(([r, c, n, p, rv]) => {
-      if (r) setReservations(r.items);
-      if (c) setContacts(c.items);
-      if (n) setNewsletter(n.items);
-      if (p) setProtection(p);
-      if (rv) setReviews(rv.items);
-    });
+    let cancelled = false;
+    adminSession()
+      .then(({ authenticated }) => {
+        if (cancelled) return;
+        setAuthed(authenticated);
+        if (authenticated) void reloadAdminData();
+      })
+      .catch(() => {
+        if (!cancelled) setAuthed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, adminToken]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const token = adminToken.trim();
+  const handleLogin = async () => {
+    const value = loginToken.trim();
+    if (!value) {
+      setError('Introduza o token de administrador.');
+      return;
+    }
+    setLoginBusy(true);
+    setError(null);
+    try {
+      await adminLogin(value);
+      setLoginToken('');
+      setAuthed(true);
+      void reloadAdminData().catch(() => undefined);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao iniciar sessão.');
+    } finally {
+      setLoginBusy(false);
+    }
+  };
+
+  const handleLogout = () => {
+    void adminLogout()
+      .catch(() => undefined)
+      .finally(() => setAuthed(false));
+  };
+
+  if (!authed) {
+    return (
+      <div className="fixed inset-0 z-[200] flex items-stretch justify-end bg-black/70 backdrop-blur-sm">
+        <div className="w-full max-w-3xl bg-[#0C0D0E] border-l border-[#282A30] flex flex-col h-full shadow-2xl">
+          <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[#282A30] bg-[#141518]">
+            <div>
+              <h2 className="font-serif text-2xl text-[#F7F5F0] leading-tight">Painel de Administração</h2>
+              <p className="text-xs text-[#F7F5F0]/60 mt-0.5 font-mono">Inicie sessão para gerir o site</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 text-[#F7F5F0]/70 hover:text-[#F7F5F0] hover:bg-[#282A30] transition-colors"
+              aria-label="Fechar painel"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {error && (
+            <div className="px-6 py-3 bg-red-950/40 border-b border-red-900/50 text-red-300 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+              <button type="button" className="ml-auto text-red-300 hover:text-white" onClick={() => setError(null)}>
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="flex-1 flex flex-col items-center justify-center p-6">
+            <div className="w-full max-w-sm bg-[#141518] border border-[#282A30] p-5 space-y-4">
+              <div>
+                <h3 className="font-serif text-lg text-[#F7F5F0]">Acesso de Administração</h3>
+                <p className="text-xs text-[#F7F5F0]/60 mt-1">
+                  Introduza o token de administrador para aceder ao painel de gestão do Boca Maldita.
+                </p>
+              </div>
+              <input
+                type="password"
+                value={loginToken}
+                onChange={(e) => setLoginToken(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleLogin();
+                }}
+                placeholder="Token de administrador"
+                autoFocus
+                className="w-full bg-[#0C0D0E] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373] font-mono"
+              />
+              {!adminEnabled && (
+                <p className="text-[11px] text-amber-400/90">Admin desativado no servidor.</p>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleLogin()}
+                disabled={loginBusy}
+                className="w-full px-4 py-2.5 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+              >
+                {loginBusy ? 'A verificar…' : 'Entrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   async function run(action: string, fn: () => Promise<void>, successMessage: string) {
-    if (!token) {
-      setError('Introduza o token de administrador para poder guardar.');
+    if (!authed) {
+      setError('Inicie sessão para poder guardar.');
       return;
     }
     setBusy(action);
     setError(null);
     try {
       await fn();
-      writeSession(ADMIN_TOKEN_STORAGE_KEY, token);
       showToast(successMessage);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro inesperado.');
+      if (err instanceof HttpError && err.status === 401) {
+        setAuthed(false);
+        setError('A sessão terminou ou expirou. Inicie sessão novamente.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Erro inesperado.');
+      }
     } finally {
       setBusy(null);
     }
@@ -253,7 +358,7 @@ export default function AdminPanel({
             px: asset.px && asset.px !== 50 ? asset.px : undefined,
             py: asset.py && asset.py !== 50 ? asset.py : undefined,
           }));
-        await saveAdminAssets(overrides, token);
+        await saveAdminAssets(overrides);
         onAssetsChange(imageDrafts);
       },
       'Imagens (e logótipo) publicadas para todos os visitantes.',
@@ -264,7 +369,7 @@ export default function AdminPanel({
     void run(
       'imagens',
       async () => {
-        await resetAdminAssets(token);
+        await resetAdminAssets();
         setImageDrafts(DEFAULT_IMAGE_ASSETS);
         onAssetsChange(DEFAULT_IMAGE_ASSETS);
       },
@@ -276,7 +381,7 @@ export default function AdminPanel({
     void run(
       'menu',
       async () => {
-        await saveAdminMenus(menuDrafts, token);
+        await saveAdminMenus(menuDrafts);
         onMenusChange(menuDrafts);
       },
       'Menu publicado para todos os visitantes.',
@@ -287,7 +392,7 @@ export default function AdminPanel({
     void run(
       'menu',
       async () => {
-        await resetAdminMenus(token);
+        await resetAdminMenus();
         setMenuDrafts(MENU_ITEMS);
         onMenusChange(MENU_ITEMS);
       },
@@ -299,7 +404,7 @@ export default function AdminPanel({
     void run(
       'conteudo',
       async () => {
-        await saveSiteContent(contentDraft, token);
+        await saveSiteContent(contentDraft);
         onContentChange(contentDraft);
       },
       'Conteúdo do site publicado.',
@@ -316,7 +421,6 @@ export default function AdminPanel({
             dailyCapacity: Number(protection.dailyCapacity) || DEFAULT_PROTECTION.dailyCapacity,
             maxPerClient: Number(protection.maxPerClient) || DEFAULT_PROTECTION.maxPerClient,
           },
-          token,
         );
       },
       protection.enabled ? 'Proteção de reservas ligada.' : 'Proteção de reservas desligada.',
@@ -331,7 +435,7 @@ export default function AdminPanel({
     void run(
       'reservas',
       async () => {
-        await deleteAdminReservation(id, token);
+        await deleteAdminReservation(id);
         setReservations((prev) => prev.filter((r) => r.id !== id));
       },
       'Reserva removida.',
@@ -383,11 +487,11 @@ export default function AdminPanel({
       'reservas',
       async () => {
         if (mode === 'edit' && id !== null) {
-          await updateAdminReservation(id, draft, token);
+          await updateAdminReservation(id, draft);
         } else {
-          await createAdminReservation(draft, token);
+          await createAdminReservation(draft);
         }
-        const rows = await getAdminReservations(token);
+        const rows = await getAdminReservations();
         setReservations(rows.items);
       },
       mode === 'edit' ? 'Reserva atualizada.' : 'Reserva criada.',
@@ -399,7 +503,7 @@ export default function AdminPanel({
     void run(
       'contactos',
       async () => {
-        await deleteAdminContact(id, token);
+        await deleteAdminContact(id);
         setContacts((prev) => prev.filter((c) => c.id !== id));
       },
       'Contacto removido.',
@@ -410,7 +514,7 @@ export default function AdminPanel({
     void run(
       'newsletter',
       async () => {
-        await deleteAdminNewsletter(id, token);
+        await deleteAdminNewsletter(id);
         setNewsletter((prev) => prev.filter((n) => n.id !== id));
       },
       'Subscrição removida.',
@@ -546,18 +650,22 @@ export default function AdminPanel({
           </button>
         </div>
 
-        {/* Token bar */}
+        {/* Sessão */}
         <div className="px-6 py-3 border-b border-[#282A30] bg-[#0C0D0E] flex flex-wrap items-center gap-3">
-          <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono shrink-0">
-            Token de administrador
-          </label>
-          <input
-            type="password"
-            value={adminToken}
-            onChange={(e) => onAdminTokenChange(e.target.value)}
-            placeholder="Introduza o token para publicar alterações"
-            className="flex-1 min-w-[220px] bg-[#141518] border border-[#282A30] px-3 py-2 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
-          />
+          <span className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono shrink-0">
+            Sessão ativa
+          </span>
+          <span className="text-xs text-[#F7F5F0]/70 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+            Autenticado por sessão segura
+          </span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="ml-auto px-3 py-1.5 bg-[#141518] border border-[#282A30] text-[#F7F5F0]/70 text-xs uppercase tracking-wider font-semibold hover:border-red-400/60 hover:text-red-300"
+          >
+            Terminar sessão
+          </button>
           {!adminEnabled && (
             <span className="text-[11px] text-amber-400/90 flex items-center gap-1.5 font-mono">
               <AlertTriangle className="w-3.5 h-3.5" />
@@ -1048,7 +1156,7 @@ export default function AdminPanel({
           )}
 
           {activeTab === 'dias' && (
-            <ClosedDaysManager adminToken={token} busy={busy} run={run} />
+            <ClosedDaysManager busy={busy} run={run} />
           )}
 
           {activeTab === 'avaliacoes' && (
@@ -1120,7 +1228,7 @@ export default function AdminPanel({
                               void run(
                                 'avaliacoes',
                                 async () => {
-                                  await setAdminReviewStatus(review.id, 'approved', token);
+                                  await setAdminReviewStatus(review.id, 'approved');
                                   setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, status: 'approved' } : r)));
                                 },
                                 'Avaliação apresentada publicamente.',
@@ -1140,7 +1248,7 @@ export default function AdminPanel({
                               void run(
                                 'avaliacoes',
                                 async () => {
-                                  await setAdminReviewStatus(review.id, 'rejected', token);
+                                  await setAdminReviewStatus(review.id, 'rejected');
                                   setReviews((prev) => prev.map((r) => (r.id === review.id ? { ...r, status: 'rejected' } : r)));
                                 },
                                 'Avaliação rejeitada.',
@@ -1159,7 +1267,7 @@ export default function AdminPanel({
                             void run(
                               'avaliacoes',
                               async () => {
-                                await deleteAdminReview(review.id, token);
+                                await deleteAdminReview(review.id);
                                 setReviews((prev) => prev.filter((r) => r.id !== review.id));
                               },
                               'Avaliação eliminada.',
@@ -1179,13 +1287,7 @@ export default function AdminPanel({
           )}
 
           {activeTab === 'seguranca' && (
-            <SecurityTabContent
-              adminToken={adminToken}
-              busy={busy}
-              run={run}
-              onAdminTokenChange={onAdminTokenChange}
-              onClose={onClose}
-            />
+            <SecurityTabContent busy={busy} run={run} onClose={onClose} />
           )}
 
           {activeTab === 'protecao' && (
@@ -2065,16 +2167,12 @@ function generateStrongToken(): string {
 }
 
 function SecurityTabContent({
-  adminToken,
   busy,
   run,
-  onAdminTokenChange,
   onClose,
 }: {
-  adminToken: string;
   busy: string | null;
   run: RunFn;
-  onAdminTokenChange: (token: string) => void;
   onClose: () => void;
 }) {
   const [newToken, setNewToken] = useState('');
@@ -2125,15 +2223,14 @@ function SecurityTabContent({
         )}
         <button
           type="button"
-          disabled={busy === 'seguranca' || !adminToken.trim()}
+          disabled={busy === 'seguranca'}
           onClick={() =>
             void run(
               'seguranca',
               async () => {
-                await updateAdminToken(newToken.trim(), adminToken.trim());
+                await updateAdminToken(newToken.trim());
                 setNewToken('');
                 setShowToken(false);
-                onAdminTokenChange('');
                 onClose();
               },
               'Token alterado com sucesso. Inicie sessão com o novo token.',
@@ -2160,11 +2257,9 @@ function dateKeyFromDate(d: Date): string {
 }
 
 function ClosedDaysManager({
-  adminToken,
   busy,
   run,
 }: {
-  adminToken: string;
   busy: string | null;
   run: RunFn;
 }) {
@@ -2178,7 +2273,7 @@ function ClosedDaysManager({
 
   const reload = async () => {
     try {
-      const { items: list } = await getAdminClosedDays(adminToken);
+      const { items: list } = await getAdminClosedDays();
       setItems(list);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Erro ao carregar datas fechadas.');
@@ -2186,10 +2281,9 @@ function ClosedDaysManager({
   };
 
   useEffect(() => {
-    if (!adminToken.trim()) return;
     void reload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminToken]);
+  }, []);
 
   const handleAdd = () => {
     setFormError(null);
@@ -2208,7 +2302,7 @@ function ClosedDaysManager({
     void run(
       'dias',
       async () => {
-        await createAdminClosedDay({ title: title.trim(), startDate, endDate: endDate || undefined, repeat, note: note.trim() }, adminToken);
+        await createAdminClosedDay({ title: title.trim(), startDate, endDate: endDate || undefined, repeat, note: note.trim() });
         setTitle('');
         setEndDate('');
         setNote('');
@@ -2222,7 +2316,7 @@ function ClosedDaysManager({
     void run(
       'dias',
       async () => {
-        await deleteAdminClosedDay(id, adminToken);
+        await deleteAdminClosedDay(id);
         await reload();
       },
       'Período removido.',
@@ -2317,7 +2411,7 @@ function ClosedDaysManager({
         <button
           type="button"
           onClick={handleAdd}
-          disabled={busy === 'dias' || !adminToken.trim()}
+          disabled={busy === 'dias'}
           className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2.5 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
         >
           <Plus className="w-4 h-4" />

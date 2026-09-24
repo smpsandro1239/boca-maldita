@@ -3,9 +3,10 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
-import { adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
+import { adminLoginSchema, adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
 import { sendNewsletterWelcome, sendReservationConfirmation } from './email';
 import { solveCheckExpression } from './checkExpression';
+import { createSession, deleteSession, destroyAllSessions, parseCookies, requireAdmin, timingSafeEqualStr, CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth';
 import type { NextFunction, Request, Response } from 'express';
 
 let distDir = '';
@@ -159,25 +160,6 @@ async function getEffectiveAdminToken(storage: Storage): Promise<string> {
   return (stored?.trim() || adminToken);
 }
 
-function adminUnauthorized(res: Response, hasToken: boolean): void {
-  if (hasToken) {
-    res.status(401).json({ error: 'Token de administrador inválido.' });
-  } else {
-    res.status(503).json({
-      error: 'Administração desativada: defina a variável ADMIN_TOKEN no servidor.',
-    });
-  }
-}
-
-async function isAuthorized(req: Request, res: Response, storage: Storage): Promise<boolean> {
-  const effective = await getEffectiveAdminToken(storage);
-  if (!effective || req.headers['x-admin-token'] !== effective) {
-    adminUnauthorized(res, effective !== '');
-    return false;
-  }
-  return true;
-}
-
 export async function createApp(): Promise<AppInstance> {
   let storage: Storage;
   try {
@@ -199,6 +181,19 @@ export async function createApp(): Promise<AppInstance> {
     const entry = ipHits.get(ip);
     if (!entry || now - entry.startedAt >= RATE_WINDOW_MS) {
       ipHits.set(ip, { count: 1, startedAt: now });
+      return true;
+    }
+    entry.count += 1;
+    return entry.count <= RATE_MAX_HITS;
+  }
+
+  const loginHits = new Map<string, { count: number; startedAt: number }>();
+  function allowLoginHit(ip: string | undefined): boolean {
+    if (!ip) return true;
+    const now = Date.now();
+    const entry = loginHits.get(ip);
+    if (!entry || now - entry.startedAt >= RATE_WINDOW_MS) {
+      loginHits.set(ip, { count: 1, startedAt: now });
       return true;
     }
     entry.count += 1;
@@ -339,7 +334,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/site', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = siteSettingsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -351,8 +346,57 @@ export async function createApp(): Promise<AppInstance> {
     }
   });
 
+  app.post('/api/admin/login', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const ip = getClientIp(req);
+      if (!allowLoginHit(ip)) {
+        return res.status(429).json({ error: 'Demasiadas tentativas de login. Aguarde alguns minutos.' });
+      }
+      const parsed = adminLoginSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Introduza o token de administrador.' });
+      }
+      const effective = await getEffectiveAdminToken(storage);
+      if (!effective || !timingSafeEqualStr(parsed.data.token, effective)) {
+        return res.status(401).json({ error: 'Token de administrador inválido.' });
+      }
+      const { sid, csrf } = await createSession(storage);
+      res.cookie(SESSION_COOKIE, sid, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: SESSION_TTL_MS,
+      });
+      res.cookie(CSRF_COOKIE, csrf, {
+        httpOnly: false,
+        secure: true,
+        sameSite: 'strict',
+        path: '/',
+        maxAge: SESSION_TTL_MS,
+      });
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/admin/session', async (req: Request, res: Response) => {
+    const identity = await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: false });
+    if (!identity) return;
+    res.json({ authenticated: true });
+  });
+
+  app.post('/api/admin/logout', async (req: Request, res: Response) => {
+    const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    if (sid) await deleteSession(storage, sid);
+    res.cookie(SESSION_COOKIE, '', { httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: 0, expires: new Date(0) });
+    res.cookie(CSRF_COOKIE, '', { httpOnly: false, secure: true, sameSite: 'strict', path: '/', maxAge: 0, expires: new Date(0) });
+    res.json({ ok: true });
+  });
+
   app.get('/api/admin/verify-token', async (req: Request, res: Response) => {
-    if (!(await isAuthorized(req, res, storage))) return;
+    if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: false }))) return;
     res.json({ ok: true });
   });
 
@@ -373,7 +417,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/assets', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = assetOverridesSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -395,7 +439,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/assets', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       await storage.deleteSetting(IMAGE_OVERRIDES_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -425,7 +469,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/menus', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = menuItemsSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -442,7 +486,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/menus', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       await storage.deleteSetting(MENU_ITEMS_KEY);
       res.json({ ok: true });
     } catch (err) {
@@ -468,7 +512,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/site-content', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = siteContentSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -483,7 +527,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/reservation-protection', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       res.json(await getReservationProtection(storage));
     } catch (err) {
       next(err);
@@ -492,7 +536,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/reservation-protection', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = reservationProtectionSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -506,7 +550,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/reservations', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       res.json({ items: await storage.listReservations() });
     } catch (err) {
       next(err);
@@ -515,7 +559,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/reservations/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -528,7 +572,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.post('/api/admin/reservations', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = adminReservationSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -542,7 +586,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/reservations/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -563,7 +607,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/contacts', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       res.json({ items: await storage.listContacts() });
     } catch (err) {
       next(err);
@@ -572,7 +616,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/contacts/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -585,7 +629,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/newsletter', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       res.json({ items: await storage.listNewsletter() });
     } catch (err) {
       next(err);
@@ -594,7 +638,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/newsletter/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -631,7 +675,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/reviews', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       res.json({ items: await storage.listReviews() });
     } catch (err) {
       next(err);
@@ -640,7 +684,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/reviews/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -661,7 +705,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/reviews/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -674,7 +718,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.get('/api/admin/closed-days', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       res.json({ items: await storage.listClosedPeriods() });
     } catch (err) {
       next(err);
@@ -683,7 +727,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.post('/api/admin/closed-days', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = closedPeriodSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.issues[0].message });
@@ -697,7 +741,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.delete('/api/admin/closed-days/:id', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const idResult = idParamSchema.safeParse(req.params.id);
       if (!idResult.success) {
         return res.status(400).json({ error: 'ID inválido.' });
@@ -710,7 +754,7 @@ export async function createApp(): Promise<AppInstance> {
 
   app.put('/api/admin/security/token', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      if (!(await isAuthorized(req, res, storage))) return;
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       const parsed = adminTokenUpdateSchema.safeParse(req.body ?? {});
       if (!parsed.success) {
         return res.status(400).json({
@@ -722,6 +766,9 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(400).json({ error: 'O novo token é igual ao atual.' });
       }
       await storage.setSetting(ADMIN_TOKEN_KEY, parsed.data.token);
+      await destroyAllSessions(storage);
+      res.cookie(SESSION_COOKIE, '', { httpOnly: true, secure: true, sameSite: 'strict', path: '/', maxAge: 0, expires: new Date(0) });
+      res.cookie(CSRF_COOKIE, '', { httpOnly: false, secure: true, sameSite: 'strict', path: '/', maxAge: 0, expires: new Date(0) });
       res.json({ ok: true });
     } catch (err) {
       next(err);
