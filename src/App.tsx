@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { LegalDoc, ScreenType, ImageAsset, MenuItem, SiteContent } from './types';
 import { DEFAULT_IMAGE_ASSETS } from './data/assets';
 import { MENU_ITEMS } from './data/menuData';
 import Header from './components/Header';
 import Footer from './components/Footer';
-import VideoModal from './components/VideoModal';
-import DishDetailModal from './components/DishDetailModal';
 import HomeScreen from './screens/HomeScreen';
 import RestaurantScreen from './screens/RestaurantScreen';
 import MenuScreen from './screens/MenuScreen';
@@ -15,8 +13,33 @@ import ContactScreen from './screens/ContactScreen';
 import LegalScreen from './screens/LegalScreen';
 import * as api from './lib/api';
 import { SiteProvider, DEFAULT_SITE_CONTENT, computeAssets } from './context/SiteContext';
-import AdminPanel from './components/AdminPanel';
 import { Check } from 'lucide-react';
+
+const AdminPanel = lazy(() => import('./components/AdminPanel'));
+const VideoModal = lazy(() => import('./components/VideoModal'));
+const DishDetailModal = lazy(() => import('./components/DishDetailModal'));
+
+function SpinnerFallback() {
+  return <div className="w-8 h-8 border-2 border-[#D4A373]/30 border-t-[#D4A373] rounded-full animate-spin" />;
+}
+
+function PanelFallback() {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-stretch justify-end bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-3xl bg-[#0C0D0E] border-l border-[#282A30] flex items-center justify-center h-full shadow-2xl">
+        <SpinnerFallback />
+      </div>
+    </div>
+  );
+}
+
+function ModalFallback() {
+  return (
+    <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-6">
+      <SpinnerFallback />
+    </div>
+  );
+}
 
 const ALIAS_MAP: Record<string, string> = {
   'hero-chef-plating': 'hero-chef',
@@ -196,34 +219,46 @@ export default function App() {
           contactEmail={siteContent.contactEmail}
         />
 
-        <AdminPanel
-          isOpen={isAdminPanelOpen}
-          onClose={() => setIsAdminPanelOpen(false)}
-          adminEnabled={adminEnabled}
-          assets={assets}
-          onAssetsChange={setAssets}
-          menus={menuItems}
-          onMenusChange={setMenuItems}
-          content={siteContent}
-          onContentChange={setSiteContent}
-          showToast={showToast}
-        />
+        {isAdminPanelOpen && (
+          <Suspense fallback={<PanelFallback />}>
+            <AdminPanel
+              isOpen={isAdminPanelOpen}
+              onClose={() => setIsAdminPanelOpen(false)}
+              adminEnabled={adminEnabled}
+              assets={assets}
+              onAssetsChange={setAssets}
+              menus={menuItems}
+              onMenusChange={setMenuItems}
+              content={siteContent}
+              onContentChange={setSiteContent}
+              showToast={showToast}
+            />
+          </Suspense>
+        )}
 
-        <VideoModal
-          isOpen={isVideoModalOpen}
-          onClose={() => setIsVideoModalOpen(false)}
-          posterUrl={getUrl('hero-chef')}
-          videoUrl={siteContent.videoUrl}
-        />
+        {isVideoModalOpen && (
+          <Suspense fallback={<ModalFallback />}>
+            <VideoModal
+              isOpen={isVideoModalOpen}
+              onClose={() => setIsVideoModalOpen(false)}
+              posterUrl={getUrl('hero-chef')}
+              videoUrl={siteContent.videoUrl}
+            />
+          </Suspense>
+        )}
 
-        <DishDetailModal
-          item={selectedDish}
-          onClose={() => setSelectedDish(null)}
-          onBookTable={() => {
-            setSelectedDish(null);
-            handleNavigate('reservas');
-          }}
-        />
+        {selectedDish && (
+          <Suspense fallback={<ModalFallback />}>
+            <DishDetailModal
+              item={selectedDish}
+              onClose={() => setSelectedDish(null)}
+              onBookTable={() => {
+                setSelectedDish(null);
+                handleNavigate('reservas');
+              }}
+            />
+          </Suspense>
+        )}
       </div>
     </SiteProvider>
   );
