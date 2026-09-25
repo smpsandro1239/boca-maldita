@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { MouseEvent, WheelEvent } from 'react';
+import type { PointerEvent, WheelEvent } from 'react';
 import {
   X,
   LayoutDashboard,
@@ -273,7 +273,7 @@ export default function AdminPanel({
           </div>
 
           {error && (
-            <div className="px-6 py-3 bg-red-950/40 border-b border-red-900/50 text-red-300 text-sm flex items-center gap-2">
+<div className="px-4 sm:px-6 py-3 bg-red-950/40 border-b border-red-900/50 text-red-300 text-sm flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
               <button type="button" className="ml-auto text-red-300 hover:text-white" onClick={() => setError(null)}>
@@ -525,14 +525,14 @@ export default function AdminPanel({
     setImageDrafts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   };
 
-  const handleAssetDrag = (e: MouseEvent, asset: ImageAsset, container: HTMLDivElement) => {
+  const handleAssetDrag = (e: PointerEvent<HTMLDivElement>, asset: ImageAsset, container: HTMLDivElement) => {
     const rect = container.getBoundingClientRect();
     const startX = e.clientX;
     const startY = e.clientY;
     const startPx = asset.px ?? 50;
     const startPy = asset.py ?? 50;
 
-    const onMove = (ev: globalThis.MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       const nextPx = clamp(startPx + (dx / rect.width) * 100, 0, 100);
@@ -540,11 +540,13 @@ export default function AdminPanel({
       updateDraftAsset(asset.id, { px: nextPx, py: nextPy });
     };
     const onUp = () => {
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
   };
 
   const handleAssetZoom = (e: WheelEvent, asset: ImageAsset) => {
@@ -635,9 +637,9 @@ export default function AdminPanel({
     <div className="fixed inset-0 z-[200] flex items-stretch justify-end bg-black/70 backdrop-blur-sm">
       <div className="w-full max-w-3xl bg-[#0C0D0E] border-l border-[#282A30] flex flex-col h-full shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-[#282A30] bg-[#141518]">
-          <div>
-            <h2 className="font-serif text-2xl text-[#F7F5F0] leading-tight">Painel de Administração</h2>
+        <div className="flex items-center justify-between gap-4 px-4 sm:px-6 py-4 border-b border-[#282A30] bg-[#141518]">
+          <div className="min-w-0">
+            <h2 className="font-serif text-xl sm:text-2xl text-[#F7F5F0] leading-tight">Painel de Administração</h2>
             <p className="text-xs text-[#F7F5F0]/60 mt-0.5 font-mono">Boca Maldita — gerir todo o site</p>
           </div>
           <button
@@ -651,7 +653,7 @@ export default function AdminPanel({
         </div>
 
         {/* Sessão */}
-        <div className="px-6 py-3 border-b border-[#282A30] bg-[#0C0D0E] flex flex-wrap items-center gap-3">
+        <div className="px-4 sm:px-6 py-3 border-b border-[#282A30] bg-[#0C0D0E] flex flex-wrap items-center gap-3">
           <span className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono shrink-0">
             Sessão ativa
           </span>
@@ -685,7 +687,7 @@ export default function AdminPanel({
         )}
 
         {/* Tabs */}
-        <div className="px-6 pt-4 flex flex-wrap gap-2 border-b border-[#282A30]">
+        <div className="px-4 sm:px-6 pt-4 flex gap-2 overflow-x-auto border-b border-[#282A30] sm:flex-wrap sm:overflow-visible sm:pb-1">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -694,7 +696,7 @@ export default function AdminPanel({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold transition-colors border ${
+                className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold transition-colors border shrink-0 whitespace-nowrap ${
                   isActive
                     ? 'bg-[#D4A373] text-[#0C0D0E] border-[#D4A373]'
                     : 'bg-[#141518] text-[#F7F5F0]/70 border-[#282A30] hover:border-[#D4A373]/50 hover:text-[#D4A373]'
@@ -708,7 +710,7 @@ export default function AdminPanel({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 sm:py-6 space-y-6">
           {activeTab === 'geral' && (
             <>
               <div>
@@ -809,12 +811,12 @@ export default function AdminPanel({
                 <p className="text-xs text-[#F7F5F0]/60">
                   Arraste sobre a miniatura para posicionar e use a roda do rato para fazer zoom. O logótipo é a primeira imagem.
                 </p>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={handlePublishImages}
                     disabled={busy === 'imagens'}
-                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50 shrink-0"
                   >
                     {busy === 'imagens' ? 'A publicar…' : <Save className="w-4 h-4" />}
                     <span>Publicar imagens</span>
@@ -823,7 +825,7 @@ export default function AdminPanel({
                     type="button"
                     onClick={handleResetImages}
                     disabled={busy === 'imagens'}
-                    className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                    className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50 shrink-0"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Repor originais
@@ -876,17 +878,17 @@ export default function AdminPanel({
                 <button
                   type="button"
                   onClick={openNewItem}
-                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold"
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold shrink-0"
                 >
                   <Plus className="w-4 h-4" />
                   Novo prato
                 </button>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={handlePublishMenus}
                     disabled={busy === 'menu'}
-                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50 shrink-0"
                   >
                     {busy === 'menu' ? 'A publicar…' : <Save className="w-4 h-4" />}
                     <span>Publicar menu</span>
@@ -895,7 +897,7 @@ export default function AdminPanel({
                     type="button"
                     onClick={handleResetMenus}
                     disabled={busy === 'menu'}
-                    className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                    className="flex items-center gap-2 bg-[#141518] border border-[#282A30] hover:border-[#D4A373]/60 text-[#F7F5F0]/80 px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50 shrink-0"
                   >
                     <RotateCcw className="w-4 h-4" />
                     Repor carta original
@@ -993,8 +995,8 @@ export default function AdminPanel({
                 <p className="text-xs text-[#F7F5F0]/60">
                   Reservas registadas no site. Podes criar, duplicar, editar, remover e ver em calendário.
                 </p>
-                <div className="flex items-center gap-2">
-                  <div className="flex border border-[#282A30]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="flex border border-[#282A30] rounded-sm overflow-hidden shrink-0">
                     <button
                       type="button"
                       onClick={() => setReservationsView('calendario')}
@@ -1023,7 +1025,7 @@ export default function AdminPanel({
                   <button
                     type="button"
                     onClick={() => openNewReservation()}
-                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold"
+                    className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold shrink-0"
                   >
                     <Plus className="w-4 h-4" />
                     Nova reserva
@@ -1114,15 +1116,15 @@ export default function AdminPanel({
 
           {activeTab === 'conteudo' && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-[#F7F5F0]/60">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60 flex-1 min-w-0">
                   Textos e contactos do site. Deixe o campo vazio para usar os textos originais.
                 </p>
                 <button
                   type="button"
                   onClick={handlePublishContent}
                   disabled={busy === 'conteudo'}
-                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50 shrink-0"
                 >
                   {busy === 'conteudo' ? 'A publicar…' : <Save className="w-4 h-4" />}
                   <span>Publicar conteúdo</span>
@@ -1292,15 +1294,15 @@ export default function AdminPanel({
 
           {activeTab === 'protecao' && (
             <div className="space-y-5">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-[#F7F5F0]/60">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-xs text-[#F7F5F0]/60 flex-1 min-w-0">
                   Protege contra reservas fraudulentas (robôs / alguém a reservar todas as mesas). És tu quem decide: desligado não muda nada no site; ligado aplica as regras que escolheres.
                 </p>
                 <button
                   type="button"
                   onClick={handlePublishProtection}
                   disabled={busy === 'protecao'}
-                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50"
+                  className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold disabled:opacity-50 shrink-0"
                 >
                   {busy === 'protecao' ? 'A guardar…' : <Save className="w-4 h-4" />}
                   <span>Guardar proteção</span>
@@ -1402,7 +1404,7 @@ interface ImageEditorCardProps {
   key?: string;
   asset: ImageAsset;
   onChange: (id: string, patch: Partial<ImageAsset>) => void;
-  onDrag: (e: MouseEvent, asset: ImageAsset, container: HTMLDivElement) => void;
+  onDrag: (e: PointerEvent<HTMLDivElement>, asset: ImageAsset, container: HTMLDivElement) => void;
   onZoom: (e: WheelEvent, asset: ImageAsset) => void;
   onReset: () => void;
   onCopy: () => void;
@@ -1439,7 +1441,7 @@ function ImageEditorCard({ asset, onChange, onDrag, onZoom, onReset, onCopy }: I
 
       <div
         className="w-full h-40 bg-[#0C0D0E] border border-[#282A30] overflow-hidden relative cursor-grab active:cursor-grabbing touch-none"
-        onMouseDown={(e) => onDrag(e, asset, e.currentTarget)}
+        onPointerDown={(e) => onDrag(e, asset, e.currentTarget)}
         onWheel={(e) => onZoom(e, asset)}
         title="Arraste para posicionar · roda do rato para zoom"
       >
@@ -1781,7 +1783,7 @@ function ReservationsCalendar({
       </div>
 
       {dayReservations.length === 0 ? (
-        <div className="bg-[#141518] border border-[#282A30] p-4 flex items-center justify-between gap-3">
+        <div className="bg-[#141518] border border-[#282A30] p-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-[#F7F5F0]/50">Sem reservas nesta data.</p>
           <button
             type="button"
@@ -1995,7 +1997,7 @@ function ReservationEditor({ draft, mode, reference, onCancel, onSave }: Reserva
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-[#282A30] bg-[#141518]">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-[#282A30] bg-[#141518]">
           <button
             type="button"
             onClick={onCancel}
@@ -2124,7 +2126,7 @@ function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProp
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-[#282A30] bg-[#141518]">
+        <div className="flex flex-wrap justify-end gap-2 px-5 py-4 border-t border-[#282A30] bg-[#141518]">
           <button
             type="button"
             onClick={onCancel}
