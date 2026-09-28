@@ -4,7 +4,9 @@ Documento operacional do deploy, smoke tests e higiene. **Lê antes de fazer qua
 
 ## 1. Regra de ouro: UM deploy por lote
 
-- Um commit por lote → `git push origin main` → **UMA** execução de `npx vercel --prod --yes`.
+- Um commit por lote → `git push origin main` → **UMA** execução de `npx vercel@59.26.0 --prod --yes`.
+- **PIN obrigatório:** `npx vercel` (sem versão) instalou a **v60**, que falha com
+  `Error: Not authorized` ao fazer `--prod`. Usar sempre **`vercel@59.26.0`**.
 - **NUNCA** loops de retry: cada execução nova cria um deployment novo (polui o histórico e
   torna ambíguo qual é o atual).
 - Pré-requisitos antes do deploy: `npm run typecheck`, `npm run build`, `npm test` e, se
@@ -14,8 +16,8 @@ Documento operacional do deploy, smoke tests e higiene. **Lê antes de fazer qua
 
 ### Sequência
 1. Push do commit para `main`.
-2. `npx vercel --prod --yes` (o `--yes` usa as env vars do projeto ligado; não há env vars locais
-   a definir para produção).
+2. `npx vercel@59.26.0 --prod --yes` (o `--yes` usa as env vars do projeto ligado; não há env vars locais
+   a definir para produção). **Nunca** degradar para `npx vercel` sem pin — ver secção 1.
 3. Verificar:
    - `npx vercel ls --prod bmaldita --limit 3` → o deployment mais recente com `● Ready` +
      `Environment Production` é o que está aliased a `bmaldita.vercel.app`.
@@ -41,8 +43,8 @@ Documento operacional do deploy, smoke tests e higiene. **Lê antes de fazer qua
 Removidos com `npx vercel rm <url> --yes` (deployments de produção não-atuais):
 `pqgla87vo`, `guwkwj57r` (Error) e os duplicados de retry `crla59xdd`, `mohz11fjg`,
 `f9hlr17a8`, `nhafp553p`.
-**Deployment de produção atual:** `bmaldita-ee779dbs6-smpsandro1239s-projects.vercel.app`
-(commit `624e517`).
+**Deployment de produção atual:** `bmaldita-b28qqdi5h-smpsandro1239s-projects.vercel.app`
+(commit `81523ed`).
 
 ## 3. Base de dados: produção vs teste
 
@@ -96,7 +98,16 @@ O script **aborta** se a URL não contiver `test`/`smoke`/`local`, ou se for igu
 
 ## 6. Segredos / token admin
 
-- Admin de produção: `x-admin-token` (header). O token vem de `ADMIN_TOKEN` (env) e pode ser
-  sobreposto por um valor guardado em `settings` via API admin.
+- **Autenticação do painel (D-3):** sessão por cookies **`bmtauth` (HttpOnly) + `bmcsrf`**, TTL de
+  14 dias, criados pelo `POST /api/admin/login`. As mutações exigem também o header
+  `X-Csrf-Token`. O header `X-Admin-Token` continua aceite como **fallback server-to-server**
+  (scripts/integrações) — não é usado pelo painel.
+- O token efetivo vem de `ADMIN_TOKEN` (env) e pode ser sobreposto por um valor guardado em
+  `settings` via `PUT /api/admin/security/token`.
+- **Armadilha do `.env` (aspas):** o `ADMIN_TOKEN` local está **entre aspas** (`ADMIN_TOKEN="…"`).
+  O `source .env` do bash tira as aspas; qualquer script que leia o ficheiro com regex precisa de
+  as remover também (`/^"(.*)"$/m → $1`), senão o login devolve
+  `"Token de administrador inválido."`. Preferir sempre `source .env` quando for disparar a API
+  localmente em vez de reimplementar o parsing.
 - `.env` e `.env*` estão excluídos do upload (`.vercelignore` ancorado à raiz). Não commitar
   segredos.

@@ -93,9 +93,15 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 
 ## API
 
+> **Autenticação de administração (D-3):** os endpoints `/api/admin/*` (e `PUT /api/site`) usam
+> **cookie `bmtauth` (HttpOnly) + cookie `bmcsrf`**, criados no `POST /api/admin/login`, com TTL de
+> 14 dias. As mutações exigem ainda o header `X-Csrf-Token` (igual ao cookie `bmcsrf`). O header
+> `X-Admin-Token` continua aceite apenas como **fallback server-to-server** (Scripts, integrações) —
+> não é usado pelo painel.
+
 - `GET /api/health` — estado do servidor
 - `GET /api/site` — definições públicas do site (`contactEmail`)
-- `PUT /api/site` — atualizar email de contacto em todo o site (requer `X-Admin-Token`)
+- `PUT /api/site` — atualizar email de contacto em todo o site (admin: cookie+CSRF, ou `X-Admin-Token`)
 - `POST /api/reservations` — registar pedido de reserva (sujeito à proteção anti-fraude e às datas fechadas; envia email de confirmação se SMTP configurado)
 - `GET /api/reservations-config` — configuração pública das reservas (pausa, pergunta anti-robô, **datas fechadas**)
 - `POST /api/contacts` — registar mensagem de contacto
@@ -104,27 +110,30 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 - `GET /api/reviews` — avaliações aprovadas (público)
 - `GET /api/menus` — menu publicado (ou `null` se ainda não houver alterações)
 - `GET /api/site-content` — conteúdo público (email, contactos, textos, vídeo)
-- `GET /api/admin/verify-token` — validar o token de administrador (usado pelo ecrã de login de `/admin`)
-- `PUT /api/admin/security/token` — alterar o token do painel (política forte; o novo token passa a ser o efetivo, guardado na base; requer `X-Admin-Token`)
-- `GET /api/admin/reviews`, `PUT /api/admin/reviews/:id`, `DELETE /api/admin/reviews/:id` — aprovar/rejeitar/remover avaliações (requer `X-Admin-Token`)
-- `GET /api/admin/closed-days`, `POST /api/admin/closed-days`, `DELETE /api/admin/closed-days/:id` — gerir **datas fechadas** (dia único, intervalo com repetição semanal ou anual; requer `X-Admin-Token`)
-- `GET /api/admin/assets`, `PUT /api/admin/assets`, `DELETE /api/admin/assets` — ler/publicar/repor imagens e logótipo (requer `X-Admin-Token`)
-- `GET /api/admin/menus`, `PUT /api/admin/menus`, `DELETE /api/admin/menus` — ler/publicar/repor a carta (requer `X-Admin-Token`)
-- `PUT /api/admin/site-content` — publicar conteúdo/contactos (requer `X-Admin-Token`)
-- `GET /api/admin/reservations`, `POST /api/admin/reservations`, `PUT /api/admin/reservations/:id`, `DELETE /api/admin/reservations/:id` — gestão completa de reservas (criar, duplicar, editar, remover; requer `X-Admin-Token`)
-- `GET /api/admin/reservation-protection`, `PUT /api/admin/reservation-protection` — consultar/configurar a proteção anti-fraude das reservas (requer `X-Admin-Token`)
-- `GET /api/admin/contacts`, `DELETE /api/admin/contacts/:id` — mensagens de contacto (requer `X-Admin-Token`)
-- `GET /api/admin/newsletter`, `DELETE /api/admin/newsletter/:id` — subscrições do boletim (requer `X-Admin-Token`)
+- `POST /api/admin/login` — iniciar sessão com `{ "token": "<ADMIN_TOKEN>" }`; devolve os cookies `bmtauth` + `bmcsrf`
+- `GET /api/admin/session` — verificar a sessão atual (cookie ou `X-Admin-Token`)
+- `POST /api/admin/logout` — terminar a sessão
+- `GET /api/admin/verify-token` — validar sessão/token (legado; o ecrã de `/admin` usa `POST /api/admin/login`)
+- `PUT /api/admin/security/token` — alterar o token do painel (política forte; o novo token passa a ser o efetivo, guardado na base; admin: cookie+CSRF, ou `X-Admin-Token`)
+- `GET /api/admin/reviews`, `PUT /api/admin/reviews/:id`, `DELETE /api/admin/reviews/:id` — aprovar/rejeitar/remover avaliações (admin)
+- `GET /api/admin/closed-days`, `POST /api/admin/closed-days`, `DELETE /api/admin/closed-days/:id` — gerir **datas fechadas** (dia único, intervalo com repetição semanal ou anual; admin)
+- `GET /api/admin/assets`, `PUT /api/admin/assets`, `DELETE /api/admin/assets` — ler/publicar/repor imagens e logótipo (admin)
+- `GET /api/admin/menus`, `PUT /api/admin/menus`, `DELETE /api/admin/menus` — ler/publicar/repor a carta (admin)
+- `PUT /api/admin/site-content` — publicar conteúdo/contactos (admin)
+- `GET /api/admin/reservations`, `POST /api/admin/reservations`, `PUT /api/admin/reservations/:id`, `DELETE /api/admin/reservations/:id` — gestão completa de reservas (criar, duplicar, editar, remover; admin)
+- `GET /api/admin/reservation-protection`, `PUT /api/admin/reservation-protection` — consultar/configurar a proteção anti-fraude das reservas (admin)
+- `GET /api/admin/contacts`, `DELETE /api/admin/contacts/:id` — mensagens de contacto (admin)
+- `GET /api/admin/newsletter`, `DELETE /api/admin/newsletter/:id` — subscrições do boletim (admin)
 
 ## Painel de administração
 
-Acede-se em **https://bmaldita.vercel.app/admin** (em dev: `http://localhost:3001/admin`). O site público **não mostra qualquer botão de acesso** — ao abrir `/admin` é pedido o `ADMIN_TOKEN` num ecrã de login, que fica guardado na sessão do navegador.
+Acede-se em **https://bmaldita.vercel.app/admin** (em dev: `http://localhost:3001/admin`). O site público **não mostra qualquer botão de acesso** — ao abrir `/admin` é pedido o `ADMIN_TOKEN` num ecrã de login. Ao entrar, a sessão fica guardada em cookies **`bmtauth` (HttpOnly) + `bmcsrf`** durante 14 dias; o token em si não é guardado no navegador.
 
 Separa-se em:
 
 - **Estado** — contadores de reservas, contactos, newsletter e pratos, com explicação do fluxo.
 - **Imagens & Logótipo** — altera o **logótipo** e todas as imagens do site (fundo, salão, pratos, mapa…).
-  - Arraste sobre a miniatura para **posicionar** (esquerda/direita/cima/baixo) e use a **roda do rato** (ou os cursores) para fazer **zoom**;
+  - Arraste sobre a miniatura para **posicionar** (esquerda/direita/cima/baixo; arrasto por rato **ou toque**) e use a **roda do rato** (ou os cursores) para fazer **zoom**;
   - O enquadramento aplica-se automaticamente em todo o site (objetos `cover` com `object-position` + `scale`);
   - "Publicar imagens" guarda no servidor para todos os visitantes; "Repor originais" volta aos placeholders.
 - **Menu** — gestão completa da carta: adicionar, editar, duplicar posição, ocultar ou eliminar pratos; preço, categoria (inclui a **Carta de Vinhos**), foto, descrição, origem, sugestão de vinho e "especial do chef". Publicar atualiza o site; repor restaura a carta de origem.
