@@ -75,10 +75,15 @@ export default function App() {
       return;
     }
     if (window.location.hash === '#cardapio') {
-      const t = window.setTimeout(() => {
+      const scrollToMenu = () => {
         document.getElementById('cardapio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 150);
-      return () => window.clearTimeout(t);
+      };
+      const t1 = window.setTimeout(scrollToMenu, 150);
+      const t2 = window.setTimeout(scrollToMenu, 900);
+      return () => {
+        window.clearTimeout(t1);
+        window.clearTimeout(t2);
+      };
     }
   }, []);
 
