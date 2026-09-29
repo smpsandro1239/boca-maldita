@@ -67,6 +67,21 @@ export default function App() {
     setIsAdminPanelOpen(isAdminPath);
   }, []);
 
+  useEffect(() => {
+    const host = window.location.hostname.replace(/^www\./, '').toLowerCase();
+    const isMenuSubdomain = host === 'menu.bocamaldita.pt' || host.endsWith('.menu.bocamaldita.pt');
+    if (isMenuSubdomain) {
+      window.location.replace('https://www.bocamaldita.pt/#cardapio');
+      return;
+    }
+    if (window.location.hash === '#cardapio') {
+      const t = window.setTimeout(() => {
+        document.getElementById('cardapio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+      return () => window.clearTimeout(t);
+    }
+  }, []);
+
   const refreshAssets = useCallback(async () => {
     try {
       const { enabled, overrides } = await api.getAdminAssets();
