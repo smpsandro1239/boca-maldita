@@ -743,14 +743,18 @@ var siteContentSchema = z.object({
   phone: z.string().trim().max(40).optional().default(""),
   whatsapp: z.string().trim().max(40).optional().default(""),
   address: z.string().trim().max(200).optional().default(""),
-  hours: z.string().trim().max(240).optional().default(""),
+  hours: z.string().trim().max(400).optional().default(""),
   headline: z.string().trim().max(160).optional().default(""),
   heroSubtitle: z.string().trim().max(240).optional().default(""),
   aboutTitle: z.string().trim().max(160).optional().default(""),
   aboutText: z.string().trim().max(4e3).optional().default(""),
   instagram: z.string().trim().max(200).optional().default(""),
   facebook: z.string().trim().max(200).optional().default(""),
-  videoUrl: z.string().trim().max(2e3).optional().default("")
+  videoUrl: z.string().trim().max(2e3).optional().default(""),
+  testimonialText: z.string().trim().max(400).optional().default(""),
+  testimonialName: z.string().trim().max(120).optional().default(""),
+  testimonialRole: z.string().trim().max(120).optional().default(""),
+  testimonialStars: z.string().trim().max(1).regex(/^[1-5]$/, "A classifica\xE7\xE3o deve ser um n\xFAmero entre 1 e 5.").optional().default("")
 }).strict();
 var idParamSchema = z.coerce.number().int().positive();
 
@@ -848,6 +852,91 @@ async function sendNewsletterWelcome(email) {
     return true;
   } catch (err) {
     console.error("[email] Erro ao enviar boas-vindas do boletim:", err);
+    return false;
+  }
+}
+function getAdminInbox() {
+  const contactEmail = (process.env.SITE_CONTACT_EMAIL ?? "").trim();
+  if (contactEmail) return contactEmail;
+  const from = (process.env.MAIL_FROM ?? "").trim();
+  const match = /<([^>]+)>/.exec(from);
+  if (match) return match[1];
+  const fallback = from || "smpsandro1239@gmail.com";
+  return fallback;
+}
+function buildContactHtml(payload) {
+  return [
+    `<div style="font-family:Georgia,serif;background:#0C0D0E;padding:32px 16px;color:#F7F5F0;">`,
+    `  <div style="max-width:560px;margin:0 auto;border:1px solid #282A30;background:#141518;padding:32px;">`,
+    `    <p style="font-family:monospace;letter-spacing:0.2em;color:#D4A373;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita \xB7 Nova Mensagem de Contacto</p>`,
+    `    <h1 style="font-size:24px;margin:0 0 16px;">${escapeHtml(payload.assunto)}</h1>`,
+    `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:14px;">`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;width:38%;">Nome</td><td style="padding:8px 0;">${escapeHtml(payload.nome)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Email</td><td style="padding:8px 0;">${escapeHtml(payload.email)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;vertical-align:top;">Mensagem</td><td style="padding:8px 0;white-space:pre-line;">${escapeHtml(payload.mensagem)}</td></tr>`,
+    `    </table>`,
+    `    <p style="color:#A6A8AD;font-size:13px;margin:24px 0 0;">Responda diretamente a este email para contactar o remetente.</p>`,
+    `  </div>`,
+    `</div>`
+  ].join("\n");
+}
+async function sendContactNotification(payload) {
+  const transporter = await getTransporter();
+  if (!transporter) {
+    console.warn("[email] SMTP n\xE3o configurado \u2014 notifica\xE7\xE3o de contacto n\xE3o enviada.");
+    return false;
+  }
+  try {
+    await transporter.sendMail({
+      from: (process.env.MAIL_FROM ?? "").trim() || "Boca Maldita <smpsandro1239@gmail.com>",
+      to: getAdminInbox(),
+      subject: `Nova mensagem de ${payload.nome} \u2014 ${payload.assunto}`,
+      html: buildContactHtml(payload)
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] Erro ao enviar notifica\xE7\xE3o de contacto:", err);
+    return false;
+  }
+}
+function buildReservationAdminHtml(payload) {
+  return [
+    `<div style="font-family:Georgia,serif;background:#0C0D0E;padding:32px 16px;color:#F7F5F0;">`,
+    `  <div style="max-width:560px;margin:0 auto;border:1px solid #282A30;background:#141518;padding:32px;">`,
+    `    <p style="font-family:monospace;letter-spacing:0.2em;color:#D4A373;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita \xB7 Novo Pedido de Reserva</p>`,
+    `    <h1 style="font-size:24px;margin:0 0 8px;">Reserva ${escapeHtml(payload.reference)}</h1>`,
+    `    <p style="color:#A6A8AD;margin:0 0 20px;font-size:13px;">Ver detalhes e gerir a reserva no painel de administra\xE7\xE3o.</p>`,
+    `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:14px;">`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;width:38%;">Nome</td><td style="padding:8px 0;">${escapeHtml(payload.name)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Email</td><td style="padding:8px 0;">${escapeHtml(payload.email)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Telefone</td><td style="padding:8px 0;">${escapeHtml(payload.phone)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Data</td><td style="padding:8px 0;">${escapeHtml(payload.date)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Hora</td><td style="padding:8px 0;">${escapeHtml(payload.time)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Convidados</td><td style="padding:8px 0;">${escapeHtml(payload.guests)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">\xC1rea</td><td style="padding:8px 0;">${escapeHtml(payload.area)}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Ocasi\xE3o</td><td style="padding:8px 0;">${escapeHtml(payload.occasion)}</td></tr>`,
+    payload.notes ? `      <tr><td style="padding:8px 0;color:#A6A8AD;vertical-align:top;">Notas</td><td style="padding:8px 0;white-space:pre-line;">${escapeHtml(payload.notes)}</td></tr>` : "",
+    `    </table>`,
+    `  </div>`,
+    `</div>`
+  ].join("\n");
+}
+async function sendReservationAdminNotification(payload) {
+  const transporter = await getTransporter();
+  if (!transporter) {
+    console.warn("[email] SMTP n\xE3o configurado \u2014 notifica\xE7\xE3o de reserva n\xE3o enviada.");
+    return false;
+  }
+  try {
+    await transporter.sendMail({
+      from: (process.env.MAIL_FROM ?? "").trim() || "Boca Maldita <smpsandro1239@gmail.com>",
+      to: getAdminInbox(),
+      subject: `Nova reserva ${payload.reference} \u2014 ${payload.name} \u2014 ${payload.date} ${payload.time}`,
+      html: buildReservationAdminHtml(payload)
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] Erro ao enviar notifica\xE7\xE3o de reserva:", err);
     return false;
   }
 }
@@ -1055,7 +1144,11 @@ var DEFAULT_SITE_CONTENT = {
   aboutText: "",
   instagram: "https://www.instagram.com/bocamaldita/",
   facebook: "https://web.facebook.com/malditaboca",
-  videoUrl: "https://www.facebook.com/malditaboca/videos/at%C3%A9-j%C3%A1-/758681031592904/"
+  videoUrl: "https://www.facebook.com/malditaboca/videos/at%C3%A9-j%C3%A1-/758681031592904/",
+  testimonialText: "Uma experi\xEAncia carn\xEDvora inesquec\xEDvel em Vila de Prado. O ponto da carne maturada e os aromas a lenha s\xE3o de uma perfei\xE7\xE3o rara.",
+  testimonialName: "In\xEAs Barreto",
+  testimonialRole: "Cr\xEDtica Gastron\xF3mica",
+  testimonialStars: "5"
 };
 function parseStoredJson(raw) {
   if (!raw) return {};
@@ -1206,6 +1299,9 @@ async function createApp() {
       sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
         console.error("[email] Falha no envio de confirma\xE7\xE3o:", err);
       });
+      sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
+        console.error("[email] Falha no envio de notifica\xE7\xE3o de reserva:", err);
+      });
       res.status(201).json({ id, reference });
     } catch (err) {
       next(err);
@@ -1221,6 +1317,14 @@ async function createApp() {
         return res.status(429).json({ error: "Demasiados pedidos de contacto. Aguarde alguns minutos." });
       }
       const { id } = await storage.createContact(parsed.data);
+      sendContactNotification({
+        nome: parsed.data.nome ?? "",
+        email: parsed.data.email ?? "",
+        assunto: parsed.data.assunto ?? "",
+        mensagem: parsed.data.mensagem ?? ""
+      }).catch((err) => {
+        console.error("[email] Falha no envio de notifica\xE7\xE3o de contacto:", err);
+      });
       res.status(201).json({ id });
     } catch (err) {
       next(err);

@@ -16,6 +16,10 @@ const DEFAULT_SITE_CONTENT: SiteContent = {
   instagram: 'https://www.instagram.com/bocamaldita/',
   facebook: 'https://web.facebook.com/malditaboca',
   videoUrl: 'https://www.facebook.com/malditaboca/videos/at%C3%A9-j%C3%A1-/758681031592904/',
+  testimonialText: 'Uma experiência carnívora inesquecível em Vila de Prado. O ponto da carne maturada e os aromas a lenha são de uma perfeição rara.',
+  testimonialName: 'Inês Barreto',
+  testimonialRole: 'Crítica Gastronómica',
+  testimonialStars: '5',
 };
 
 export { DEFAULT_SITE_CONTENT };

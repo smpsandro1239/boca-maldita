@@ -57,10 +57,14 @@ export default function HomeScreen({
   const [checkQuestion, setCheckQuestion] = useState(() => generateCheckQuestion());
   const [checkValue, setCheckValue] = useState('');
   const [honeypotValue, setHoneypotValue] = useState('');
+  const todayISO = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  })();
   const [bookingFormData, setBookingFormData] = useState({
     nome: '',
     email: '',
-    data: '',
+    data: todayISO,
     convidados: '2 Pessoas',
     telefone: ''
   });
@@ -166,7 +170,7 @@ export default function HomeScreen({
                 {/* Overlaid Review Card (Bottom Right, matching AT Restaurant screenshot) */}
                 <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 max-w-[320px] sm:max-w-[340px] bg-[#141518]/95 backdrop-blur-md p-5 border border-[#282A30] shadow-2xl">
                   <p className="text-xs sm:text-sm text-[#F7F5F0] italic leading-snug font-sans">
-                    “Uma experiência carnívora inesquecível em Vila de Prado. O ponto da carne maturada e os aromas a lenha são de uma perfeição rara.”
+                    “{siteContent.testimonialText || 'Uma experiência carnívora inesquecível em Vila de Prado. O ponto da carne maturada e os aromas a lenha são de uma perfeição rara.'}”
                   </p>
                   <div className="mt-3 pt-3 border-t border-[#282A30] flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
@@ -174,25 +178,31 @@ export default function HomeScreen({
                         {reviewerUrl ? (
                           <AssetImage
                             src={reviewerUrl}
-                            alt="Gonçalo Vilar"
+                            alt={siteContent.testimonialName || 'Inês Barreto'}
                             className="w-full h-full object-cover"
                           />
                         ) : null}
                       </div>
                       <div>
                         <div className="text-xs font-semibold text-[#F7F5F0] leading-tight">
-                          Gonçalo Vilar
+                          {siteContent.testimonialName || 'Inês Barreto'}
                         </div>
                         <div className="text-[10px] text-[#A6A8AD] uppercase tracking-wider">
-                          Crítico Gastronómico
+                          {siteContent.testimonialRole || 'Crítica Gastronómica'}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center text-[#D4A373]">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className="w-3.5 h-3.5 fill-[#D4A373] text-[#D4A373]" />
-                      ))}
+                      {(() => {
+                        const stars = Math.min(5, Math.max(1, Number(siteContent.testimonialStars) || 5));
+                        return [...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${i < stars ? 'fill-[#D4A373] text-[#D4A373]' : 'text-[#3A3D44]'}`}
+                          />
+                        ));
+                      })()}
                     </div>
                   </div>
                 </div>
@@ -818,24 +828,30 @@ export default function HomeScreen({
                 </div>
 
                 <div className="space-y-3 text-xs text-[#A6A8AD]">
-                  <div className="flex justify-between items-center py-1 border-b border-[#282A30]/60">
-                    <span className="text-[#F7F5F0] font-medium">Terça a Sexta-feira</span>
-                    <span>19h30 – 23h00</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#282A30]/60">
-                    <span className="text-[#F7F5F0] font-medium">Sábado</span>
-                    <span>12h00 – 15h00 | 19h30 – 23h30</span>
-                  </div>
-                  <div className="flex justify-between items-center py-1 border-b border-[#282A30]/60">
-                    <span className="text-[#F7F5F0] font-medium">Domingo</span>
-                    <span>12h00 – 15h30 (Almoço de Família)</span>
-                  </div>
-                  <div className="flex justify-between items-center py-2 px-3 bg-[#1C1E22] border border-[#282A30]">
-                    <span className="text-[#D4A373] font-medium">Segunda-feira</span>
-                    <span className="text-[#D4A373] uppercase tracking-widest text-[11px] font-mono">
-                      Encerrado para Descanso
-                    </span>
-                  </div>
+                  {siteContent.hours && siteContent.hours.trim() ? (
+                    <p className="whitespace-pre-line leading-relaxed">{siteContent.hours}</p>
+                  ) : (
+                    <>
+                      <div className="flex justify-between items-center py-1 border-b border-[#282A30]/60">
+                        <span className="text-[#F7F5F0] font-medium">Terça a Sexta-feira</span>
+                        <span>19h30 – 23h00</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-b border-[#282A30]/60">
+                        <span className="text-[#F7F5F0] font-medium">Sábado</span>
+                        <span>12h00 – 15h00 | 19h30 – 23h30</span>
+                      </div>
+                      <div className="flex justify-between items-center py-1 border-b border-[#282A30]/60">
+                        <span className="text-[#F7F5F0] font-medium">Domingo</span>
+                        <span>12h00 – 15h30 (Almoço de Família)</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 px-3 bg-[#1C1E22] border border-[#282A30]">
+                        <span className="text-[#D4A373] font-medium">Segunda-feira</span>
+                        <span className="text-[#D4A373] uppercase tracking-widest text-[11px] font-mono">
+                          Encerrado para Descanso
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

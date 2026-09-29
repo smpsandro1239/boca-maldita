@@ -65,6 +65,10 @@ export interface SiteContent {
   instagram: string;
   facebook: string;
   videoUrl: string;
+  testimonialText: string;
+  testimonialName: string;
+  testimonialRole: string;
+  testimonialStars: string;
 }
 
 export interface ReservationAdminRow {

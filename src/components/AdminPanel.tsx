@@ -1136,13 +1136,24 @@ export default function AdminPanel({
                 <ContentField label="Telefone" value={contentDraft.phone} onChange={(v) => setContentField('phone', v)} />
                 <ContentField label="WhatsApp (número)" value={contentDraft.whatsapp} onChange={(v) => setContentField('whatsapp', v)} helper="Só dígitos com indicativo (ex.: 351253031890). Vazio usa o telefone. Aplica-se em todo o site." />
                 <ContentField label="Morada" value={contentDraft.address} onChange={(v) => setContentField('address', v)} />
-                <ContentField label="Horário" value={contentDraft.hours} onChange={(v) => setContentField('hours', v)} />
                 <ContentField label="Título principal (hero)" value={contentDraft.headline} onChange={(v) => setContentField('headline', v)} />
                 <ContentField label="Subtítulo (hero)" value={contentDraft.heroSubtitle} onChange={(v) => setContentField('heroSubtitle', v)} />
                 <ContentField label="Título da secção sobre o restaurante" value={contentDraft.aboutTitle} onChange={(v) => setContentField('aboutTitle', v)} />
                 <ContentField label="Instagram" value={contentDraft.instagram} onChange={(v) => setContentField('instagram', v)} />
                 <ContentField label="Facebook" value={contentDraft.facebook} onChange={(v) => setContentField('facebook', v)} />
                 <ContentField label="Link do vídeo (Facebook, mp4, webm)" value={contentDraft.videoUrl} onChange={(v) => setContentField('videoUrl', v)} helper="Aceita link do Facebook (reproduz em embed), ficheiro .mp4/.webm/.m3u8 ou outro URL a abrir em nova aba." />
+              </div>
+
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Horário Detalhado</label>
+                <textarea
+                  value={contentDraft.hours}
+                  onChange={(e) => setContentField('hours', e.target.value)}
+                  rows={8}
+                  placeholder={"Terça a Sexta-feira\n19h30 – 23h00\nSábado\n12h00 – 15h00 | 19h30 – 23h30\nDomingo\n12h00 – 15h30 (Almoço de Família)\nSegunda-feira\nEncerrado para Descanso"}
+                  className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y font-mono"
+                />
+                <p className="mt-1 text-[10px] text-[#686B73]">Uma linha por período. Aparece tal como escrito no bloco "Horário Detalhado" do site.</p>
               </div>
 
               <div>
@@ -1153,6 +1164,26 @@ export default function AdminPanel({
                   rows={6}
                   className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y"
                 />
+              </div>
+
+              <div className="border border-[#282A30] bg-[#141518]/40 p-4 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Star className="w-4 h-4 text-[#D4A373]" />
+                  <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">Testemunho do Hero</label>
+                </div>
+                <textarea
+                  value={contentDraft.testimonialText}
+                  onChange={(e) => setContentField('testimonialText', e.target.value)}
+                  rows={4}
+                  placeholder="“Uma experiência carnívora inesquecível…”"
+                  className="mt-1 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y"
+                />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <ContentField label="Nome" value={contentDraft.testimonialName} onChange={(v) => setContentField('testimonialName', v)} />
+                  <ContentField label="Cargo / Função" value={contentDraft.testimonialRole} onChange={(v) => setContentField('testimonialRole', v)} />
+                  <ContentField label="Estrelas (1 a 5)" value={contentDraft.testimonialStars} onChange={(v) => setContentField('testimonialStars', v)} helper="Um dígito entre 1 e 5." />
+                </div>
+                <p className="text-[10px] text-[#686B73]">A fotografia do testemunho é a imagem "Inês Barreto" editável no separador Imagens & Logótipo.</p>
               </div>
             </div>
           )}

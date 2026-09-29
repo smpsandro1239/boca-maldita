@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
 import { adminLoginSchema, adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
-import { sendNewsletterWelcome, sendReservationConfirmation } from './email';
+import { sendContactNotification, sendNewsletterWelcome, sendReservationAdminNotification, sendReservationConfirmation } from './email';
 import { solveCheckExpression } from './checkExpression';
 import { createSession, deleteSession, destroyAllSessions, parseCookies, requireAdmin, timingSafeEqualStr, CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth';
 import type { NextFunction, Request, Response } from 'express';
@@ -110,6 +110,10 @@ const DEFAULT_SITE_CONTENT: Record<string, string> = {
   instagram: 'https://www.instagram.com/bocamaldita/',
   facebook: 'https://web.facebook.com/malditaboca',
   videoUrl: 'https://www.facebook.com/malditaboca/videos/at%C3%A9-j%C3%A1-/758681031592904/',
+  testimonialText: 'Uma experiência carnívora inesquecível em Vila de Prado. O ponto da carne maturada e os aromas a lenha são de uma perfeição rara.',
+  testimonialName: 'Inês Barreto',
+  testimonialRole: 'Crítica Gastronómica',
+  testimonialStars: '5',
 };
 
 function parseStoredJson(raw: string | null): Record<string, unknown> {
@@ -279,6 +283,9 @@ export async function createApp(): Promise<AppInstance> {
       sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
         console.error('[email] Falha no envio de confirmação:', err);
       });
+      sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
+        console.error('[email] Falha no envio de notificação de reserva:', err);
+      });
       res.status(201).json({ id, reference });
     } catch (err) {
       next(err);
@@ -295,6 +302,14 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(429).json({ error: 'Demasiados pedidos de contacto. Aguarde alguns minutos.' });
       }
       const { id } = await storage.createContact(parsed.data);
+      sendContactNotification({
+        nome: parsed.data.nome ?? '',
+        email: parsed.data.email ?? '',
+        assunto: parsed.data.assunto ?? '',
+        mensagem: parsed.data.mensagem ?? '',
+      }).catch((err) => {
+        console.error('[email] Falha no envio de notificação de contacto:', err);
+      });
       res.status(201).json({ id });
     } catch (err) {
       next(err);

@@ -243,7 +243,7 @@ export const siteContentSchema = z
     phone: z.string().trim().max(40).optional().default(''),
     whatsapp: z.string().trim().max(40).optional().default(''),
     address: z.string().trim().max(200).optional().default(''),
-    hours: z.string().trim().max(240).optional().default(''),
+    hours: z.string().trim().max(400).optional().default(''),
     headline: z.string().trim().max(160).optional().default(''),
     heroSubtitle: z.string().trim().max(240).optional().default(''),
     aboutTitle: z.string().trim().max(160).optional().default(''),
@@ -251,6 +251,10 @@ export const siteContentSchema = z
     instagram: z.string().trim().max(200).optional().default(''),
     facebook: z.string().trim().max(200).optional().default(''),
     videoUrl: z.string().trim().max(2000).optional().default(''),
+    testimonialText: z.string().trim().max(400).optional().default(''),
+    testimonialName: z.string().trim().max(120).optional().default(''),
+    testimonialRole: z.string().trim().max(120).optional().default(''),
+    testimonialStars: z.string().trim().max(1).regex(/^[1-5]$/, 'A classificação deve ser um número entre 1 e 5.').optional().default(''),
   })
   .strict();
 

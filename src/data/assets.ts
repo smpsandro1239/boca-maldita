@@ -19,11 +19,11 @@ export const DEFAULT_IMAGE_ASSETS: ImageAsset[] = [
   },
   {
     id: 'reviewer-goncalo',
-    name: 'Gonçalo Vilar - Crítico Gastronómico',
+    name: 'Inês Barreto - Crítica Gastronómica',
     category: 'pessoas',
     url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAa1eaKcXOiww77c6cQNEoU8x3m8REm88NuLjXWmnkNxA3D-GvrGew4N2GK6ggoICeFTH0t90MoU8PiSkKKJxgX9FuwbTyfS7m60PLlZ2KYRn67az5GN_DP_TsGGREiVz4zXXf6F1ozgIiVhn_7kY5cuWntn8U5MiQYg2-SQroKnwwsrJzmnE42pHHpZz1Sj7QoqGPR5QPZKQSFOyziohMgYj5i7gCxrTfTR2kgneDFWvh_FVgkzzQOFA',
-    description: 'Retrato do crítico gastronómico convidado',
-    alt: 'Retrato de Gonçalo Vilar no restaurante'
+    description: 'Retrato da crítica gastronómica convidada no restaurante',
+    alt: 'Retrato de Inês Barreto no restaurante'
   },
   {
     id: 'dining-room',
