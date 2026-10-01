@@ -1,8 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { ScreenType, MenuItem, PublicReservationConfig, ReviewAdminRow } from '../types';
+import { ScreenType, MenuItem, PublicReservationConfig, PublicDiarias, ReviewAdminRow } from '../types';
 import { useSite, telHref } from '../context/SiteContext';
 import AssetImage from '../components/AssetImage';
-import { createReservation, createReview, getReservationConfig, getReviews } from '../lib/api';
+import { createReservation, createReview, getDiarias, getReservationConfig, getReviews } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
 import { GMAPS_URL } from '../data/contact';
 import { MENU_ITEMS } from '../data/menuData';
@@ -71,6 +71,7 @@ export default function HomeScreen({
   });
   const { menuItems, siteContent } = useSite();
   const phone = siteContent.phone;
+  const [todayDiarias, setTodayDiarias] = useState<PublicDiarias | null>(null);
 
   useEffect(() => {
     getReservationConfig()
@@ -78,11 +79,30 @@ export default function HomeScreen({
       .catch(() => setReservationConfig({ protectionEnabled: true, paused: false, requireCheck: true, closedPeriods: [] }));
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    getDiarias()
+      .then((data) => {
+        if (!cancelled) setTodayDiarias(data);
+      })
+      .catch(() => {
+        if (!cancelled) setTodayDiarias(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const featuredDishes = activeMenuTab === 'carnes'
     ? menuItems.filter(i => i.category === 'carnes').slice(0, 4)
     : menuItems.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
 
+  const scheduledDiarias = todayDiarias && todayDiarias.currentMeal !== 'closed'
+    ? (todayDiarias.currentMeal === 'lunch' ? todayDiarias.lunch : todayDiarias.dinner)
+    : [];
+
   const diariasDishes = (() => {
+    if (scheduledDiarias.length > 0) return scheduledDiarias.slice(0, 4);
     const fromSite = menuItems.filter(i => i.category === 'diarias');
     return fromSite.length > 0 ? fromSite.slice(0, 4) : MENU_ITEMS.filter(i => i.category === 'diarias').slice(0, 4);
   })();
@@ -581,7 +601,14 @@ export default function HomeScreen({
               </span>
             ))}
             <span className="text-[10px] uppercase tracking-widest font-mono text-[#D4A373]">
-              Um menu completo pelo mesmo preço
+              {(() => {
+                if (todayDiarias?.hasSchedule) {
+                  if (todayDiarias.servedMeals.lunch && !todayDiarias.servedMeals.dinner) return 'Servido só ao almoço (12h–16h)';
+                  if (!todayDiarias.servedMeals.lunch && todayDiarias.servedMeals.dinner) return 'Servido só ao jantar (19h30–23h)';
+                  return 'Servido ao almoço e ao jantar';
+                }
+                return 'Um menu completo pelo mesmo preço';
+              })()}
             </span>
           </div>
 

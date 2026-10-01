@@ -267,8 +267,11 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Reserva',
     tagline: 'Douro DOC',
     description: 'Baga de Touriga Franca e Touriga Nacional, 18 meses em barrica de carvalho francês. Taninos sedosos, notas de ameixa negra, especiaria e cacau. Ideal com carnes na brasa.',
-    imageUrl: '',
+    imageUrl: 'https://live.staticflickr.com/606/21911441615_e9004564f6_b.jpg',
     origin: 'Douro DOC',
+    producer: 'Quinta do Porto',
+    vintage: '2019',
+    servesCount: '75cl',
     pairingWine: 'Touriga Franca > Touriga Nacional'
   },
   {
@@ -280,8 +283,11 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Vinho de Talha',
     tagline: 'Alentejo DOC',
     description: 'Vinificação ancestral em ânfora de barro. Fruta madura, textura terrosa e final fresco. Companheiro direto do Costelão no Fogo.',
-    imageUrl: '',
+    imageUrl: 'https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxNDQ4OTc1LWltYWdlLWt3dnh1NzlqLmpwZw.jpg',
     origin: 'Alentejo DOC',
+    producer: 'Ponte da Barca',
+    vintage: '2021',
+    servesCount: '75cl',
     pairingWine: 'Alicante Bouschet > Trincadeira'
   },
   {
@@ -293,8 +299,11 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Espumante',
     tagline: 'Método Clássico',
     description: 'Baga Baião de longa maturação, bolha fina e vivaz. Entrada obrigatória: acompanha o Tutano Assado e o Carpaccio 45D.',
-    imageUrl: '',
+    imageUrl: 'https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4MTA1NzgxNi1pbWFnZS1rd3Z3Y3Ntbi5qcGc.jpg',
     origin: 'Bairrada DOC',
+    producer: 'Casa da Bairrada',
+    vintage: '2018',
+    servesCount: '75cl',
     pairingWine: 'Baga'
   },
   {
@@ -306,8 +315,11 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Branco',
     tagline: 'Monção e Melgaço DOC',
     description: 'Citrino, mineral e vibrante, com tensão de mar e granito. Perfeito para o Polvo no Carvão e o Gambão Tigre.',
-    imageUrl: '',
+    imageUrl: 'https://pd.w.org/2025/02/564679e1f107f7976.53960415-1536x2048.jpeg',
     origin: 'Monção e Melgaço DOC',
+    producer: 'Adega de Monção',
+    vintage: '2022',
+    servesCount: '75cl',
     pairingWine: 'Alvarinho'
   },
   {
@@ -319,8 +331,11 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Vinho Verde',
     tagline: 'Vinho Verde DOC',
     description: 'Fresco, floral e ligeiramente frisante, direto das vinhas do Cávado. Prova da casa para o início da noite.',
-    imageUrl: '',
+    imageUrl: 'https://live.staticflickr.com/3885/32686236920_0654fa6f81_b.jpg',
     origin: 'Vinho Verde DOC',
+    producer: 'Adega de Ponte da Barca',
+    vintage: '2023',
+    servesCount: '75cl',
     pairingWine: 'Loureiro'
   },
   {
@@ -332,9 +347,44 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Rosé',
     tagline: 'Terras de Lisboa DOC',
     description: 'Rosé delicado de Pinot Noir com notas de morango, framboesa e flor de laranjeira. Leve e gastronómico.',
-    imageUrl: '',
+    imageUrl: 'https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZnJ3aW5lX3Jvc2VfYm90dGxlc19nbGFzcy1pbWFnZS1reWJjYnJ2aC5qcGc.jpg',
     origin: 'Terras de Lisboa DOC',
+    producer: 'Quinta das Aves',
+    vintage: '2022',
+    servesCount: '75cl',
     pairingWine: 'Pinot Noir'
+  },
+  {
+    id: 'vinho-porto-tawny-10',
+    name: 'Vinho do Porto Tawny 10 Anos',
+    price: 34.0,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Porto',
+    tagline: 'Douro DOP',
+    description: 'Estágio de 10 anos em casca, com notas de frutos secos, mel, laranja cristalizada e especiaria doce. Servido fresco, em copo pequeno, no fecho da refeição.',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/a/a0/Azerbaijani_Port_wine_Aghdam_with_a_glass.jpg',
+    origin: 'Douro DOP',
+    producer: 'Quinta do Porto',
+    vintage: '10 Anos',
+    servesCount: '75cl',
+    pairingWine: 'Touriga Nacional > Tinta Roriz'
+  },
+  {
+    id: 'vinho-pera-manca-tinto',
+    name: 'Pêra-Manca Tinto',
+    price: 89.0,
+    currency: '€',
+    category: 'vinhos',
+    badge: 'Assinatura',
+    tagline: 'Alentejo DOC',
+    description: 'O tinto de referência alentejano: profundidade, estrutura e um caráter inconfundível. A escolha para quem quer fechar as grandes refeições com o Costelão no Fogo.',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/e/e7/Bottle_and_glass_of_red_wine.jpg',
+    origin: 'Alentejo DOC',
+    producer: 'Fundação Eugénio de Almeida',
+    vintage: '2018',
+    servesCount: '75cl',
+    pairingWine: 'Alicante Bouschet > Trincadeira'
   },
 
   // Bebidas & Refrescos
@@ -347,7 +397,7 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Sem Álcool',
     tagline: 'Natural ou Com Gás',
     description: 'Água mineral natural ou com gás, servida bem fresca.',
-    imageUrl: '',
+    imageUrl: 'https://live.staticflickr.com/8281/7803156280_98a67aef89_b.jpg',
     servesCount: '50cl'
   },
   {
@@ -357,8 +407,9 @@ export const MENU_ITEMS: MenuItem[] = [
     currency: '€',
     category: 'bebidas',
     badge: 'Sem Álcool',
+    tagline: 'Clássicas e Zero',
     description: 'Coca-Cola, Coca-Cola Zero, Ice Tea de limão ou Sumol de laranja.',
-    imageUrl: '',
+    imageUrl: 'https://live.staticflickr.com/1893/43522180855_b4a694a201_b.jpg',
     servesCount: '33cl'
   },
   {
@@ -370,7 +421,7 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Sem Álcool',
     tagline: 'Esprimido na Hora',
     description: 'Laranjas espremidas na hora, sem adição de açúcar.',
-    imageUrl: '',
+    imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/f/f0/JP_%E6%97%A5%E6%9C%AC_Japan_%E6%B2%96%E7%B9%A9_OKINAWA_%E9%82%A3%E9%9C%B8_Naha_%E9%AD%9A%E5%B1%8B%E6%B5%B7%E9%AE%AE_Izakaya_%E5%B1%85%E9%85%92%E5%B1%8B%E9%A3%9F%E5%A0%82_Japanese_seafood_restaurant_lunch_orange_juice_glass_cup_February_2026_N13P.jpg',
     servesCount: '40cl'
   },
   {
@@ -381,8 +432,8 @@ export const MENU_ITEMS: MenuItem[] = [
     category: 'bebidas',
     badge: 'Da Casa',
     tagline: 'Vinho Verde ou Douro',
-    description: 'Um copo de 150cl de vinho verde loureiro (branco) ou um tinto Douro da casa.',
-    imageUrl: '',
+    description: 'Um copo de 150ml de vinho verde loureiro (branco) ou um tinto Douro da casa.',
+    imageUrl: 'https://live.staticflickr.com/4351/37326619942_5e1c6273be_b.jpg',
     servesCount: '150cl'
   },
   {
@@ -394,7 +445,55 @@ export const MENU_ITEMS: MenuItem[] = [
     badge: 'Sem Álcool',
     tagline: 'Torra da Casa',
     description: 'Expresso de torra portuguesa com grão de origem selecionada.',
-    imageUrl: '',
+    imageUrl: 'https://live.staticflickr.com/5023/5598864934_6a61f37302_b.jpg',
     servesCount: 'Individual'
+  },
+  {
+    id: 'imperial-cerveja-pressao',
+    name: 'Imperial / Cerveja de Pressão',
+    price: 2.8,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Da Pressão',
+    tagline: 'Gelada e bem Tirada',
+    description: 'Cerveja de pressão com colarinho de espuma, servida gelada. O clássico para acompanhar as Residual do Ouriço ou as Croquetes de Vitela.',
+    imageUrl: 'https://live.staticflickr.com/65535/48942626443_7c177cec86_b.jpg',
+    servesCount: '25cl'
+  },
+  {
+    id: 'soda-limao-artesanal',
+    name: 'Soda de Limão Artesanal',
+    price: 3.0,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Artesanal',
+    tagline: 'Limão e Água com Gás',
+    description: 'Limão esmagado na hora, água com gás e muito gelo. Refrescante, sem adição de açúcar.',
+    imageUrl: 'https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvdXB3azYyMDYwMDc0LXdpa2ltZWRpYS1pbWFnZS1rb3dvNXl1ay5qcGc.jpg',
+    servesCount: '30cl'
+  },
+  {
+    id: 'sangria-da-casa',
+    name: 'Sangria da Casa (Tinto ou Branco)',
+    price: 12.0,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Para Partilhar',
+    tagline: 'Jarro para Dois',
+    description: 'Vinho tinto ou branco, fruta fresca da época e um toque de especiarias. Preparada de véspera, com seis dias de descanso antes de servir.',
+    imageUrl: 'https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvZnJzYW5ncmlhX3dpbmVfc3RyYXdfZHJpbmstaW1hZ2Uta3ljZmtkZ20uanBn.jpg',
+    servesCount: '1 litro'
+  },
+  {
+    id: 'licor-beirao',
+    name: 'Licor Beirão',
+    price: 3.5,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Fim de Refeição',
+    tagline: 'Com ou Sem Gelo',
+    description: 'O licor de ervas português, servido fresco ou com gelo. O fecho perfeito para uma refeição no Boca Maldita.',
+    imageUrl: 'https://live.staticflickr.com/65535/55463548198_fa627161ce_b.jpg',
+    servesCount: 'Dose 40ml'
   }
 ];

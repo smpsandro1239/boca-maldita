@@ -198,3 +198,38 @@ export interface ReservationProtectionConfig {
   rateLimit: boolean;
   requireCheck: boolean;
 }
+
+export type DiariaRepeat = 'none' | 'weekly' | 'biweekly' | 'monthly';
+
+export interface DiariaSchedule {
+  id: string;
+  anchorDate: string;
+  repeat: DiariaRepeat;
+  activeFrom: string;
+  activeTo: string | null;
+  lunch: boolean;
+  dinner: boolean;
+  itemIds: string[];
+}
+
+export interface DiariaScheduleInput {
+  anchorDate: string;
+  repeat: DiariaRepeat;
+  activeFrom?: string;
+  activeTo?: string | null;
+  lunch: boolean;
+  dinner: boolean;
+  itemIds: string[];
+}
+
+export type PublicDiariaPeriod = 'lunch' | 'dinner' | 'closed';
+
+export interface PublicDiarias {
+  date: string;
+  currentMeal: PublicDiariaPeriod;
+  lunch: MenuItem[];
+  dinner: MenuItem[];
+  hasSchedule: boolean;
+  servedMeals: { lunch: boolean; dinner: boolean };
+  closedTitle: string | null;
+}

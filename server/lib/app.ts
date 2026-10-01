@@ -3,11 +3,12 @@ import express from 'express';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
-import { adminLoginSchema, adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
+import { adminLoginSchema, adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, diariaScheduleSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
 import { sendClosedDayConflictEmail, sendContactNotification, sendNewsletterWelcome, sendReservationAdminNotification, sendReservationConfirmation } from './email';
 import { isDateBlocked } from './blockedDates';
 import { findClosedPeriodConflicts } from './closedPeriodConflicts';
 import { solveCheckExpression } from './checkExpression';
+import { buildDefaultDiariaSchedules, currentMeal, normalizeDiariaSchedule, resolveDiariasDay, todayKey as todayKeyLocal, type DiariaSchedule } from './diarias';
 import { createSession, deleteSession, destroyAllSessions, parseCookies, requireAdmin, timingSafeEqualStr, CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -22,6 +23,7 @@ const MENU_ITEMS_KEY = 'menu_items';
 const SITE_CONTENT_KEY = 'site_content';
 const RESERVATION_PROTECTION_KEY = 'reservation_protection';
 const ADMIN_TOKEN_KEY = 'admin_token';
+const DIARIA_SCHEDULES_KEY = 'diaria_schedules';
 const DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? '').trim() || 'smpsandro1239@gmail.com';
 
 const RATE_WINDOW_MS = 15 * 60 * 1000;
@@ -47,6 +49,39 @@ async function getClosedPeriodForDate(storage: Storage, date: string): Promise<{
     }
   }
   return null;
+}
+
+async function getDiariaSchedules(storage: Storage): Promise<DiariaSchedule[]> {
+  const raw = await storage.getSetting(DIARIA_SCHEDULES_KEY);
+  if (raw === null || raw === undefined || raw === '') return buildDefaultDiariaSchedules();
+  try {
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed) ? parsed : [];
+    const out: DiariaSchedule[] = [];
+    for (const value of list) {
+      const normalized = normalizeDiariaSchedule(value);
+      if (normalized) out.push(normalized);
+    }
+    return out;
+  } catch {
+    return buildDefaultDiariaSchedules();
+  }
+}
+
+async function saveDiariaSchedules(storage: Storage, schedules: DiariaSchedule[]): Promise<void> {
+  await storage.setSetting(DIARIA_SCHEDULES_KEY, JSON.stringify(schedules));
+}
+
+async function getMenuItemsForApi(storage: Storage): Promise<Array<{ id: string; visible?: boolean }>> {
+  const raw = await storage.getSetting(MENU_ITEMS_KEY);
+  const items = raw ? parseStoredJson(raw).items : null;
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter(
+      (item): item is { id: string; visible?: boolean } =>
+        !!item && typeof item === 'object' && typeof (item as { id?: unknown }).id === 'string',
+    )
+    .map((item) => ({ id: item.id, visible: item.visible }));
 }
 
 const DEFAULT_RESERVATION_PROTECTION: ReservationProtectionInput = {
@@ -433,6 +468,27 @@ export async function createApp(): Promise<AppInstance> {
     }
   });
 
+  app.get('/api/diarias', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const queryDate = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayKeyLocal();
+      const schedules = await getDiariaSchedules(storage);
+      const menuItems = await getMenuItemsForApi(storage);
+      const resolved = resolveDiariasDay(schedules, menuItems, queryDate);
+      const closed = await getClosedPeriodForDate(storage, queryDate);
+      res.json({
+        date: queryDate,
+        currentMeal: closed ? 'closed' : currentMeal(),
+        lunch: resolved.lunch,
+        dinner: resolved.dinner,
+        hasSchedule: resolved.hasSchedule,
+        servedMeals: resolved.servedMeals,
+        closedTitle: closed?.title ?? null,
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   app.get('/api/admin/menus', async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const raw = await storage.getSetting(MENU_ITEMS_KEY);
@@ -464,6 +520,88 @@ export async function createApp(): Promise<AppInstance> {
     try {
       if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
       await storage.deleteSetting(MENU_ITEMS_KEY);
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.get('/api/admin/diarias', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
+      res.json({ schedules: await getDiariaSchedules(storage) });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.post('/api/admin/diarias', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
+      const parsed = diariaScheduleSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const schedules = await getDiariaSchedules(storage);
+      const schedule: DiariaSchedule = {
+        id: `diaria_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        anchorDate: parsed.data.anchorDate,
+        repeat: parsed.data.repeat,
+        activeFrom: parsed.data.activeFrom,
+        activeTo: parsed.data.activeTo,
+        lunch: parsed.data.lunch,
+        dinner: parsed.data.dinner,
+        itemIds: parsed.data.itemIds.slice(0, 4),
+      };
+      schedules.push(schedule);
+      await saveDiariaSchedules(storage, schedules);
+      res.json({ ok: true, schedule });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.put('/api/admin/diarias/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
+      const parsed = diariaScheduleSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const id = String(req.params.id ?? '');
+      const schedules = await getDiariaSchedules(storage);
+      const index = schedules.findIndex((s) => s.id === id);
+      if (index === -1) {
+        return res.status(404).json({ error: 'Agendamento não encontrado.' });
+      }
+      const schedule: DiariaSchedule = {
+        id,
+        anchorDate: parsed.data.anchorDate,
+        repeat: parsed.data.repeat,
+        activeFrom: parsed.data.activeFrom,
+        activeTo: parsed.data.activeTo,
+        lunch: parsed.data.lunch,
+        dinner: parsed.data.dinner,
+        itemIds: parsed.data.itemIds.slice(0, 4),
+      };
+      schedules[index] = schedule;
+      await saveDiariaSchedules(storage, schedules);
+      res.json({ ok: true, schedule });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  app.delete('/api/admin/diarias/:id', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!(await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== 'GET' }))) return;
+      const id = String(req.params.id ?? '');
+      const schedules = await getDiariaSchedules(storage);
+      const filtered = schedules.filter((s) => s.id !== id);
+      if (filtered.length === schedules.length) {
+        return res.status(404).json({ error: 'Agendamento não encontrado.' });
+      }
+      await saveDiariaSchedules(storage, filtered);
       res.json({ ok: true });
     } catch (err) {
       next(err);

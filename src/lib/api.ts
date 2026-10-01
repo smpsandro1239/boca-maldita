@@ -1,4 +1,4 @@
-import type { AssetOverride, ClosedDayConflictDates, ClosedPeriod, ClosedPeriodInput, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
+import type { AssetOverride, ClosedDayConflictDates, ClosedPeriod, ClosedPeriodInput, ContactAdminRow, DiariaSchedule, DiariaScheduleInput, MenuItem, NewsletterAdminRow, PublicDiarias, PublicDiariaPeriod, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
 
 export class HttpError extends Error {
   constructor(
@@ -286,4 +286,40 @@ export function deleteAdminClosedDay(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/closed-days/${id}`, {
     method: 'DELETE',
   });
+}
+
+export function getDiarias(date?: string): Promise<PublicDiarias> {
+  return request<PublicDiarias>(date ? `/diarias?date=${encodeURIComponent(date)}` : '/diarias');
+}
+
+export function getAdminDiarias(): Promise<{ schedules: DiariaSchedule[] }> {
+  return request<{ schedules: DiariaSchedule[] }>('/admin/diarias');
+}
+
+export function createAdminDiaria(input: DiariaScheduleInput): Promise<{ ok: boolean; schedule: DiariaSchedule }> {
+  return request<{ ok: boolean; schedule: DiariaSchedule }>('/admin/diarias', {
+    method: 'POST',
+    headers: mutationHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateAdminDiaria(id: string, input: DiariaScheduleInput): Promise<{ ok: boolean; schedule: DiariaSchedule }> {
+  return request<{ ok: boolean; schedule: DiariaSchedule }>(`/admin/diarias/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    headers: mutationHeaders(),
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteAdminDiaria(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(`/admin/diarias/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function diariaMealLabel(meal: PublicDiariaPeriod): string {
+  if (meal === 'lunch') return 'Almoço';
+  if (meal === 'dinner') return 'Jantar';
+  return 'Fechado';
 }

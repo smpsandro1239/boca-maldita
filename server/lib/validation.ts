@@ -94,6 +94,30 @@ export const closedPeriodSchema = z
     path: ['endDate'],
   });
 
+export const diariaScheduleSchema = z
+  .object({
+    anchorDate: dateKeySchema,
+    repeat: z.enum(['none', 'weekly', 'biweekly', 'monthly'], { message: 'Repetição inválida.' }),
+    activeFrom: dateKeySchema.optional(),
+    activeTo: z.union([dateKeySchema, z.literal(''), z.null()]).optional(),
+    lunch: z.boolean().optional().default(true),
+    dinner: z.boolean().optional().default(true),
+    itemIds: z
+      .array(z.string().trim().min(1, 'Identificador de prato inválido.'))
+      .min(1, 'Escolha pelo menos um prato para este dia.')
+      .max(4, 'Máximo de 4 pratos por dia (2 carnes e 2 peixes).'),
+  })
+  .strict()
+  .refine((value) => value.lunch || value.dinner, {
+    message: 'Selecione pelo menos o almoço ou o jantar.',
+    path: ['lunch'],
+  })
+  .transform((value) => ({
+    ...value,
+    activeFrom: value.activeFrom || value.anchorDate,
+    activeTo: value.activeTo || null,
+  }));
+
 export const adminReservationSchema = z
   .object({
     name: nameField,
@@ -269,6 +293,7 @@ export type ReviewInput = z.infer<typeof reviewSchema>;
 export type ReviewStatusInput = z.infer<typeof reviewStatusSchema>;
 export type AdminTokenUpdateInput = z.infer<typeof adminTokenUpdateSchema>;
 export type ClosedPeriodInput = z.infer<typeof closedPeriodSchema>;
+export type DiariaScheduleInput = z.infer<typeof diariaScheduleSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export type AssetOverrideInput = z.infer<typeof assetOverridesSchema>['overrides'][number];
 export type MenuItemInput = z.infer<typeof menuItemSchema>;

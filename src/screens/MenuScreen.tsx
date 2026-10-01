@@ -1,8 +1,10 @@
-import { useState, type MouseEvent } from 'react';
-import { MenuItem } from '../types';
+import { useEffect, useState, type MouseEvent } from 'react';
+import { MenuItem, PublicDiarias } from '../types';
 import { useSite } from '../context/SiteContext';
-import { Search, Flame, Wine, Clock, Award, ArrowRight, Copy, Check } from 'lucide-react';
+import { Search, Flame, Wine, Clock, Award, ArrowRight, Copy, Check, UtensilsCrossed } from 'lucide-react';
 import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
+import { MENU_ITEMS } from '../data/menuData';
+import { getDiarias, diariaMealLabel } from '../lib/api';
 
 interface MenuScreenProps {
   onSelectDish: (dish: MenuItem) => void;
@@ -18,21 +20,59 @@ export default function MenuScreen({
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const [todayDiarias, setTodayDiarias] = useState<PublicDiarias | null>(null);
   const { menuItems } = useSite();
+
+  useEffect(() => {
+    let cancelled = false;
+    getDiarias()
+      .then((data) => {
+        if (!cancelled) setTodayDiarias(data);
+      })
+      .catch(() => {
+        if (!cancelled) setTodayDiarias(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const categories = [
     { id: 'todas', label: 'Toda a Carta' },
     ...Object.entries(MENU_CATEGORY_LABELS).map(([id, label]) => ({ id, label }))
   ];
 
-  const filteredItems = menuItems.filter(item => {
-    if (item.visible === false) return false;
-    const matchesCat = selectedCategory === 'todas' || item.category === selectedCategory;
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          (item.origin && item.origin.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCat && matchesSearch;
-  });
+  const serviceDishes = todayDiarias && todayDiarias.currentMeal !== 'closed'
+    ? (todayDiarias.currentMeal === 'lunch' ? todayDiarias.lunch : todayDiarias.dinner)
+    : [];
+
+  const menuDiarias = MENU_ITEMS.filter(i => i.category === 'diarias').slice(0, 4);
+
+  const filteredItems = (() => {
+    if (selectedCategory === 'diarias') {
+      const fromSite = menuItems.filter(i => i.category === 'diarias' && i.visible !== false).slice(0, 4);
+      const selected = serviceDishes.length > 0 ? serviceDishes : fromSite.length > 0 ? fromSite : menuDiarias;
+      return selected.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                              (item.origin && item.origin.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesSearch;
+      });
+    }
+
+    const merged = selectedCategory === 'todas'
+      ? [...serviceDishes.filter(d => !menuItems.some(m => m.id === d.id)), ...menuItems]
+      : menuItems;
+
+    return merged.filter(item => {
+      if (item.visible === false) return false;
+      const matchesCat = selectedCategory === 'todas' || item.category === selectedCategory;
+      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            (item.origin && item.origin.toLowerCase().includes(searchQuery.toLowerCase()));
+      return matchesCat && matchesSearch;
+    });
+  })();
 
   const handleCopyLink = (e: MouseEvent, url: string) => {
     e.stopPropagation();
@@ -95,6 +135,37 @@ export default function MenuScreen({
           </div>
 
         </div>
+
+        {/* Prato do Dia service note */}
+        {selectedCategory === 'diarias' && (
+          <div className="bg-[#141518] border border-[#282A30] px-4 py-3 text-xs text-[#A6A8AD] flex flex-wrap items-center gap-x-5 gap-y-1.5">
+            <span className="flex items-center gap-2 text-[#D4A373] font-mono uppercase tracking-widest text-[10px]">
+              <UtensilsCrossed className="w-3.5 h-3.5" />
+              Prato do Dia
+            </span>
+            {todayDiarias && todayDiarias.currentMeal === 'closed' ? (
+              <span>Hoje encerrado{todayDiarias.closedTitle ? ` — ${todayDiarias.closedTitle}` : ''}. A mostrar as diárias disponíveis.</span>
+            ) : (
+              <>
+                <span>
+                  Servido {diariaMealLabel(todayDiarias?.currentMeal ?? 'lunch').toLowerCase()} ({todayDiarias?.currentMeal === 'dinner' ? '19h30–23h' : '12h–16h'})
+                </span>
+                {todayDiarias?.hasSchedule && (
+                  <span>
+                    {todayDiarias.servedMeals.lunch && todayDiarias.servedMeals.dinner
+                      ? 'Além disso, programado para almoço e jantar'
+                      : todayDiarias.servedMeals.lunch
+                        ? 'Programado só para o almoço'
+                        : todayDiarias.servedMeals.dinner
+                          ? 'Programado só para o jantar'
+                          : 'Programação do dia sem serviço definido'}
+                  </span>
+                )}
+                {!todayDiarias?.hasSchedule && <span>A mostrar as diárias regulares.</span>}
+              </>
+            )}
+          </div>
+        )}
 
         {/* Menu Grid */}
         {filteredItems.length === 0 ? (

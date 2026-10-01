@@ -26,6 +26,7 @@ import {
   KeyRound,
   ShieldAlert,
   CalendarX,
+  Soup,
 } from 'lucide-react';
 import type { AssetOverride, ClosedPeriod, ContactAdminRow, ImageAsset, MenuItem, NewsletterAdminRow, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewStatus, SiteContent } from '../types';
 import {
@@ -59,8 +60,9 @@ import {
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
 import { MENU_CATEGORIES, MENU_CATEGORY_LABELS, MENU_CATEGORY_ORDER } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
+import DiariasManager from './DiariasManager';
 
-type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'dias' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
+type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'dias' | 'diarias' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   logo: 'Logótipo',
@@ -625,6 +627,7 @@ export default function AdminPanel({
     { id: 'geral', label: 'Estado', icon: LayoutDashboard },
     { id: 'imagens', label: 'Imagens & Logótipo', icon: ImageIcon },
     { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
+    { id: 'diarias', label: 'Diárias', icon: Soup },
     { id: 'reservas', label: 'Reservas', icon: CalendarDays },
     { id: 'dias', label: 'Datas Fechadas', icon: CalendarX },
     { id: 'avaliacoes', label: 'Avaliações', icon: Star },
@@ -1236,6 +1239,10 @@ export default function AdminPanel({
 
           {activeTab === 'dias' && (
             <ClosedDaysManager busy={busy} run={run} />
+          )}
+
+          {activeTab === 'diarias' && (
+            <DiariasManager busy={busy} run={run} menus={menus} showToast={showToast} />
           )}
 
           {activeTab === 'avaliacoes' && (

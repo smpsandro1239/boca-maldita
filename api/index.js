@@ -659,6 +659,22 @@ var closedPeriodSchema = z.object({
   message: "A data final tem de ser igual ou posterior \xE0 data inicial.",
   path: ["endDate"]
 });
+var diariaScheduleSchema = z.object({
+  anchorDate: dateKeySchema,
+  repeat: z.enum(["none", "weekly", "biweekly", "monthly"], { message: "Repeti\xE7\xE3o inv\xE1lida." }),
+  activeFrom: dateKeySchema.optional(),
+  activeTo: z.union([dateKeySchema, z.literal(""), z.null()]).optional(),
+  lunch: z.boolean().optional().default(true),
+  dinner: z.boolean().optional().default(true),
+  itemIds: z.array(z.string().trim().min(1, "Identificador de prato inv\xE1lido.")).min(1, "Escolha pelo menos um prato para este dia.").max(4, "M\xE1ximo de 4 pratos por dia (2 carnes e 2 peixes).")
+}).strict().refine((value) => value.lunch || value.dinner, {
+  message: "Selecione pelo menos o almo\xE7o ou o jantar.",
+  path: ["lunch"]
+}).transform((value) => ({
+  ...value,
+  activeFrom: value.activeFrom || value.anchorDate,
+  activeTo: value.activeTo || null
+}));
 var adminReservationSchema = z.object({
   name: nameField,
   email: emailField,
@@ -1053,6 +1069,137 @@ function solveCheckExpression(expression) {
   return match[2] === "+" ? a + b : a - b;
 }
 
+// server/lib/diarias.ts
+var LUNCH_CUTOFF_HOUR = 16;
+var RESTAURANT_TIME_ZONE = "Europe/Lisbon";
+var lisbonFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: RESTAURANT_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  hourCycle: "h23"
+});
+function lisbonParts(now) {
+  const parts = lisbonFormatter.formatToParts(now);
+  const get = (type) => Number(parts.find((part) => part.type === type)?.value ?? "0");
+  return {
+    year: get("year"),
+    month: get("month"),
+    day: get("day"),
+    hour: get("hour")
+  };
+}
+function currentMeal(now = /* @__PURE__ */ new Date()) {
+  return lisbonParts(now).hour < LUNCH_CUTOFF_HOUR ? "lunch" : "dinner";
+}
+function parseDateKey2(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+function diffDays(from, to) {
+  return Math.round((parseDateKey2(to).getTime() - parseDateKey2(from).getTime()) / 864e5);
+}
+function todayKey(now = /* @__PURE__ */ new Date()) {
+  const { year, month, day } = lisbonParts(now);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+function scheduleAppliesOn(schedule, date) {
+  if (date < schedule.anchorDate) return false;
+  if (date < schedule.activeFrom) return false;
+  if (schedule.activeTo && date > schedule.activeTo) return false;
+  switch (schedule.repeat) {
+    case "none":
+      return date === schedule.anchorDate;
+    case "weekly":
+      return diffDays(schedule.anchorDate, date) % 7 === 0;
+    case "biweekly":
+      return diffDays(schedule.anchorDate, date) % 14 === 0;
+    case "monthly": {
+      const anchor = parseDateKey2(schedule.anchorDate);
+      const day = parseDateKey2(date);
+      return day.getDate() === anchor.getDate();
+    }
+  }
+}
+function resolveDiariasDay(schedules, menuItems, date) {
+  const byId = /* @__PURE__ */ new Map();
+  for (const item of menuItems) {
+    if (item.visible === false) continue;
+    byId.set(item.id, item);
+  }
+  const lunch = [];
+  const dinner = [];
+  const seenLunch = /* @__PURE__ */ new Set();
+  const seenDinner = /* @__PURE__ */ new Set();
+  let hasSchedule = false;
+  let lunchServed = false;
+  let dinnerServed = false;
+  for (const schedule of schedules) {
+    if (!scheduleAppliesOn(schedule, date)) continue;
+    hasSchedule = true;
+    if (schedule.lunch) lunchServed = true;
+    if (schedule.dinner) dinnerServed = true;
+    for (const id of schedule.itemIds) {
+      const item = byId.get(id);
+      if (!item) continue;
+      if (schedule.lunch && !seenLunch.has(id)) {
+        seenLunch.add(id);
+        lunch.push(item);
+      }
+      if (schedule.dinner && !seenDinner.has(id)) {
+        seenDinner.add(id);
+        dinner.push(item);
+      }
+      if (lunch.length >= 4 && dinner.length >= 4) break;
+    }
+  }
+  return {
+    lunch: lunch.slice(0, 4),
+    dinner: dinner.slice(0, 4),
+    hasSchedule,
+    servedMeals: { lunch: lunchServed, dinner: dinnerServed }
+  };
+}
+function isDiariaSchedule(value) {
+  if (!value || typeof value !== "object") return false;
+  const record = value;
+  return typeof record.id === "string" && typeof record.anchorDate === "string" && typeof record.repeat === "string" && typeof record.activeFrom === "string" && (record.activeTo === null || typeof record.activeTo === "string") && typeof record.lunch === "boolean" && typeof record.dinner === "boolean" && Array.isArray(record.itemIds);
+}
+function normalizeDiariaSchedule(value) {
+  if (!isDiariaSchedule(value)) return null;
+  const record = value;
+  return {
+    ...record,
+    activeTo: record.activeTo || null,
+    itemIds: record.itemIds.filter((id) => typeof id === "string" && id.trim().length > 0).slice(0, 4)
+  };
+}
+var DEFAULT_DIARIA_ITEM_IDS = [
+  "diaria-bife-minhota",
+  "diaria-pescada-minhota",
+  "diaria-frango-churrasco",
+  "diaria-sardinha-assada"
+];
+var SEED_ANCHOR_MONDAY = "2024-01-01";
+function buildDefaultDiariaSchedules() {
+  return [0, 1, 2, 3, 4].map((offset) => {
+    const anchorDate = /* @__PURE__ */ new Date(`${SEED_ANCHOR_MONDAY}T12:00:00Z`);
+    anchorDate.setUTCDate(anchorDate.getUTCDate() + offset);
+    const date = anchorDate.toISOString().slice(0, 10);
+    return {
+      id: `default-${date}`,
+      anchorDate: date,
+      repeat: "weekly",
+      activeFrom: date,
+      activeTo: null,
+      lunch: true,
+      dinner: false,
+      itemIds: [...DEFAULT_DIARIA_ITEM_IDS]
+    };
+  });
+}
+
 // server/lib/auth.ts
 import { randomBytes, timingSafeEqual } from "node:crypto";
 var SESSION_COOKIE = "bmtauth";
@@ -1176,6 +1323,7 @@ var MENU_ITEMS_KEY = "menu_items";
 var SITE_CONTENT_KEY = "site_content";
 var RESERVATION_PROTECTION_KEY = "reservation_protection";
 var ADMIN_TOKEN_KEY = "admin_token";
+var DIARIA_SCHEDULES_KEY = "diaria_schedules";
 var DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? "").trim() || "smpsandro1239@gmail.com";
 var RATE_WINDOW_MS = 15 * 60 * 1e3;
 var RATE_MAX_HITS = 5;
@@ -1196,6 +1344,33 @@ async function getClosedPeriodForDate(storage, date) {
     }
   }
   return null;
+}
+async function getDiariaSchedules(storage) {
+  const raw = await storage.getSetting(DIARIA_SCHEDULES_KEY);
+  if (raw === null || raw === void 0 || raw === "") return buildDefaultDiariaSchedules();
+  try {
+    const parsed = JSON.parse(raw);
+    const list = Array.isArray(parsed) ? parsed : [];
+    const out = [];
+    for (const value of list) {
+      const normalized = normalizeDiariaSchedule(value);
+      if (normalized) out.push(normalized);
+    }
+    return out;
+  } catch {
+    return buildDefaultDiariaSchedules();
+  }
+}
+async function saveDiariaSchedules(storage, schedules) {
+  await storage.setSetting(DIARIA_SCHEDULES_KEY, JSON.stringify(schedules));
+}
+async function getMenuItemsForApi(storage) {
+  const raw = await storage.getSetting(MENU_ITEMS_KEY);
+  const items = raw ? parseStoredJson(raw).items : null;
+  if (!Array.isArray(items)) return [];
+  return items.filter(
+    (item) => !!item && typeof item === "object" && typeof item.id === "string"
+  ).map((item) => ({ id: item.id, visible: item.visible }));
 }
 var DEFAULT_RESERVATION_PROTECTION = {
   enabled: false,
@@ -1548,6 +1723,26 @@ async function createApp() {
       next(err);
     }
   });
+  app.get("/api/diarias", async (req, res, next) => {
+    try {
+      const queryDate = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayKey();
+      const schedules = await getDiariaSchedules(storage);
+      const menuItems = await getMenuItemsForApi(storage);
+      const resolved = resolveDiariasDay(schedules, menuItems, queryDate);
+      const closed = await getClosedPeriodForDate(storage, queryDate);
+      res.json({
+        date: queryDate,
+        currentMeal: closed ? "closed" : currentMeal(),
+        lunch: resolved.lunch,
+        dinner: resolved.dinner,
+        hasSchedule: resolved.hasSchedule,
+        servedMeals: resolved.servedMeals,
+        closedTitle: closed?.title ?? null
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
   app.get("/api/admin/menus", async (_req, res, next) => {
     try {
       const raw = await storage.getSetting(MENU_ITEMS_KEY);
@@ -1577,6 +1772,84 @@ async function createApp() {
     try {
       if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
       await storage.deleteSetting(MENU_ITEMS_KEY);
+      res.json({ ok: true });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.get("/api/admin/diarias", async (req, res, next) => {
+    try {
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
+      res.json({ schedules: await getDiariaSchedules(storage) });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.post("/api/admin/diarias", async (req, res, next) => {
+    try {
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
+      const parsed = diariaScheduleSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const schedules = await getDiariaSchedules(storage);
+      const schedule = {
+        id: `diaria_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        anchorDate: parsed.data.anchorDate,
+        repeat: parsed.data.repeat,
+        activeFrom: parsed.data.activeFrom,
+        activeTo: parsed.data.activeTo,
+        lunch: parsed.data.lunch,
+        dinner: parsed.data.dinner,
+        itemIds: parsed.data.itemIds.slice(0, 4)
+      };
+      schedules.push(schedule);
+      await saveDiariaSchedules(storage, schedules);
+      res.json({ ok: true, schedule });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.put("/api/admin/diarias/:id", async (req, res, next) => {
+    try {
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
+      const parsed = diariaScheduleSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.issues[0].message });
+      }
+      const id = String(req.params.id ?? "");
+      const schedules = await getDiariaSchedules(storage);
+      const index = schedules.findIndex((s) => s.id === id);
+      if (index === -1) {
+        return res.status(404).json({ error: "Agendamento n\xE3o encontrado." });
+      }
+      const schedule = {
+        id,
+        anchorDate: parsed.data.anchorDate,
+        repeat: parsed.data.repeat,
+        activeFrom: parsed.data.activeFrom,
+        activeTo: parsed.data.activeTo,
+        lunch: parsed.data.lunch,
+        dinner: parsed.data.dinner,
+        itemIds: parsed.data.itemIds.slice(0, 4)
+      };
+      schedules[index] = schedule;
+      await saveDiariaSchedules(storage, schedules);
+      res.json({ ok: true, schedule });
+    } catch (err) {
+      next(err);
+    }
+  });
+  app.delete("/api/admin/diarias/:id", async (req, res, next) => {
+    try {
+      if (!await requireAdmin(req, res, storage, () => getEffectiveAdminToken(storage), { requireCsrf: req.method !== "GET" })) return;
+      const id = String(req.params.id ?? "");
+      const schedules = await getDiariaSchedules(storage);
+      const filtered = schedules.filter((s) => s.id !== id);
+      if (filtered.length === schedules.length) {
+        return res.status(404).json({ error: "Agendamento n\xE3o encontrado." });
+      }
+      await saveDiariaSchedules(storage, filtered);
       res.json({ ok: true });
     } catch (err) {
       next(err);
