@@ -249,6 +249,7 @@ export const menuItemSchema = z
     producer: z.string().trim().max(200).optional().default(''),
     vintage: z.string().trim().max(80).optional().default(''),
     isChefSpecial: z.boolean().optional().default(false),
+    dailyKind: z.enum(['carne', 'peixe']).optional(),
     visible: z.boolean().optional().default(true),
     order: z.number().int().min(0).optional(),
   })

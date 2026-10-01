@@ -1,5 +1,8 @@
 import { MenuCategory } from './data/menuCategories';
 
+/** Para os itens da categoria 'diarias': se o prato do dia é carne ou peixe. */
+export type DailyKind = 'carne' | 'peixe';
+
 export type ScreenType = 
   | 'inicio' 
   | 'o-restaurante' 
@@ -40,6 +43,7 @@ export interface MenuItem {
   producer?: string;
   vintage?: string;
   isChefSpecial?: boolean;
+  dailyKind?: DailyKind;
   visible?: boolean;
   order?: number;
 }

@@ -145,6 +145,7 @@ export function saveAdminAssets(overrides: AssetOverride[]): Promise<{ ok: boole
 export function resetAdminAssets(): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/assets', {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 
@@ -198,6 +199,7 @@ export function saveAdminReservationProtection(config: ReservationProtectionConf
 export function deleteAdminReservation(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/reservations/${id}`, {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 
@@ -224,6 +226,7 @@ export function getAdminContacts(): Promise<{ items: ContactAdminRow[] }> {
 export function deleteAdminContact(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/contacts/${id}`, {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 
@@ -234,6 +237,7 @@ export function getAdminNewsletter(): Promise<{ items: NewsletterAdminRow[] }> {
 export function deleteAdminNewsletter(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/newsletter/${id}`, {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 
@@ -260,6 +264,7 @@ export function setAdminReviewStatus(id: number, status: ReviewStatus): Promise<
 export function deleteAdminReview(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/reviews/${id}`, {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 
@@ -286,6 +291,7 @@ export function createAdminClosedDay(input: ClosedPeriodInput): Promise<{ id: nu
 export function deleteAdminClosedDay(id: number): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/closed-days/${id}`, {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 
@@ -316,6 +322,7 @@ export function updateAdminDiaria(id: string, input: DiariaScheduleInput): Promi
 export function deleteAdminDiaria(id: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(`/admin/diarias/${encodeURIComponent(id)}`, {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 

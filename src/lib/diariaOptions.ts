@@ -3,21 +3,28 @@ import type { MenuItem } from '../types';
 export type DiariaSlotKind = 'meat' | 'fish';
 
 /**
- * Os ids guardados num agendamento têm de aparecer nas opcoes do editor, senao
+ * Os ids guardados num agendamento tem de aparecer nas opcoes do editor, senao
  * o <select> cai no placeholder e faz o utilizador jurar que o agendamento esta vazio.
- * As diarias (category 'diarias') contam como prato de carne e de peixe.
+ *
+ * As diarias (category 'diarias') entram pelo campo dailyKind, para nunca aparecerem
+ * nos dois lados ao mesmo tempo. Sem dailyKind definido, entram nos dois: e preferivel
+ * um prato duplicado a um prato que desaparece do editor.
  */
-const SLOT_CATEGORIES: Record<DiariaSlotKind, Set<string>> = {
-  meat: new Set(['carnes', 'diarias']),
-  fish: new Set(['mar', 'diarias']),
-};
+function matchesSlot(item: MenuItem, kind: DiariaSlotKind): boolean {
+  if (item.category === 'diarias') {
+    if (item.dailyKind === 'carne') return kind === 'meat';
+    if (item.dailyKind === 'peixe') return kind === 'fish';
+    return true;
+  }
+  if (kind === 'meat') return item.category === 'carnes';
+  return item.category === 'mar';
+}
 
 export function buildDiariaOptions(items: MenuItem[], kind: DiariaSlotKind): MenuItem[] {
-  const allowed = SLOT_CATEGORIES[kind];
   const seen = new Set<string>();
   const out: MenuItem[] = [];
   for (const item of items) {
-    if (!allowed.has(item.category)) continue;
+    if (!matchesSlot(item, kind)) continue;
     if (seen.has(item.id)) continue;
     seen.add(item.id);
     out.push(item);

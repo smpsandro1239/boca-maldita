@@ -86,6 +86,22 @@ describe('menuItemSchema', () => {
     expect(result.data?.vintage).toBe('2020');
   });
 
+  it('keeps dailyKind on daily items so publishing the menu does not drop it', () => {
+    const result = menuItemSchema.safeParse({
+      ...base,
+      category: 'diarias',
+      name: 'Pescada à Minhota',
+      dailyKind: 'peixe',
+    });
+    expect(result.success).toBe(true);
+    expect(result.data?.dailyKind).toBe('peixe');
+  });
+
+  it('rejects an unknown dailyKind', () => {
+    const result = menuItemSchema.safeParse({ ...base, category: 'diarias', dailyKind: 'frango' });
+    expect(result.success).toBe(false);
+  });
+
   it('rejects relative image urls', () => {
     const result = menuItemSchema.safeParse({ ...base, imageUrl: '/images/prato.jpg' });
     expect(result.success).toBe(false);

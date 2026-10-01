@@ -2116,7 +2116,15 @@ interface MenuItemEditorProps {
   onSave: () => void;
 }
 
-const ITEM_FIELDS: { key: keyof MenuItem; label: string; type: string; desc?: string }[] = [
+interface ItemField {
+  key: keyof MenuItem;
+  label: string;
+  type: string;
+  desc?: string;
+  options?: { value: string; label: string }[];
+}
+
+const ITEM_FIELDS: ItemField[] = [
   { key: 'name', label: 'Nome do prato', type: 'text', desc: 'Como aparece no menu do site.' },
   { key: 'price', label: 'Preço', type: 'number', desc: 'Em euros (ex.: 14.90). Não é usado se este item for um "Menu do Dia" com preço incluído.' },
   { key: 'badge', label: 'Distintivo (ex.: "Recomendado")', type: 'text', desc: 'Rótulo pequeno sobre a foto. Ex.: "Dry-Aged 60D", "Diária · Carne".' },
@@ -2128,7 +2136,13 @@ const ITEM_FIELDS: { key: keyof MenuItem; label: string; type: string; desc?: st
   { key: 'pairingWine', label: 'Sugestão de vinho', type: 'text', desc: 'Vinho recomendado, aparece no card e no detalhe.' },
 ];
 
-function itemFieldsFor(category: MenuItem['category']): { key: keyof MenuItem; label: string; type: string; desc?: string }[] {
+function itemFieldsFor(category: MenuItem['category']): ItemField[] {
+  if (category === 'diarias') {
+    return [
+      { key: 'dailyKind', label: 'É carne ou peixe?', type: 'select', options: [{ value: '', label: '— não definido —' }, { value: 'carne', label: 'Carne' }, { value: 'peixe', label: 'Peixe' }], desc: 'Define em que lista aparece no agendamento das Diárias: "2 Carnes" ou "2 Peixes".' },
+      ...ITEM_FIELDS,
+    ];
+  }
   if (category !== 'vinhos') return ITEM_FIELDS;
   const wineFields: { key: keyof MenuItem; label: string; type: string }[] = [
     { key: 'producer', label: 'Produtor', type: 'text' },
@@ -2158,15 +2172,29 @@ function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProp
           {itemFieldsFor(item.category).map((field) => (
             <div key={field.key as string}>
               <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">{field.label}</label>
-              <input
-                type={field.type}
-                value={String(item[field.key] ?? '')}
-                onChange={(e) => {
-                  const value = field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value;
-                  onChange({ ...item, [field.key]: value as never });
-                }}
-                className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
-              />
+              {field.options ? (
+                <select
+                  value={String(item[field.key] ?? '')}
+                  onChange={(e) => onChange({ ...item, [field.key]: e.target.value as never })}
+                  className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+                >
+                  {field.options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type={field.type}
+                  value={String(item[field.key] ?? '')}
+                  onChange={(e) => {
+                    const value = field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value;
+                    onChange({ ...item, [field.key]: value as never });
+                  }}
+                  className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
+                />
+              )}
               {field.desc ? <p className="text-[10px] text-[#F7F5F0]/40 mt-1">{field.desc}</p> : null}
             </div>
           ))}
