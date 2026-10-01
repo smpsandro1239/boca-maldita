@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
-import { createApp, type AppInstance } from '../api/lib/app';
+import { createApp, type AppInstance } from '../server/lib/app';
 
 // ----- Silenciar DEP0169 (url.parse) -----
 // O runtime/dependências emitem um DeprecationWarning de url.parse() em cada

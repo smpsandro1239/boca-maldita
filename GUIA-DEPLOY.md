@@ -50,7 +50,7 @@ Removidos com `npx vercel rm <url> --yes` (deployments de produção não-atuais
 
 - **Produção:** Turso (`TURSO_URL` + `TURSO_AUTH_TOKEN`, injectados pelo Vercel em runtime;
   `.env` local contém os mesmos para desenvolvimento).
-- Decisão de ligação em `api/lib/storage.ts`: se `TURSO_URL`+token → Turso; senão, se não `VERCEL`
+- Decisão de ligação em `server/lib/storage.ts`: se `TURSO_URL`+token → Turso; senão, se não `VERCEL`
   → SQLite local (`DB_PATH`, default `data/boca-maldita.db`); senão memória.
 - Devido ao `dotenv/config` no arranque da API: **qualquer smoke que levante a API localmente
   tem de forçar `TURSO_URL=""` e `TURSO_AUTH_TOKEN=""` no ambiente do processo filho** — o dotenv

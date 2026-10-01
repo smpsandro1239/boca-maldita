@@ -1,12 +1,12 @@
 /* gerado por scripts/build-api.mjs — não editar manualmente */
 
-// api/lib/app.ts
+// server/lib/app.ts
 import "dotenv/config";
 import express from "express";
 import { existsSync } from "node:fs";
 import path2 from "node:path";
 
-// api/lib/storage.ts
+// server/lib/storage.ts
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 var TABLE_SCHEMA = `
@@ -596,7 +596,7 @@ async function createStorage() {
   }
 }
 
-// api/lib/validation.ts
+// server/lib/validation.ts
 import { z } from "zod";
 var AVAILABLE_TIMES = [
   "12:30",
@@ -758,7 +758,7 @@ var siteContentSchema = z.object({
 }).strict();
 var idParamSchema = z.coerce.number().int().positive();
 
-// api/lib/email.ts
+// server/lib/email.ts
 function escapeHtml(value) {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
@@ -990,7 +990,7 @@ async function sendClosedDayConflictEmail(payload) {
   }
 }
 
-// api/lib/blockedDates.ts
+// server/lib/blockedDates.ts
 function parseDateKey(key) {
   const [year, month, day] = key.split("-").map(Number);
   return { year, month, day };
@@ -1023,7 +1023,7 @@ function isDateBlocked(date, period) {
   return date >= period.start_date && date <= end;
 }
 
-// api/lib/closedPeriodConflicts.ts
+// server/lib/closedPeriodConflicts.ts
 function reservationDateKey(date) {
   return String(date).split(/[T ]/)[0] || String(date);
 }
@@ -1043,7 +1043,7 @@ function findClosedPeriodConflicts(reservations, period) {
   return { total: rows.length, rows, dates };
 }
 
-// api/lib/checkExpression.ts
+// server/lib/checkExpression.ts
 function solveCheckExpression(expression) {
   const match = /^\s*(\d{1,3})\s*([+-])\s*(\d{1,3})\s*$/.exec(expression);
   if (!match) return null;
@@ -1053,7 +1053,7 @@ function solveCheckExpression(expression) {
   return match[2] === "+" ? a + b : a - b;
 }
 
-// api/lib/auth.ts
+// server/lib/auth.ts
 import { randomBytes, timingSafeEqual } from "node:crypto";
 var SESSION_COOKIE = "bmtauth";
 var CSRF_COOKIE = "bmcsrf";
@@ -1165,7 +1165,7 @@ async function requireAdmin(req, res, store, getEffectiveToken, opts) {
   return null;
 }
 
-// api/lib/app.ts
+// server/lib/app.ts
 var distDir = "";
 if (!process.env.VERCEL) {
   distDir = path2.resolve(process.cwd(), "dist");

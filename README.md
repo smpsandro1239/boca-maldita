@@ -76,7 +76,7 @@ Pré-requisitos: Node.js >= 20.
 
 ```
 api/index.js   # Função serverless (Vercel) — gerada por scripts/build-api.mjs (não editar)
-api/lib/        # Backend Express + armazenamento (partilhado com o servidor local)
+server/lib/     # Backend Express + armazenamento (partilhado com o servidor local)
   app.ts       # Fábrica da aplicação (rotas, admin, email) — usada em local e Vercel
   storage.ts   # Camada de dados: SQLite local ou Turso (automático por variáveis)
   email.ts     # Envio de confirmações de reserva (SMTP, opcional)
