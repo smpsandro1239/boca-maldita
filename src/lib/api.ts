@@ -163,6 +163,7 @@ export function saveAdminMenus(items: MenuItem[]): Promise<{ ok: boolean }> {
 export function resetAdminMenus(): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>('/admin/menus', {
     method: 'DELETE',
+    headers: mutationHeaders(),
   });
 }
 

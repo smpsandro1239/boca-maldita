@@ -8,6 +8,7 @@ import {
   updateAdminDiaria,
 } from '../lib/api';
 import { MENU_ITEMS } from '../data/menuData';
+import { buildDiariaOptionsWithCurrent } from '../lib/diariaOptions';
 
 const DIARIA_REPEAT_LABELS: Record<DiariaRepeat, string> = {
   none: 'Só este dia',
@@ -79,8 +80,7 @@ export default function DiariasManager({ busy, run, menus, showToast }: DiariasM
     return byId;
   }, [menus]);
 
-  const meatOptions = useMemo(() => [...allItems.values()].filter((i) => i.category === 'carnes'), [allItems]);
-  const fishOptions = useMemo(() => [...allItems.values()].filter((i) => i.category === 'mar'), [allItems]);
+  const optionItems = useMemo(() => [...allItems.values()], [allItems]);
 
   const [schedules, setSchedules] = useState<DiariaSchedule[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -101,6 +101,16 @@ export default function DiariasManager({ busy, run, menus, showToast }: DiariasM
   const [modelId, setModelId] = useState('');
   const [copyTarget, setCopyTarget] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+
+  const currentSlotIds = useMemo(() => slotItems.filter(Boolean), [slotItems]);
+  const meatOptions = useMemo(
+    () => buildDiariaOptionsWithCurrent(optionItems, 'meat', currentSlotIds),
+    [optionItems, currentSlotIds],
+  );
+  const fishOptions = useMemo(
+    () => buildDiariaOptionsWithCurrent(optionItems, 'fish', currentSlotIds),
+    [optionItems, currentSlotIds],
+  );
 
   const reload = async () => {
     try {
