@@ -106,6 +106,38 @@ export const DEFAULT_IMAGE_ASSETS: ImageAsset[] = [
     alt: 'Gambão tigre grelhado na brasa'
   },
   {
+    id: 'dish-diaria-bife',
+    name: 'Bife à Minhota',
+    category: 'diarias',
+    url: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d7/Ribeye_steak%2C_chips%2C_b%C3%A9arnaise_sauce.jpg/1920px-Ribeye_steak%2C_chips%2C_b%C3%A9arnaise_sauce.jpg',
+    description: 'Bife grelhado com batatas fritas, fotografado em prato escuro — CC0 via Wikimedia Commons',
+    alt: 'Bife à Minhota grelhado com batatas fritas'
+  },
+  {
+    id: 'dish-diaria-frango',
+    name: 'Frango de Churrasco',
+    category: 'diarias',
+    url: 'https://pd.w.org/2025/07/85268892458144ee8.41252455-2048x1152.jpg',
+    description: 'Pedaços de frango marinado a grelhar sobre carvão em brasa — CC0 via Wikimedia Commons',
+    alt: 'Frango de churrasco a grelhar sobre carvão'
+  },
+  {
+    id: 'dish-diaria-pescada',
+    name: 'Pescada à Minhota',
+    category: 'diarias',
+    url: 'https://pd.w.org/2026/06/616a2a4d9f9f52c6.92313291-1536x2048.jpg',
+    description: 'Peixe branco grelhado com molho cremoso, batata e limão em prato escuro — CC0 via Wikimedia Commons',
+    alt: 'Pescada grelhada com molho cremoso e batata'
+  },
+  {
+    id: 'dish-diaria-sardinha',
+    name: 'Sardinha Assada',
+    category: 'diarias',
+    url: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a3/Sardinas_Plancha_-_Casa_Don_Carlos_2025-10-01.jpg/1920px-Sardinas_Plancha_-_Casa_Don_Carlos_2025-10-01.jpg',
+    description: 'Sardinhas assadas da plancha com limão, servidas em prato — CC0 via Wikimedia Commons',
+    alt: 'Sardinhas assadas com limão'
+  },
+  {
     id: 'map-location',
     name: 'Mapa Localização Vila de Prado',
     category: 'mapa',

@@ -14,7 +14,7 @@ export type LegalDoc = 'privacidade' | 'termos' | 'livro';
 export interface ImageAsset {
   id: string;
   name: string;
-  category: 'logo' | 'hero' | 'ambiente' | 'carnes' | 'mar' | 'entradas' | 'mapa' | 'pessoas';
+  category: 'logo' | 'hero' | 'ambiente' | 'carnes' | 'mar' | 'entradas' | 'diarias' | 'mapa' | 'pessoas';
   url: string;
   description: string;
   alt: string;
@@ -169,6 +169,11 @@ export interface ClosedPeriodInput {
   endDate?: string;
   repeat: ClosedPeriodRepeat;
   note?: string;
+}
+
+export interface ClosedDayConflictDates {
+  total: number;
+  dates: { date: string; count: number }[];
 }
 
 export interface PublicClosedPeriod {

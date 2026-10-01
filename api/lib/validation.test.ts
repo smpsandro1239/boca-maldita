@@ -97,7 +97,7 @@ describe('menuItemSchema', () => {
   });
 
   it('rejects an invalid category', () => {
-    const result = menuItemSchema.safeParse({ ...base, category: 'bebidas' });
+    const result = menuItemSchema.safeParse({ ...base, category: 'sushi' });
     expect(result.success).toBe(false);
   });
 });

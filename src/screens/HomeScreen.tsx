@@ -5,6 +5,7 @@ import AssetImage from '../components/AssetImage';
 import { createReservation, createReview, getReservationConfig, getReviews } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
 import { GMAPS_URL } from '../data/contact';
+import { MENU_ITEMS } from '../data/menuData';
 import { 
   Play, 
   Flame, 
@@ -80,6 +81,11 @@ export default function HomeScreen({
   const featuredDishes = activeMenuTab === 'carnes'
     ? menuItems.filter(i => i.category === 'carnes').slice(0, 4)
     : menuItems.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
+
+  const diariasDishes = (() => {
+    const fromSite = menuItems.filter(i => i.category === 'diarias');
+    return fromSite.length > 0 ? fromSite.slice(0, 4) : MENU_ITEMS.filter(i => i.category === 'diarias').slice(0, 4);
+  })();
 
   const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
@@ -538,6 +544,108 @@ export default function HomeScreen({
               className="inline-flex items-center gap-2 text-[#F7F5F0] hover:text-[#D4A373] text-xs uppercase tracking-[0.2em] font-sans font-semibold transition-colors group"
             >
               <span>Consultar Carta de Vinhos e Menu Completo</span>
+              <ArrowRight className="w-4 h-4 text-[#D4A373] group-hover:translate-x-1.5 transition-transform" />
+            </button>
+          </div>
+
+        </div>
+      </section>
+
+      {/* ================= DIÁRIAS · PRATO DO DIA ================= */}
+      <section className="w-full py-20 lg:py-24 bg-[#141518] border-b border-[#282A30]" id="diarias">
+        <div className="max-w-7xl mx-auto px-5 lg:px-12">
+
+          {/* Section Header */}
+          <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
+            <div className="flex items-center justify-center gap-3">
+              <span className="h-[1.5px] w-10 bg-[#D4A373]"></span>
+              <span className="text-xs uppercase tracking-[0.25em] text-[#D4A373] font-sans font-semibold">
+                Diárias · Prato do Dia
+              </span>
+              <span className="h-[1.5px] w-10 bg-[#D4A373]"></span>
+            </div>
+            <h2 className="font-serif text-3xl sm:text-4xl text-[#F7F5F0]">
+              Dois de Carne, Dois de Peixe — Todos os Dias
+            </h2>
+            <p className="text-sm sm:text-base text-[#A6A8AD] leading-relaxed">
+              O conforto da cozinha minhota na brasa de azinho, a um preço justo para o almoço e o jantar.
+            </p>
+          </div>
+
+          {/* What's included strip */}
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 bg-[#0C0D0E] border border-[#282A30] px-6 py-4 mb-10">
+            {['Prato do dia', 'Pão', 'Bebida', 'Sobremesa', 'Café'].map((item) => (
+              <span key={item} className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-mono text-[#F7F5F0]/60">
+                <Check className="w-3 h-3 text-[#D4A373]" />
+                {item}
+              </span>
+            ))}
+            <span className="text-[10px] uppercase tracking-widest font-mono text-[#D4A373]">
+              Um menu completo pelo mesmo preço
+            </span>
+          </div>
+
+          {/* Daily Dishes Grid */}
+          {diariasDishes.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {diariasDishes.map(dish => (
+                <div
+                  key={dish.id}
+                  onClick={() => onSelectDish(dish)}
+                  className="bg-[#0C0D0E] border border-[#282A30] flex flex-col justify-between group overflow-hidden shadow-lg hover:border-[#D4A373]/60 cursor-pointer transition-all duration-300"
+                >
+                  <div>
+                    <div className="h-60 overflow-hidden relative bg-[#0C0D0E]">
+                      {dish.imageUrl ? (
+                        <AssetImage
+                          src={dish.imageUrl}
+                          alt={dish.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : null}
+                      {dish.badge && (
+                        <span className="absolute top-3 right-3 bg-[#0C0D0E]/90 text-[#D4A373] text-[10px] px-2.5 py-1 uppercase tracking-wider font-mono border border-[#D4A373]/30">
+                          {dish.badge}
+                        </span>
+                      )}
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="bg-[#D4A373] text-[#0C0D0E] text-[11px] font-sans uppercase tracking-widest px-3 py-1 font-semibold">
+                          Ver Menu do Dia
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-5 space-y-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <h3 className="font-serif text-lg text-[#F7F5F0] group-hover:text-[#D4A373] transition-colors">
+                          {dish.name}
+                        </h3>
+                        <span className="font-serif text-lg text-[#D4A373] font-semibold shrink-0">
+                          {dish.currency}{dish.price.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-[#A6A8AD] line-clamp-3 leading-relaxed">
+                        {dish.description}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="px-5 pb-5 pt-2 flex items-center justify-between border-t border-[#282A30]/50 text-[10px] text-[#686B73] uppercase tracking-widest">
+                    <span>Menu completo incluído</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-[#D4A373] opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Daily Menu Navigation Action */}
+          <div className="mt-14 text-center">
+            <button
+              onClick={() => onNavigate('menu-carnes')}
+              className="inline-flex items-center gap-2 text-[#F7F5F0] hover:text-[#D4A373] text-xs uppercase tracking-[0.2em] font-sans font-semibold transition-colors group"
+            >
+              <span>Ver todas as Diárias e a Carta Completa</span>
               <ArrowRight className="w-4 h-4 text-[#D4A373] group-hover:translate-x-1.5 transition-transform" />
             </button>
           </div>

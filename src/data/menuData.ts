@@ -2,6 +2,66 @@ import { MenuItem } from '../types';
 import { getAssetUrl } from './assets';
 
 export const MENU_ITEMS: MenuItem[] = [
+  // Diárias · Prato do Dia (com direito a prato, pão, bebida, sobremesa e café)
+  {
+    id: 'diaria-bife-minhota',
+    name: 'Bife à Minhota do Dia',
+    price: 14.9,
+    currency: '€',
+    category: 'diarias',
+    badge: 'Diária · Carne',
+    tagline: 'Menu do Dia Completo',
+    description: 'Bife de vaca grelhado na brasa de azinho com molho da casa, arroz de pimentos, batatas fritas e grelos salteados. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    imageUrl: getAssetUrl('dish-diaria-bife'),
+    servesCount: 'Menu do Dia',
+    origin: 'Vaca Minhota',
+    pairingWine: 'Copo de Vinho da Casa (incluído)',
+    isChefSpecial: true
+  },
+  {
+    id: 'diaria-frango-churrasco',
+    name: 'Frango no Churrasco',
+    price: 12.5,
+    currency: '€',
+    category: 'diarias',
+    badge: 'Diária · Carne',
+    tagline: 'Assado Lentamente',
+    description: 'Frango do campo assado no churrasco com pimentão e orégão, acompanhado de batata assada, esparregado e salada fresca. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    imageUrl: getAssetUrl('dish-diaria-frango'),
+    servesCount: 'Menu do Dia',
+    origin: 'Frango do Campo',
+    pairingWine: 'Copo de Vinho da Casa (incluído)'
+  },
+  {
+    id: 'diaria-pescada-minhota',
+    name: 'Pescada à Minhota',
+    price: 15.5,
+    currency: '€',
+    category: 'diarias',
+    badge: 'Diária · Peixe',
+    tagline: 'Receita de Família',
+    description: 'Pescada fresca do dia cozida com batata às rodelas, ovo escalfado e molho de azeite da horta com coentros. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    imageUrl: getAssetUrl('dish-diaria-pescada'),
+    servesCount: 'Menu do Dia',
+    origin: 'Pescado do Dia',
+    pairingWine: 'Copo de Vinho da Casa (incluído)',
+    isChefSpecial: true
+  },
+  {
+    id: 'diaria-sardinha-assada',
+    name: 'Sardinha Assada na Brasa',
+    price: 11.9,
+    currency: '€',
+    category: 'diarias',
+    badge: 'Diária · Peixe',
+    tagline: 'Brasa de Azinho',
+    description: 'Sardinhas do Atlântico assadas em brasa de azinho com pimento assado, batata cozida e broa de milho minhota. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    imageUrl: getAssetUrl('dish-diaria-sardinha'),
+    servesCount: 'Menu do Dia',
+    origin: 'Atlântico (Pescado do Dia)',
+    pairingWine: 'Copo de Vinho da Casa (incluído)'
+  },
+
   // Carnes Nobres
   {
     id: 'tomahawk-maturado',
@@ -275,5 +335,66 @@ export const MENU_ITEMS: MenuItem[] = [
     imageUrl: '',
     origin: 'Terras de Lisboa DOC',
     pairingWine: 'Pinot Noir'
+  },
+
+  // Bebidas & Refrescos
+  {
+    id: 'agua-mineral',
+    name: 'Água Mineral (garrafa 50cl)',
+    price: 1.8,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Sem Álcool',
+    tagline: 'Natural ou Com Gás',
+    description: 'Água mineral natural ou com gás, servida bem fresca.',
+    imageUrl: '',
+    servesCount: '50cl'
+  },
+  {
+    id: 'refrigerantes',
+    name: 'Refrigerantes (Coca-Cola, Ice Tea, Sumol)',
+    price: 2.5,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Sem Álcool',
+    description: 'Coca-Cola, Coca-Cola Zero, Ice Tea de limão ou Sumol de laranja.',
+    imageUrl: '',
+    servesCount: '33cl'
+  },
+  {
+    id: 'sumo-natural-laranja',
+    name: 'Sumo Natural de Laranja',
+    price: 3.5,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Sem Álcool',
+    tagline: 'Esprimido na Hora',
+    description: 'Laranjas espremidas na hora, sem adição de açúcar.',
+    imageUrl: '',
+    servesCount: '40cl'
+  },
+  {
+    id: 'copo-vinho-casa',
+    name: 'Copo de Vinho da Casa (Tinto ou Branco)',
+    price: 4.5,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Da Casa',
+    tagline: 'Vinho Verde ou Douro',
+    description: 'Um copo de 150cl de vinho verde loureiro (branco) ou um tinto Douro da casa.',
+    imageUrl: '',
+    servesCount: '150cl'
+  },
+  {
+    id: 'cafe-expresso',
+    name: 'Café Expresso',
+    price: 1.5,
+    currency: '€',
+    category: 'bebidas',
+    badge: 'Sem Álcool',
+    tagline: 'Torra da Casa',
+    description: 'Expresso de torra portuguesa com grão de origem selecionada.',
+    imageUrl: '',
+    servesCount: 'Individual'
   }
 ];

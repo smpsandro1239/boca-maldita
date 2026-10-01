@@ -1,4 +1,4 @@
-import type { AssetOverride, ClosedPeriod, ClosedPeriodInput, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
+import type { AssetOverride, ClosedDayConflictDates, ClosedPeriod, ClosedPeriodInput, ContactAdminRow, MenuItem, NewsletterAdminRow, PublicReservationConfig, ReservationAdminRow, ReservationEditorData, ReservationProtectionConfig, ReviewAdminRow, ReviewInput, ReviewStatus, SiteContent } from '../types';
 
 export class HttpError extends Error {
   constructor(
@@ -274,8 +274,8 @@ export function getAdminClosedDays(): Promise<{ items: ClosedPeriod[] }> {
   return request<{ items: ClosedPeriod[] }>('/admin/closed-days');
 }
 
-export function createAdminClosedDay(input: ClosedPeriodInput): Promise<{ id: number }> {
-  return request<{ id: number }>('/admin/closed-days', {
+export function createAdminClosedDay(input: ClosedPeriodInput): Promise<{ id: number; conflicts: ClosedDayConflictDates }> {
+  return request<{ id: number; conflicts: ClosedDayConflictDates }>('/admin/closed-days', {
     method: 'POST',
     headers: mutationHeaders(),
     body: JSON.stringify(input),

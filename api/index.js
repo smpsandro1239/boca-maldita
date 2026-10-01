@@ -713,7 +713,7 @@ var imageAssetOverrideSchema = z.object({
 var assetOverridesSchema = z.object({
   overrides: z.array(imageAssetOverrideSchema).max(200, "Demasiadas substitui\xE7\xF5es.")
 }).strict();
-var MENU_CATEGORIES = ["carnes", "mar", "entradas", "acompanhamentos", "sobremesas", "vinhos"];
+var MENU_CATEGORIES = ["diarias", "carnes", "mar", "entradas", "acompanhamentos", "sobremesas", "vinhos", "bebidas"];
 var imageField = z.string().trim().max(2e3, "O link da imagem \xE9 demasiado longo.").optional().default("").refine((value) => value === "" || /^https?:\/\//i.test(value), "O link da imagem tem de come\xE7ar por http:// ou https://.");
 var menuItemSchema = z.object({
   id: z.string().trim().min(1, "O identificador \xE9 obrigat\xF3rio.").max(80),
@@ -940,6 +940,108 @@ async function sendReservationAdminNotification(payload) {
     return false;
   }
 }
+var REPEAT_LABELS_EMAIL = {
+  none: "Data \xFAnica",
+  weekly: "Repete todas as semanas",
+  yearly: "Repete todos os anos"
+};
+function buildClosedDayConflictHtml(payload) {
+  const rowsHtml = payload.rows.map(
+    (row) => `      <tr><td style="padding:8px 0;color:#A6A8AD;">${escapeHtml(row.date)}</td><td style="padding:8px 0;color:#F7F5F0;font-family:monospace;">${escapeHtml(row.reference)}</td><td style="padding:8px 0;color:#F7F5F0;">${escapeHtml(row.name)}</td><td style="padding:8px 0;color:#F7F5F0;">${escapeHtml(row.time)}</td><td style="padding:8px 0;color:#F7F5F0;">${escapeHtml(row.guests)}</td></tr>`
+  ).join("\n");
+  return [
+    `<div style="font-family:Georgia,serif;background:#0C0D0E;padding:32px 16px;color:#F7F5F0;">`,
+    `  <div style="max-width:560px;margin:0 auto;border:1px solid #7C2D12;background:#1C1917;padding:32px;">`,
+    `    <p style="font-family:monospace;letter-spacing:0.2em;color:#FB923C;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita \xB7 Alerta de Conflito</p>`,
+    `    <h1 style="font-size:24px;margin:0 0 12px;">\u26A0 Marcou um dia fechado com reservas ativas</h1>`,
+    `    <p style="color:#A6A8AD;margin:0 0 20px;font-size:14px;line-height:1.6;">Marcou o per\xEDodo <strong style="color:#F7F5F0;">\u201C${escapeHtml(payload.title)}\u201D</strong> como fechado, mas existem <strong style="color:#FB923C;">${payload.total} reserva${payload.total === 1 ? "" : "s"}</strong> nesse per\xEDodo. Confirme no painel de administra\xE7\xE3o se deseja contactar estas pessoas ou ajustar a data.</p>`,
+    `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:13px;">`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;width:38%;">Per\xEDodo</td><td style="padding:8px 0;">${escapeHtml(payload.startDate)}${payload.endDate ? ` \u2192 ${escapeHtml(payload.endDate)}` : ""}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Repeti\xE7\xE3o</td><td style="padding:8px 0;">${escapeHtml(REPEAT_LABELS_EMAIL[payload.repeat] ?? payload.repeat)}</td></tr>`,
+    `    </table>`,
+    `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:13px;margin-top:8px;border-top:1px solid #282A30;">`,
+    `      <thead><tr><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Data</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Ref.</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Nome</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Hora</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Pessoas</td></tr></thead>`,
+    `      <tbody>`,
+    rowsHtml,
+    `      </tbody>`,
+    `    </table>`,
+    `    <p style="color:#A6A8AD;font-size:13px;margin:24px 0 0;">As reservas online nesse(s) dia(s) ficaram bloqueadas a partir de agora. Este alerta n\xE3o bloqueia reservas j\xE1 registadas \u2014 resolva cada caso no separador Reservas.</p>`,
+    `  </div>`,
+    `</div>`
+  ].join("\n");
+}
+async function sendClosedDayConflictEmail(payload) {
+  const transporter = await getTransporter();
+  if (!transporter) {
+    console.warn("[email] SMTP n\xE3o configurado \u2014 alerta de conflito n\xE3o enviado.");
+    return false;
+  }
+  try {
+    await transporter.sendMail({
+      from: (process.env.MAIL_FROM ?? "").trim() || "Boca Maldita <smpsandro1239@gmail.com>",
+      to: getAdminInbox(),
+      subject: `\u26A0 Alerta: ${payload.total} reserva${payload.total === 1 ? "" : "s"} num dia fechado (\u201C${payload.title}\u201D) \u2014 Boca Maldita`,
+      html: buildClosedDayConflictHtml(payload)
+    });
+    return true;
+  } catch (err) {
+    console.error("[email] Erro ao enviar alerta de conflito:", err);
+    return false;
+  }
+}
+
+// api/lib/blockedDates.ts
+function parseDateKey(key) {
+  const [year, month, day] = key.split("-").map(Number);
+  return { year, month, day };
+}
+function isDateBlocked(date, period) {
+  const end = period.end_date && period.end_date >= period.start_date ? period.end_date : period.start_date;
+  if (period.repeat === "weekly") {
+    const dayOfWeek = (dateKey) => {
+      const { year, month, day } = parseDateKey(dateKey);
+      return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+    };
+    const startDow = dayOfWeek(period.start_date);
+    const spanDays = Math.round(
+      (new Date(Date.UTC(parseDateKey(end).year, parseDateKey(end).month - 1, parseDateKey(end).day)).getTime() - new Date(Date.UTC(parseDateKey(period.start_date).year, parseDateKey(period.start_date).month - 1, parseDateKey(period.start_date).day)).getTime()) / 864e5
+    );
+    const rel = (dayOfWeek(date) - startDow + 7) % 7;
+    return rel <= spanDays;
+  }
+  if (period.repeat === "yearly") {
+    const { month, day } = parseDateKey(date);
+    const s = parseDateKey(period.start_date);
+    const e = parseDateKey(end);
+    const key = (m, d) => m * 100 + d;
+    const sd = key(s.month, s.day);
+    const ed = key(e.month, e.day);
+    const cd = key(month, day);
+    if (sd <= ed) return cd >= sd && cd <= ed;
+    return cd >= sd || cd <= ed;
+  }
+  return date >= period.start_date && date <= end;
+}
+
+// api/lib/closedPeriodConflicts.ts
+function reservationDateKey(date) {
+  return String(date).split(/[T ]/)[0] || String(date);
+}
+function findClosedPeriodConflicts(reservations, period) {
+  const rows = reservations.filter((r) => isDateBlocked(reservationDateKey(r.date), period)).map((r) => ({
+    reference: r.reference,
+    name: r.name,
+    date: reservationDateKey(r.date),
+    time: r.time,
+    guests: r.guests
+  })).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+  const byDate = /* @__PURE__ */ new Map();
+  for (const row of rows) {
+    byDate.set(row.date, (byDate.get(row.date) ?? 0) + 1);
+  }
+  const dates = [...byDate.entries()].map(([date, count]) => ({ date, count })).sort((a, b) => a.date.localeCompare(b.date));
+  return { total: rows.length, rows, dates };
+}
 
 // api/lib/checkExpression.ts
 function solveCheckExpression(expression) {
@@ -1077,35 +1179,6 @@ var ADMIN_TOKEN_KEY = "admin_token";
 var DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? "").trim() || "smpsandro1239@gmail.com";
 var RATE_WINDOW_MS = 15 * 60 * 1e3;
 var RATE_MAX_HITS = 5;
-function parseDateKey(key) {
-  const [year, month, day] = key.split("-").map(Number);
-  return { year, month, day };
-}
-function isDateBlocked(date, period) {
-  const end = period.end_date && period.end_date >= period.start_date ? period.end_date : period.start_date;
-  if (period.repeat === "weekly") {
-    const dayOfWeek = (dateKey) => {
-      const { year, month, day } = parseDateKey(dateKey);
-      return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    };
-    const startDow = dayOfWeek(period.start_date);
-    const spanDays = Math.round((new Date(Date.UTC(parseDateKey(end).year, parseDateKey(end).month - 1, parseDateKey(end).day)).getTime() - new Date(Date.UTC(parseDateKey(period.start_date).year, parseDateKey(period.start_date).month - 1, parseDateKey(period.start_date).day)).getTime()) / 864e5);
-    const rel = (dayOfWeek(date) - startDow + 7) % 7;
-    return rel <= spanDays;
-  }
-  if (period.repeat === "yearly") {
-    const { year, month, day } = parseDateKey(date);
-    const s = parseDateKey(period.start_date);
-    const e = parseDateKey(end);
-    const key = (m, d) => m * 100 + d;
-    const sd = key(s.month, s.day);
-    const ed = key(e.month, e.day);
-    const cd = key(month, day);
-    if (sd <= ed) return cd >= sd && cd <= ed;
-    return cd >= sd || cd <= ed;
-  }
-  return date >= period.start_date && date <= end;
-}
 async function getPublicClosedPeriods(storage) {
   const rows = await storage.listClosedPeriods();
   return rows.map((r) => ({
@@ -1730,7 +1803,22 @@ async function createApp() {
         return res.status(400).json({ error: parsed.error.issues[0].message });
       }
       const { id } = await storage.createClosedPeriod(parsed.data);
-      res.status(201).json({ id });
+      const conflicts = findClosedPeriodConflicts(await storage.listReservations(), {
+        start_date: parsed.data.startDate,
+        end_date: parsed.data.endDate || null,
+        repeat: parsed.data.repeat
+      });
+      if (conflicts.total > 0) {
+        await sendClosedDayConflictEmail({
+          title: parsed.data.title,
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate || void 0,
+          repeat: parsed.data.repeat,
+          total: conflicts.total,
+          rows: conflicts.rows
+        });
+      }
+      res.status(201).json({ id, conflicts: { total: conflicts.total, dates: conflicts.dates } });
     } catch (err) {
       next(err);
     }

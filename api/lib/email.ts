@@ -222,3 +222,76 @@ export async function sendReservationAdminNotification(payload: ConfirmationPayl
     return false;
   }
 }
+
+export interface ClosedDayConflictRow {
+  reference: string;
+  name: string;
+  date: string;
+  time: string;
+  guests: number;
+}
+
+export interface ClosedDayConflictEmailPayload {
+  title: string;
+  startDate: string;
+  endDate?: string;
+  repeat: string;
+  total: number;
+  rows: ClosedDayConflictRow[];
+}
+
+const REPEAT_LABELS_EMAIL: Record<string, string> = {
+  none: 'Data única',
+  weekly: 'Repete todas as semanas',
+  yearly: 'Repete todos os anos',
+};
+
+function buildClosedDayConflictHtml(payload: ClosedDayConflictEmailPayload): string {
+  const rowsHtml = payload.rows
+    .map(
+      (row) => `      <tr><td style="padding:8px 0;color:#A6A8AD;">${escapeHtml(row.date)}</td><td style="padding:8px 0;color:#F7F5F0;font-family:monospace;">${escapeHtml(row.reference)}</td><td style="padding:8px 0;color:#F7F5F0;">${escapeHtml(row.name)}</td><td style="padding:8px 0;color:#F7F5F0;">${escapeHtml(row.time)}</td><td style="padding:8px 0;color:#F7F5F0;">${escapeHtml(row.guests)}</td></tr>`,
+    )
+    .join('\n');
+
+  return [
+    `<div style="font-family:Georgia,serif;background:#0C0D0E;padding:32px 16px;color:#F7F5F0;">`,
+    `  <div style="max-width:560px;margin:0 auto;border:1px solid #7C2D12;background:#1C1917;padding:32px;">`,
+    `    <p style="font-family:monospace;letter-spacing:0.2em;color:#FB923C;font-size:12px;text-transform:uppercase;margin:0 0 8px;">Boca Maldita · Alerta de Conflito</p>`,
+    `    <h1 style="font-size:24px;margin:0 0 12px;">⚠ Marcou um dia fechado com reservas ativas</h1>`,
+    `    <p style="color:#A6A8AD;margin:0 0 20px;font-size:14px;line-height:1.6;">Marcou o período <strong style="color:#F7F5F0;">“${escapeHtml(payload.title)}”</strong> como fechado, mas existem <strong style="color:#FB923C;">${payload.total} reserva${payload.total === 1 ? '' : 's'}</strong> nesse período. Confirme no painel de administração se deseja contactar estas pessoas ou ajustar a data.</p>`,
+    `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:13px;">`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;width:38%;">Período</td><td style="padding:8px 0;">${escapeHtml(payload.startDate)}${payload.endDate ? ` → ${escapeHtml(payload.endDate)}` : ''}</td></tr>`,
+    `      <tr><td style="padding:8px 0;color:#A6A8AD;">Repetição</td><td style="padding:8px 0;">${escapeHtml(REPEAT_LABELS_EMAIL[payload.repeat] ?? payload.repeat)}</td></tr>`,
+    `    </table>`,
+    `    <table style="width:100%;border-collapse:collapse;color:#F7F5F0;font-size:13px;margin-top:8px;border-top:1px solid #282A30;">`,
+    `      <thead><tr><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Data</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Ref.</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Nome</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Hora</td><td style="padding:8px 0;color:#A6A8AD;border-bottom:1px solid #282A30;">Pessoas</td></tr></thead>`,
+    `      <tbody>`,
+    rowsHtml,
+    `      </tbody>`,
+    `    </table>`,
+    `    <p style="color:#A6A8AD;font-size:13px;margin:24px 0 0;">As reservas online nesse(s) dia(s) ficaram bloqueadas a partir de agora. Este alerta não bloqueia reservas já registadas — resolva cada caso no separador Reservas.</p>`,
+    `  </div>`,
+    `</div>`,
+  ].join('\n');
+}
+
+export async function sendClosedDayConflictEmail(payload: ClosedDayConflictEmailPayload): Promise<boolean> {
+  const transporter = await getTransporter();
+  if (!transporter) {
+    console.warn('[email] SMTP não configurado — alerta de conflito não enviado.');
+    return false;
+  }
+
+  try {
+    await transporter.sendMail({
+      from: (process.env.MAIL_FROM ?? '').trim() || 'Boca Maldita <smpsandro1239@gmail.com>',
+      to: getAdminInbox(),
+      subject: `⚠ Alerta: ${payload.total} reserva${payload.total === 1 ? '' : 's'} num dia fechado (“${payload.title}”) — Boca Maldita`,
+      html: buildClosedDayConflictHtml(payload),
+    });
+    return true;
+  } catch (err) {
+    console.error('[email] Erro ao enviar alerta de conflito:', err);
+    return false;
+  }
+}

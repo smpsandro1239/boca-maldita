@@ -57,7 +57,7 @@ import {
   updateAdminToken,
 } from '../lib/api';
 import { DEFAULT_IMAGE_ASSETS } from '../data/assets';
-import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
+import { MENU_CATEGORIES, MENU_CATEGORY_LABELS, MENU_CATEGORY_ORDER } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
 
 type Tab = 'geral' | 'imagens' | 'menu' | 'reservas' | 'dias' | 'contactos' | 'newsletter' | 'conteudo' | 'protecao' | 'seguranca' | 'avaliacoes';
@@ -67,8 +67,9 @@ const CATEGORY_LABELS: Record<string, string> = {
   hero: 'Herói',
   ambiente: 'Ambiente / Restaurante',
   carnes: 'Carnes',
-  mar: 'Mar',
+  mar: 'Peixe & Mar',
   entradas: 'Entradas',
+  diarias: 'Diárias / Prato do Dia',
   mapa: 'Mapa',
   pessoas: 'Pessoas',
 };
@@ -564,10 +565,11 @@ export default function AdminPanel({
       .replace(/^-+|-+$/g, '')
       .slice(0, 60) || 'prato';
 
-  const openNewItem = () => {
+  const openNewItem = (category?: MenuItem['category']) => {
     const draft: MenuItem = { ...EMPTY_MENU_ITEM };
     draft.name = '';
     draft.visible = true;
+    if (category) draft.category = category;
     setEditingItem(draft);
     setIsItemEditorOpen(true);
   };
@@ -687,27 +689,32 @@ export default function AdminPanel({
         )}
 
         {/* Tabs */}
-        <div className="px-4 sm:px-6 pt-4 flex gap-2 overflow-x-auto border-b border-[#282A30] sm:flex-wrap sm:overflow-visible sm:pb-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-3 py-2 text-xs uppercase tracking-wider font-semibold transition-colors border shrink-0 whitespace-nowrap ${
-                  isActive
-                    ? 'bg-[#D4A373] text-[#0C0D0E] border-[#D4A373]'
-                    : 'bg-[#141518] text-[#F7F5F0]/70 border-[#282A30] hover:border-[#D4A373]/50 hover:text-[#D4A373]'
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <div className="px-4 sm:px-6 pt-4 pb-1 border-b border-[#282A30]">
+  <div className="flex gap-2 overflow-x-auto [scrollbar-width:thin] sm:flex-wrap sm:overflow-visible">
+    {tabs.map((tab) => {
+      const Icon = tab.icon;
+      const isActive = activeTab === tab.id;
+      return (
+        <button
+          key={tab.id}
+          type="button"
+          onClick={() => setActiveTab(tab.id)}
+          className={`flex items-center gap-2 px-3 py-2.5 min-h-[44px] text-xs uppercase tracking-wider font-semibold transition-colors border shrink-0 whitespace-nowrap ${
+            isActive
+              ? 'bg-[#D4A373] text-[#0C0D0E] border-[#D4A373]'
+              : 'bg-[#141518] text-[#F7F5F0]/70 border-[#282A30] hover:border-[#D4A373]/50 hover:text-[#D4A373]'
+          }`}
+        >
+          <Icon className="w-3.5 h-3.5" />
+          {tab.label}
+        </button>
+      );
+    })}
+  </div>
+  <p className="sm:hidden mt-2 text-[10px] text-[#F7F5F0]/40 font-mono">
+    ← Deslize para o lado para ver mais separadores →
+  </p>
+</div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-5 sm:py-6 space-y-6">
@@ -908,82 +915,108 @@ export default function AdminPanel({
               {menuDrafts.length === 0 ? (
                 <p className="text-sm text-[#F7F5F0]/50">Sem pratos ainda. Use "Novo prato" para começar.</p>
               ) : (
-                <div className="space-y-2">
-                  {menuDrafts.map((item, index) => (
-                    <div
-                      key={item.id || index}
-                      className="flex items-center gap-3 bg-[#141518] border border-[#282A30] px-4 py-3"
-                    >
-                      <div className="flex flex-col">
-                        <button
-                          type="button"
-                          className="text-[#F7F5F0]/60 hover:text-[#D4A373] disabled:opacity-20"
-                          onClick={() => moveMenuItem(index, -1)}
-                          disabled={index === 0}
-                          aria-label="Subir"
-                        >
-                          ▲
-                        </button>
-                        <button
-                          type="button"
-                          className="text-[#F7F5F0]/60 hover:text-[#D4A373] disabled:opacity-20"
-                          onClick={() => moveMenuItem(index, 1)}
-                          disabled={index === menuDrafts.length - 1}
-                          aria-label="Descer"
-                        >
-                          ▼
-                        </button>
-                      </div>
-                      <div
-                        className="w-14 h-14 bg-[#0C0D0E] overflow-hidden shrink-0 border border-[#282A30]"
-                        style={{ aspectRatio: '1 / 1' }}
-                      >
-                        {item.imageUrl ? (
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover"
-                            style={{ objectPosition: '50% 50%' }}
-                            loading="lazy"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-serif text-base text-[#F7F5F0] truncate">{item.name}</span>
-                          <span className="text-xs text-[#D4A373] font-mono">
-                            {item.price.toFixed(2)} {item.currency}
+                <div className="space-y-6">
+                  {[...MENU_CATEGORY_ORDER, ...MENU_CATEGORIES.filter((c) => !MENU_CATEGORY_ORDER.includes(c))].map((cat) => {
+                    const groupItems = menuDrafts.filter((item) => item.category === cat);
+                    if (groupItems.length === 0) return null;
+                    return (
+                      <div key={cat} className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">
+                            {MENU_CATEGORY_LABELS[cat] ?? cat}
                           </span>
-                          {item.isChefSpecial && (
-                            <span className="text-[9px] uppercase tracking-widest text-amber-400 font-mono">Chef</span>
-                          )}
+                          <span className="text-[10px] text-[#F7F5F0]/40 font-mono">{groupItems.length}</span>
+                          <button
+                            type="button"
+                            onClick={() => openNewItem(cat)}
+                            className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wider text-[#F7F5F0]/50 hover:text-[#D4A373]"
+                          >
+                            <Plus className="w-3 h-3" />
+                            Adicionar nesta categoria
+                          </button>
                         </div>
-                        <div className="text-[11px] text-[#F7F5F0]/50 font-mono uppercase tracking-wider mt-0.5">
-                          {MENU_CATEGORY_LABELS[item.category] ?? item.category}
-                          {item.visible === false ? ' · oculto' : ''}
+                        <div className="space-y-2 border-t border-[#282A30] pt-2">
+                          {menuDrafts.map((item, index) => {
+                            if (item.category !== cat) return null;
+                            return (
+                              <div
+                                key={item.id || index}
+                                className="flex items-center gap-3 bg-[#141518] border border-[#282A30] px-4 py-3"
+                              >
+                                <div className="flex flex-col">
+                                  <button
+                                    type="button"
+                                    className="text-[#F7F5F0]/60 hover:text-[#D4A373] disabled:opacity-20"
+                                    onClick={() => moveMenuItem(index, -1)}
+                                    disabled={index === 0}
+                                    aria-label="Subir"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="text-[#F7F5F0]/60 hover:text-[#D4A373] disabled:opacity-20"
+                                    onClick={() => moveMenuItem(index, 1)}
+                                    disabled={index === menuDrafts.length - 1}
+                                    aria-label="Descer"
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
+                                <div
+                                  className="w-14 h-14 bg-[#0C0D0E] overflow-hidden shrink-0 border border-[#282A30]"
+                                  style={{ aspectRatio: '1 / 1' }}
+                                >
+                                  {item.imageUrl ? (
+                                    <img
+                                      src={item.imageUrl}
+                                      alt={item.name}
+                                      className="w-full h-full object-cover"
+                                      style={{ objectPosition: '50% 50%' }}
+                                      loading="lazy"
+                                    />
+                                  ) : null}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-serif text-base text-[#F7F5F0] truncate">{item.name}</span>
+                                    <span className="text-xs text-[#D4A373] font-mono">
+                                      {item.price.toFixed(2)} {item.currency}
+                                    </span>
+                                    {item.isChefSpecial && (
+                                      <span className="text-[9px] uppercase tracking-widest text-amber-400 font-mono">Chef</span>
+                                    )}
+                                  </div>
+                                  <div className="text-[11px] text-[#F7F5F0]/50 font-mono uppercase tracking-wider mt-0.5">
+                                    {item.visible === false ? 'Oculto no site' : 'Visível no site'}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditItem(item)}
+                                    className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
+                                    aria-label={`Editar ${item.name}`}
+                                    title={item.imageUrl}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeMenuItem(item.id)}
+                                    className="p-2 text-[#F7F5F0]/70 hover:text-red-400 hover:bg-[#282A30]"
+                                    aria-label={`Remover ${item.name}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => openEditItem(item)}
-                          className="p-2 text-[#F7F5F0]/70 hover:text-[#D4A373] hover:bg-[#282A30]"
-                          aria-label={`Editar ${item.name}`}
-                          title={item.imageUrl}
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeMenuItem(item.id)}
-                          className="p-2 text-[#F7F5F0]/70 hover:text-red-400 hover:bg-[#282A30]"
-                          aria-label={`Remover ${item.name}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1132,16 +1165,16 @@ export default function AdminPanel({
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <ContentField label="Email de contacto" value={contentDraft.contactEmail} onChange={(v) => setContentField('contactEmail', v)} />
-                <ContentField label="Telefone" value={contentDraft.phone} onChange={(v) => setContentField('phone', v)} />
-                <ContentField label="WhatsApp (número)" value={contentDraft.whatsapp} onChange={(v) => setContentField('whatsapp', v)} helper="Só dígitos com indicativo (ex.: 351253031890). Vazio usa o telefone. Aplica-se em todo o site." />
-                <ContentField label="Morada" value={contentDraft.address} onChange={(v) => setContentField('address', v)} />
-                <ContentField label="Título principal (hero)" value={contentDraft.headline} onChange={(v) => setContentField('headline', v)} />
-                <ContentField label="Subtítulo (hero)" value={contentDraft.heroSubtitle} onChange={(v) => setContentField('heroSubtitle', v)} />
-                <ContentField label="Título da secção sobre o restaurante" value={contentDraft.aboutTitle} onChange={(v) => setContentField('aboutTitle', v)} />
-                <ContentField label="Instagram" value={contentDraft.instagram} onChange={(v) => setContentField('instagram', v)} />
-                <ContentField label="Facebook" value={contentDraft.facebook} onChange={(v) => setContentField('facebook', v)} />
-                <ContentField label="Link do vídeo (Facebook, mp4, webm)" value={contentDraft.videoUrl} onChange={(v) => setContentField('videoUrl', v)} helper="Aceita link do Facebook (reproduz em embed), ficheiro .mp4/.webm/.m3u8 ou outro URL a abrir em nova aba." />
+                <ContentField label="Email de contacto" value={contentDraft.contactEmail} onChange={(v) => setContentField('contactEmail', v)} current={content.contactEmail} helper="Email onde chegam os avisos de novas reservas, contactos e newsletter. Aplica-se ao footer e a todo o site." />
+                <ContentField label="Telefone" value={contentDraft.phone} onChange={(v) => setContentField('phone', v)} current={content.phone} helper="Número mostrado no hero, no separador Contactos e no bloco de reservas rápidas." />
+                <ContentField label="WhatsApp (número)" value={contentDraft.whatsapp} onChange={(v) => setContentField('whatsapp', v)} current={content.whatsapp} helper="Só dígitos com indicativo (ex.: 351253031890). Vazio usa o telefone. Aplica-se em todo o site." />
+                <ContentField label="Morada" value={contentDraft.address} onChange={(v) => setContentField('address', v)} current={content.address} helper="Mostrada no separador Contactos e no mapa." />
+                <ContentField label="Título principal (hero)" value={contentDraft.headline} onChange={(v) => setContentField('headline', v)} current={content.headline} helper="O grande título no topo da página inicial." />
+                <ContentField label="Subtítulo (hero)" value={contentDraft.heroSubtitle} onChange={(v) => setContentField('heroSubtitle', v)} current={content.heroSubtitle} helper="A frase pequena por baixo do título principal." />
+                <ContentField label="Título da secção sobre o restaurante" value={contentDraft.aboutTitle} onChange={(v) => setContentField('aboutTitle', v)} current={content.aboutTitle} helper='Título da secção "O Restaurante" na página inicial.' />
+                <ContentField label="Instagram" value={contentDraft.instagram} onChange={(v) => setContentField('instagram', v)} current={content.instagram} helper="Link completo (https://…) para o perfil. Usado no rodapé e nos contactos." />
+                <ContentField label="Facebook" value={contentDraft.facebook} onChange={(v) => setContentField('facebook', v)} current={content.facebook} helper="Link completo (https://…) para a página. Usado no rodapé e nos contactos." />
+                <ContentField label="Link do vídeo (Facebook, mp4, webm)" value={contentDraft.videoUrl} onChange={(v) => setContentField('videoUrl', v)} current={content.videoUrl} helper="Aceita link do Facebook (reproduz em embed), ficheiro .mp4/.webm/.m3u8 ou outro URL a abrir em nova aba." />
               </div>
 
               <div>
@@ -1154,6 +1187,10 @@ export default function AdminPanel({
                   className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y font-mono"
                 />
                 <p className="mt-1 text-[10px] text-[#686B73]">Uma linha por período. Aparece tal como escrito no bloco "Horário Detalhado" do site.</p>
+                <p className={`mt-1 text-[10px] font-mono ${contentDraft.hours !== (content.hours ?? '') ? 'text-emerald-400/90' : 'text-[#F7F5F0]/35'}`}>
+                  {content.hours ? <>Agora no site: «{content.hours}»</> : <>Agora no site: vazio (usa o horário original)</>}
+                  {contentDraft.hours !== (content.hours ?? '') ? ' — por publicar' : ''}
+                </p>
               </div>
 
               <div>
@@ -1164,6 +1201,11 @@ export default function AdminPanel({
                   rows={6}
                   className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y"
                 />
+                <p className="text-[10px] text-[#F7F5F0]/40">Texto longo da secção "O Restaurante" da página inicial. Pode conter parágrafos.</p>
+                <p className={`text-[10px] mt-1 font-mono ${contentDraft.aboutText !== (content.aboutText ?? '') ? 'text-emerald-400/90' : 'text-[#F7F5F0]/35'}`}>
+                  {content.aboutText ? <>Agora no site: «{content.aboutText}»</> : <>Agora no site: vazio (usa o texto original)</>}
+                  {contentDraft.aboutText !== (content.aboutText ?? '') ? ' — por publicar' : ''}
+                </p>
               </div>
 
               <div className="border border-[#282A30] bg-[#141518]/40 p-4 space-y-4">
@@ -1179,10 +1221,14 @@ export default function AdminPanel({
                   className="mt-1 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373] resize-y"
                 />
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <ContentField label="Nome" value={contentDraft.testimonialName} onChange={(v) => setContentField('testimonialName', v)} />
-                  <ContentField label="Cargo / Função" value={contentDraft.testimonialRole} onChange={(v) => setContentField('testimonialRole', v)} />
-                  <ContentField label="Estrelas (1 a 5)" value={contentDraft.testimonialStars} onChange={(v) => setContentField('testimonialStars', v)} helper="Um dígito entre 1 e 5." />
+                  <ContentField label="Nome" value={contentDraft.testimonialName} onChange={(v) => setContentField('testimonialName', v)} current={content.testimonialName} />
+                  <ContentField label="Cargo / Função" value={contentDraft.testimonialRole} onChange={(v) => setContentField('testimonialRole', v)} current={content.testimonialRole} />
+                  <ContentField label="Estrelas (1 a 5)" value={contentDraft.testimonialStars} onChange={(v) => setContentField('testimonialStars', v)} current={content.testimonialStars} helper="Um dígito entre 1 e 5." />
                 </div>
+                <p className={`text-[10px] font-mono ${contentDraft.testimonialText !== (content.testimonialText ?? '') ? 'text-emerald-400/90' : 'text-[#F7F5F0]/35'}`}>
+                  {content.testimonialText ? <>Agora no site: «{content.testimonialText}»</> : <>Agora no site: vazio (usa a citação original)</>}
+                  {contentDraft.testimonialText !== (content.testimonialText ?? '') ? ' — por publicar' : ''}
+                </p>
                 <p className="text-[10px] text-[#686B73]">A fotografia do testemunho é a imagem "Inês Barreto" editável no separador Imagens & Logótipo.</p>
               </div>
             </div>
@@ -1580,9 +1626,12 @@ interface ContentFieldProps {
   value: string;
   onChange: (value: string) => void;
   helper?: string;
+  current?: string;
 }
 
-function ContentField({ label, value, onChange, helper }: ContentFieldProps) {
+function ContentField({ label, value, onChange, helper, current }: ContentFieldProps) {
+  const published = current ?? '';
+  const changed = value !== published;
   return (
     <div>
       <label className="text-[10px] uppercase tracking-widest text-[#D4A373] font-mono">{label}</label>
@@ -1593,6 +1642,10 @@ function ContentField({ label, value, onChange, helper }: ContentFieldProps) {
         className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] placeholder:text-[#F7F5F0]/30 focus:outline-none focus:border-[#D4A373]"
       />
       {helper ? <p className="text-[10px] text-[#F7F5F0]/40 mt-1">{helper}</p> : null}
+      <p className={`text-[10px] mt-1 font-mono ${changed ? 'text-emerald-400/90' : 'text-[#F7F5F0]/35'}`}>
+        {published ? <>Agora no site: «{published}»</> : <>Agora no site: vazio (usa o texto original)</>}
+        {changed ? ' — por publicar' : ''}
+      </p>
     </div>
   );
 }
@@ -1789,7 +1842,7 @@ function ReservationsCalendar({
                 key={key}
                 type="button"
                 onClick={() => onSelectDate(key)}
-                className={`relative flex flex-col items-center justify-center gap-0.5 aspect-square border text-[11px] transition-colors ${
+                className={`relative flex flex-col items-center justify-center gap-0.5 aspect-square min-h-[44px] border text-[11px] transition-colors ${
                   inMonth ? 'text-[#F7F5F0]' : 'text-[#F7F5F0]/25'
                 } ${isSelected ? 'border-[#D4A373] bg-[#D4A373]/15' : 'border-[#282A30] hover:border-[#D4A373]/60'} ${
                   inMonth && count > 0 ? 'bg-[#1C1E22]' : 'bg-transparent'
@@ -2057,15 +2110,15 @@ interface MenuItemEditorProps {
 }
 
 const ITEM_FIELDS: { key: keyof MenuItem; label: string; type: string; desc?: string }[] = [
-  { key: 'name', label: 'Nome do prato', type: 'text' },
-  { key: 'price', label: 'Preço', type: 'number' },
-  { key: 'badge', label: 'Distintivo (ex.: "Recomendado")', type: 'text' },
-  { key: 'tagline', label: 'Frase curta', type: 'text' },
-  { key: 'imageUrl', label: 'Imagem (link)', type: 'text' },
-  { key: 'servesCount', label: 'Serve (ex.: "2 pessoas")', type: 'text' },
-  { key: 'dryAgedDays', label: 'Dias de maturação (opcional)', type: 'number' },
-  { key: 'origin', label: 'Origem / produtor', type: 'text' },
-  { key: 'pairingWine', label: 'Sugestão de vinho', type: 'text' },
+  { key: 'name', label: 'Nome do prato', type: 'text', desc: 'Como aparece no menu do site.' },
+  { key: 'price', label: 'Preço', type: 'number', desc: 'Em euros (ex.: 14.90). Não é usado se este item for um "Menu do Dia" com preço incluído.' },
+  { key: 'badge', label: 'Distintivo (ex.: "Recomendado")', type: 'text', desc: 'Rótulo pequeno sobre a foto. Ex.: "Dry-Aged 60D", "Diária · Carne".' },
+  { key: 'tagline', label: 'Frase curta', type: 'text', desc: 'Slogan de uma linha, usado no modal de detalhes do prato.' },
+  { key: 'imageUrl', label: 'Imagem (link)', type: 'text', desc: 'Cole o "Link Direto" de uma imagem gerida no separador Imagens & Logótipo. Pode ficar vazio.' },
+  { key: 'servesCount', label: 'Serve (ex.: "2 pessoas")', type: 'text', desc: 'Quantidade recomendada. Ex.: "1 pessoa", "2 a 3 pessoas", "Menu do Dia".' },
+  { key: 'dryAgedDays', label: 'Dias de maturação (opcional)', type: 'number', desc: 'Só para carne maturada. Mostra "X dias em câmara de sal" no detalhe.' },
+  { key: 'origin', label: 'Origem / produtor', type: 'text', desc: 'Proveniência mostrada com um ícone no card do menu.' },
+  { key: 'pairingWine', label: 'Sugestão de vinho', type: 'text', desc: 'Vinho recomendado, aparece no card e no detalhe.' },
 ];
 
 function itemFieldsFor(category: MenuItem['category']): { key: keyof MenuItem; label: string; type: string; desc?: string }[] {
@@ -2107,6 +2160,7 @@ function MenuItemEditor({ item, onChange, onCancel, onSave }: MenuItemEditorProp
                 }}
                 className="mt-2 w-full bg-[#141518] border border-[#282A30] px-3 py-2.5 text-sm text-[#F7F5F0] focus:outline-none focus:border-[#D4A373]"
               />
+              {field.desc ? <p className="text-[10px] text-[#F7F5F0]/40 mt-1">{field.desc}</p> : null}
             </div>
           ))}
 
@@ -2303,6 +2357,7 @@ function ClosedDaysManager({
   const [repeat, setRepeat] = useState<'none' | 'weekly' | 'yearly'>('none');
   const [note, setNote] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [lastConflicts, setLastConflicts] = useState<{ total: number; dates: { date: string; count: number }[] } | null>(null);
 
   const reload = async () => {
     try {
@@ -2335,7 +2390,8 @@ function ClosedDaysManager({
     void run(
       'dias',
       async () => {
-        await createAdminClosedDay({ title: title.trim(), startDate, endDate: endDate || undefined, repeat, note: note.trim() });
+        const created = await createAdminClosedDay({ title: title.trim(), startDate, endDate: endDate || undefined, repeat, note: note.trim() });
+        setLastConflicts(created.conflicts);
         setTitle('');
         setEndDate('');
         setNote('');
@@ -2361,6 +2417,37 @@ function ClosedDaysManager({
 
   return (
     <div className="space-y-6">
+      {lastConflicts && lastConflicts.total > 0 && (
+        <div className="border border-amber-500/50 bg-amber-950/40 p-4">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="text-xs text-amber-200 font-semibold uppercase tracking-wider">
+                Atenção: este período coincide com {lastConflicts.total > 1 ? `${lastConflicts.total} reservas` : '1 reserva'} já registada{lastConflicts.total > 1 ? 's' : ''}
+              </p>
+              <p className="text-xs text-amber-100/80 leading-relaxed">
+                As reservas online nesse(s) dia(s) ficaram bloqueadas, mas as reservas já existentes <strong>continuam válidas</strong>. Foi enviado um email à administração com a lista completa. Resolva cada caso no separador Reservas.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                {lastConflicts.dates.map((d) => (
+                  <span key={d.date} className="text-[10px] font-mono text-amber-200 border border-amber-500/40 px-2 py-1 bg-amber-950/60">
+                    {formatDate(d.date)} — {d.count} {d.count === 1 ? 'reserva' : 'reservas'}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLastConflicts(null)}
+              className="ml-auto text-[#F7F5F0]/50 hover:text-amber-200 shrink-0"
+              aria-label="Fechar alerta"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <h3 className="font-serif text-lg text-[#F7F5F0] mb-1">Datas Fechadas</h3>
         <p className="text-xs text-[#F7F5F0]/60">

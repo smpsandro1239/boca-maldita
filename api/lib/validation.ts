@@ -197,7 +197,7 @@ export const assetOverridesSchema = z
   })
   .strict();
 
-export const MENU_CATEGORIES = ['carnes', 'mar', 'entradas', 'acompanhamentos', 'sobremesas', 'vinhos'] as const;
+export const MENU_CATEGORIES = ['diarias', 'carnes', 'mar', 'entradas', 'acompanhamentos', 'sobremesas', 'vinhos', 'bebidas'] as const;
 
 const imageField = z
   .string()

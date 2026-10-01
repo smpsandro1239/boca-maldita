@@ -4,7 +4,9 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { createMemoryStorage, createStorage, type Storage } from './storage';
 import { adminLoginSchema, adminReservationSchema, adminTokenUpdateSchema, assetOverridesSchema, closedPeriodSchema, contactSchema, idParamSchema, menuItemsSchema, newsletterSchema, reservationProtectionSchema, reservationSchema, reviewSchema, reviewStatusSchema, siteContentSchema, siteSettingsSchema, type ReservationProtectionInput } from './validation';
-import { sendContactNotification, sendNewsletterWelcome, sendReservationAdminNotification, sendReservationConfirmation } from './email';
+import { sendClosedDayConflictEmail, sendContactNotification, sendNewsletterWelcome, sendReservationAdminNotification, sendReservationConfirmation } from './email';
+import { isDateBlocked } from './blockedDates';
+import { findClosedPeriodConflicts } from './closedPeriodConflicts';
 import { solveCheckExpression } from './checkExpression';
 import { createSession, deleteSession, destroyAllSessions, parseCookies, requireAdmin, timingSafeEqualStr, CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth';
 import type { NextFunction, Request, Response } from 'express';
@@ -24,47 +26,6 @@ const DEFAULT_CONTACT_EMAIL = (process.env.SITE_CONTACT_EMAIL ?? '').trim() || '
 
 const RATE_WINDOW_MS = 15 * 60 * 1000;
 const RATE_MAX_HITS = 5;
-
-function parseDateKey(key: string): { year: number; month: number; day: number } {
-  const [year, month, day] = key.split('-').map(Number);
-  return { year, month, day };
-}
-
-function dayOfYear(key: string): number {
-  const { year, month, day } = parseDateKey(key);
-  const d = new Date(Date.UTC(year, month - 1, day));
-  const epoch = Date.UTC(year, 0, 1);
-  return Math.floor((d.getTime() - epoch) / 86400000);
-}
-
-function isDateBlocked(date: string, period: { start_date: string; end_date: string | null; repeat: string }): boolean {
-  const end = period.end_date && period.end_date >= period.start_date ? period.end_date : period.start_date;
-
-  if (period.repeat === 'weekly') {
-    const dayOfWeek = (dateKey: string): number => {
-      const { year, month, day } = parseDateKey(dateKey);
-      return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-    };
-    const startDow = dayOfWeek(period.start_date);
-    const spanDays = Math.round((new Date(Date.UTC(parseDateKey(end).year, parseDateKey(end).month - 1, parseDateKey(end).day)).getTime() - new Date(Date.UTC(parseDateKey(period.start_date).year, parseDateKey(period.start_date).month - 1, parseDateKey(period.start_date).day)).getTime()) / 86400000);
-    const rel = (dayOfWeek(date) - startDow + 7) % 7;
-    return rel <= spanDays;
-  }
-
-  if (period.repeat === 'yearly') {
-    const { year, month, day } = parseDateKey(date);
-    const s = parseDateKey(period.start_date);
-    const e = parseDateKey(end);
-    const key = (m: number, d: number): number => m * 100 + d;
-    const sd = key(s.month, s.day);
-    const ed = key(e.month, e.day);
-    const cd = key(month, day);
-    if (sd <= ed) return cd >= sd && cd <= ed;
-    return cd >= sd || cd <= ed;
-  }
-
-  return date >= period.start_date && date <= end;
-}
 
 type PublicClosedPeriodShape = { title: string; startDate: string; endDate?: string; repeat: string };
 
@@ -748,7 +709,25 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(400).json({ error: parsed.error.issues[0].message });
       }
       const { id } = await storage.createClosedPeriod(parsed.data);
-      res.status(201).json({ id });
+
+      const conflicts = findClosedPeriodConflicts(await storage.listReservations(), {
+        start_date: parsed.data.startDate,
+        end_date: parsed.data.endDate || null,
+        repeat: parsed.data.repeat,
+      });
+
+      if (conflicts.total > 0) {
+        await sendClosedDayConflictEmail({
+          title: parsed.data.title,
+          startDate: parsed.data.startDate,
+          endDate: parsed.data.endDate || undefined,
+          repeat: parsed.data.repeat,
+          total: conflicts.total,
+          rows: conflicts.rows,
+        });
+      }
+
+      res.status(201).json({ id, conflicts: { total: conflicts.total, dates: conflicts.dates } });
     } catch (err) {
       next(err);
     }
