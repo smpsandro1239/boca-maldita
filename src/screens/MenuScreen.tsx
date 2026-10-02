@@ -5,6 +5,7 @@ import { Search, Flame, Wine, Clock, Award, ArrowRight, Copy, Check, UtensilsCro
 import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
 import { getDiarias, diariaMealLabel } from '../lib/api';
+import { pickDailyDishes } from '../lib/dailyDishes';
 
 interface MenuScreenProps {
   onSelectDish: (dish: MenuItem) => void;
@@ -43,16 +44,15 @@ export default function MenuScreen({
   ];
 
   const serviceDishes = todayDiarias && todayDiarias.currentMeal !== 'closed'
-    ? (todayDiarias.currentMeal === 'lunch' ? todayDiarias.lunch : todayDiarias.dinner)
+    ? pickDailyDishes(todayDiarias.currentMeal === 'lunch' ? todayDiarias.lunch : todayDiarias.dinner, menuItems)
     : [];
-
-  const menuDiarias = MENU_ITEMS.filter(i => i.category === 'diarias').slice(0, 4);
 
   const filteredItems = (() => {
     if (selectedCategory === 'diarias') {
-      const fromSite = menuItems.filter(i => i.category === 'diarias' && i.visible !== false).slice(0, 4);
-      const selected = serviceDishes.length > 0 ? serviceDishes : fromSite.length > 0 ? fromSite : menuDiarias;
-      return selected.filter(item => {
+      return pickDailyDishes(
+        serviceDishes.length > 0 ? serviceDishes.map((d) => ({ id: d.id })) : undefined,
+        menuItems,
+      ).filter((item) => {
         const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
                               (item.origin && item.origin.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -61,7 +61,7 @@ export default function MenuScreen({
     }
 
     const merged = selectedCategory === 'todas'
-      ? [...serviceDishes.filter(d => !menuItems.some(m => m.id === d.id)), ...menuItems]
+      ? [...serviceDishes.filter((d) => !menuItems.some((m) => m.id === d.id)), ...menuItems]
       : menuItems;
 
     return merged.filter(item => {

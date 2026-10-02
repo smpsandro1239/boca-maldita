@@ -228,11 +228,21 @@ export interface DiariaScheduleInput {
 
 export type PublicDiariaPeriod = 'lunch' | 'dinner' | 'closed';
 
+/**
+ * O endpoint público /api/diarias devolve apenas a referencia {id, visible} dos
+ * pratos agendados, nao o prato completo. Usar isto como MenuItem rebenta em
+ * runtime (price undefined), por isso ha que resolver contra a carta.
+ */
+export interface PublicDailyRef {
+  id: string;
+  visible?: boolean;
+}
+
 export interface PublicDiarias {
   date: string;
   currentMeal: PublicDiariaPeriod;
-  lunch: MenuItem[];
-  dinner: MenuItem[];
+  lunch: PublicDailyRef[];
+  dinner: PublicDailyRef[];
   hasSchedule: boolean;
   servedMeals: { lunch: boolean; dinner: boolean };
   closedTitle: string | null;

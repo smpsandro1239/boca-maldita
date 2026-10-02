@@ -3,6 +3,7 @@ import { ScreenType, MenuItem, PublicReservationConfig, PublicDiarias, ReviewAdm
 import { useSite, telHref } from '../context/SiteContext';
 import AssetImage from '../components/AssetImage';
 import { createReservation, createReview, getDiarias, getReservationConfig, getReviews } from '../lib/api';
+import { pickDailyDishes } from '../lib/dailyDishes';
 import { generateCheckQuestion } from '../lib/checkQuestion';
 import { GMAPS_URL } from '../data/contact';
 import { MENU_ITEMS } from '../data/menuData';
@@ -98,14 +99,12 @@ export default function HomeScreen({
     : menuItems.filter(i => i.category === 'mar' || i.category === 'entradas').slice(0, 4);
 
   const scheduledDiarias = todayDiarias && todayDiarias.currentMeal !== 'closed'
-    ? (todayDiarias.currentMeal === 'lunch' ? todayDiarias.lunch : todayDiarias.dinner)
+    ? pickDailyDishes(todayDiarias.currentMeal === 'lunch' ? todayDiarias.lunch : todayDiarias.dinner, menuItems)
     : [];
 
-  const diariasDishes = (() => {
-    if (scheduledDiarias.length > 0) return scheduledDiarias.slice(0, 4);
-    const fromSite = menuItems.filter(i => i.category === 'diarias');
-    return fromSite.length > 0 ? fromSite.slice(0, 4) : MENU_ITEMS.filter(i => i.category === 'diarias').slice(0, 4);
-  })();
+  const diariasDishes = scheduledDiarias.length > 0
+    ? scheduledDiarias
+    : pickDailyDishes([], menuItems);
 
   const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
