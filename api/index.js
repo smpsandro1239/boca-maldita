@@ -598,6 +598,11 @@ async function createStorage() {
 
 // server/lib/validation.ts
 import { z } from "zod";
+
+// shared/contracts.ts
+var MENU_CATEGORIES = ["diarias", "carnes", "mar", "entradas", "acompanhamentos", "sobremesas", "vinhos", "bebidas"];
+
+// server/lib/validation.ts
 var AVAILABLE_TIMES = [
   "12:30",
   "13:00",
@@ -729,7 +734,6 @@ var imageAssetOverrideSchema = z.object({
 var assetOverridesSchema = z.object({
   overrides: z.array(imageAssetOverrideSchema).max(200, "Demasiadas substitui\xE7\xF5es.")
 }).strict();
-var MENU_CATEGORIES = ["diarias", "carnes", "mar", "entradas", "acompanhamentos", "sobremesas", "vinhos", "bebidas"];
 var imageField = z.string().trim().max(2e3, "O link da imagem \xE9 demasiado longo.").optional().default("").refine((value) => value === "" || /^https?:\/\//i.test(value), "O link da imagem tem de come\xE7ar por http:// ou https://.");
 var menuItemSchema = z.object({
   id: z.string().trim().min(1, "O identificador \xE9 obrigat\xF3rio.").max(80),

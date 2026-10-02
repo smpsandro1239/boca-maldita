@@ -9,6 +9,7 @@ import { isDateBlocked } from './blockedDates';
 import { findClosedPeriodConflicts } from './closedPeriodConflicts';
 import { solveCheckExpression } from './checkExpression';
 import { buildDefaultDiariaSchedules, currentMeal, normalizeDiariaSchedule, resolveDiariasDay, todayKey as todayKeyLocal, type DiariaSchedule } from './diarias';
+import type { PublicDiarias } from '../../shared/contracts';
 import { createSession, deleteSession, destroyAllSessions, parseCookies, requireAdmin, timingSafeEqualStr, CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth';
 import type { NextFunction, Request, Response } from 'express';
 
@@ -468,7 +469,7 @@ export async function createApp(): Promise<AppInstance> {
     }
   });
 
-  app.get('/api/diarias', async (req: Request, res: Response, next: NextFunction) => {
+  app.get('/api/diarias', async (req: Request, res: Response<PublicDiarias>, next: NextFunction) => {
     try {
       const queryDate = typeof req.query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : todayKeyLocal();
       const schedules = await getDiariaSchedules(storage);

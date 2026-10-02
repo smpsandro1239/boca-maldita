@@ -1,4 +1,7 @@
 import { z } from 'zod';
+// A lista de categorias é fonte única em shared/contracts.ts; o zod continua
+// aqui a validar. Divergir as duas listas dava 400 em itens que a UI aceitava.
+import { MENU_CATEGORIES } from '../../shared/contracts';
 
 export const AVAILABLE_TIMES = [
   '12:30',
@@ -221,8 +224,6 @@ export const assetOverridesSchema = z
   })
   .strict();
 
-export const MENU_CATEGORIES = ['diarias', 'carnes', 'mar', 'entradas', 'acompanhamentos', 'sobremesas', 'vinhos', 'bebidas'] as const;
-
 const imageField = z
   .string()
   .trim()
@@ -294,7 +295,11 @@ export type ReviewInput = z.infer<typeof reviewSchema>;
 export type ReviewStatusInput = z.infer<typeof reviewStatusSchema>;
 export type AdminTokenUpdateInput = z.infer<typeof adminTokenUpdateSchema>;
 export type ClosedPeriodInput = z.infer<typeof closedPeriodSchema>;
-export type DiariaScheduleInput = z.infer<typeof diariaScheduleSchema>;
+// O schema tem .transform(), por isso `z.infer` dá o tipo PÓS-transformação —
+// o que fica guardado — e não o que o cliente envia. Dois nomes, não um:
+// Request é o que o cliente pode mandar, Payload é o que fica persistido.
+export type DiariaScheduleRequest = z.input<typeof diariaScheduleSchema>;
+export type DiariaSchedulePayload = z.infer<typeof diariaScheduleSchema>;
 export type SiteSettingsInput = z.infer<typeof siteSettingsSchema>;
 export type AssetOverrideInput = z.infer<typeof assetOverridesSchema>['overrides'][number];
 export type MenuItemInput = z.infer<typeof menuItemSchema>;

@@ -1,3 +1,5 @@
+import type { PublicDailyRef } from '../../shared/contracts';
+
 export type DiariaRepeat = 'none' | 'weekly' | 'biweekly' | 'monthly';
 export type DiariaMeal = 'lunch' | 'dinner';
 
@@ -12,14 +14,9 @@ export interface DiariaSchedule {
   itemIds: string[];
 }
 
-export interface MenuItemLike {
-  id: string;
-  visible?: boolean;
-}
-
 export interface ResolvedDiariasDay {
-  lunch: MenuItemLike[];
-  dinner: MenuItemLike[];
+  lunch: PublicDailyRef[];
+  dinner: PublicDailyRef[];
   hasSchedule: boolean;
   servedMeals: { lunch: boolean; dinner: boolean };
 }
@@ -88,17 +85,17 @@ export function scheduleAppliesOn(schedule: DiariaSchedule, date: string): boole
 
 export function resolveDiariasDay(
   schedules: DiariaSchedule[],
-  menuItems: MenuItemLike[],
+  menuItems: PublicDailyRef[],
   date: string,
 ): ResolvedDiariasDay {
-  const byId = new Map<string, MenuItemLike>();
+  const byId = new Map<string, PublicDailyRef>();
   for (const item of menuItems) {
     if (item.visible === false) continue;
     byId.set(item.id, item);
   }
 
-  const lunch: MenuItemLike[] = [];
-  const dinner: MenuItemLike[] = [];
+  const lunch: PublicDailyRef[] = [];
+  const dinner: PublicDailyRef[] = [];
   const seenLunch = new Set<string>();
   const seenDinner = new Set<string>();
   let hasSchedule = false;

@@ -1,6 +1,9 @@
-export const MENU_CATEGORIES = ['diarias', 'carnes', 'mar', 'entradas', 'acompanhamentos', 'sobremesas', 'vinhos', 'bebidas'] as const;
+import { MENU_CATEGORIES, type MenuCategory } from '../../shared/contracts';
 
-export type MenuCategory = (typeof MENU_CATEGORIES)[number];
+// A lista de categorias vive em shared/contracts.ts para servidor e cliente
+// discordarem nunca. As labels e a ordem continuam aqui porque são UI.
+export { MENU_CATEGORIES };
+export type { MenuCategory };
 
 export const MENU_CATEGORY_LABELS: Record<MenuCategory, string> = {
   diarias: 'Prato do Dia',

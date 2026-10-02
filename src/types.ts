@@ -1,7 +1,14 @@
-import { MenuCategory } from './data/menuCategories';
-
-/** Para os itens da categoria 'diarias': se o prato do dia é carne ou peixe. */
-export type DailyKind = 'carne' | 'peixe';
+// Contratos de resposta da API: fonte única em shared/contracts.ts.
+// Re-exportados aqui para não partir os imports existentes no cliente.
+export { MENU_CATEGORIES } from '../shared/contracts';
+export type {
+  DailyKind,
+  MenuCategory,
+  MenuItem,
+  PublicDiariaPeriod,
+  PublicDailyRef,
+  PublicDiarias,
+} from '../shared/contracts';
 
 export type ScreenType = 
   | 'inicio' 
@@ -24,28 +31,6 @@ export interface ImageAsset {
   scale?: number;
   px?: number;
   py?: number;
-}
-
-export interface MenuItem {
-  id: string;
-  name: string;
-  price: number;
-  currency: string;
-  category: MenuCategory;
-  badge?: string;
-  tagline?: string;
-  description: string;
-  imageUrl: string;
-  dryAgedDays?: number;
-  servesCount?: string;
-  origin?: string;
-  pairingWine?: string;
-  producer?: string;
-  vintage?: string;
-  isChefSpecial?: boolean;
-  dailyKind?: DailyKind;
-  visible?: boolean;
-  order?: number;
 }
 
 export interface AssetOverride {
@@ -224,26 +209,4 @@ export interface DiariaScheduleInput {
   lunch: boolean;
   dinner: boolean;
   itemIds: string[];
-}
-
-export type PublicDiariaPeriod = 'lunch' | 'dinner' | 'closed';
-
-/**
- * O endpoint público /api/diarias devolve apenas a referencia {id, visible} dos
- * pratos agendados, nao o prato completo. Usar isto como MenuItem rebenta em
- * runtime (price undefined), por isso ha que resolver contra a carta.
- */
-export interface PublicDailyRef {
-  id: string;
-  visible?: boolean;
-}
-
-export interface PublicDiarias {
-  date: string;
-  currentMeal: PublicDiariaPeriod;
-  lunch: PublicDailyRef[];
-  dinner: PublicDailyRef[];
-  hasSchedule: boolean;
-  servedMeals: { lunch: boolean; dinner: boolean };
-  closedTitle: string | null;
 }
