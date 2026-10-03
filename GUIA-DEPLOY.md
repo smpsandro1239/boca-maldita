@@ -197,7 +197,43 @@ O script **aborta** se a URL não contiver `test`/`smoke`/`local`, ou se for igu
   `%LOCALAPPDATA%\Temp\opencode\rcheck\`).
 - Conteúdo: se alterou textos/seo, confirmar que o HTML serve o que o painel publicou.
 
-## 6. Segredos / token admin
+## 6. SEO e domínio — o canónico está acoplado ao DNS
+
+**Decisão (2026-10-03):** o domínio final é `https://bocamaldita.pt` (apex, sem `www`).
+O `www.bocamaldita.pt` faz **301** para o apex. Idioma: **PT-only**, sem `hreflang` e sem
+versão EN.
+
+### ⛔ Nunca mudar o canónico antes do DNS
+
+Hoje `index.html` declara `canonical: https://bmaldita.vercel.app/` e isso **é verdade**:
+é para lá que a app está. `og:url`, o `url`/`hasMenu` do JSON-LD, o `Sitemap:` do
+`robots.txt` e o `sitemap.xml` apontam para o mesmo sítio, e são coerentes com a realidade.
+
+**A regra:** canónico, `og:url`, `sitemap.xml` e `robots.txt` só passam a
+`bocamaldita.pt` **no mesmo lote em que o DNS aponta para a Vercel**. Nunca antes.
+
+Porquê — se o canónico mudar primeiro, o Google recebe "a versão verdadeira desta página
+está em `bocamaldita.pt`", responde lá, e encontra o **WordPress**. Passa a considerar a
+homepage do WordPress como canónica para o nosso conteúdo e desindexa a app. É **pior do
+que não ter canónico nenhum**. O mesmo se aplica ao `sitemap.xml` (aponta o crawler para
+conteúdo que não é o nosso) e ao `robots.txt` (o `Sitemap:` errado é sinal de negligência).
+
+Não há terceiro caminho: ou o DNS move e o canónico muda no mesmo lote, ou o canónico fica
+em `vercel.app` até lá. Enquanto o DNS não mudar, `bmaldita.vercel.app` é a verdade actual
+e o Google aceita.
+
+### Ordem do lote de DNS (quando chegar)
+
+1. apontar `bocamaldita.pt` (A/CNAME) para a Vercel e aguardar propagação
+2. `www` → **301** para o apex
+3. no **mesmo lote**: `canonical`, `og:url`, JSON-LD `url`/`hasMenu`, `robots.txt` `Sitemap:`,
+   `sitemap.xml` `<loc>`
+4. verificar com `vercel curl` que o host novo devolve 200 antes de submeter sitemap
+
+### Enquanto o DNS não muda
+
+Deixar como está. Não é dívida, é verdade. A única coisa a fazer entretanto é trabalho que
+não depende do host: schema, robots, `/admin` em `noindex`, imagens, conteúdo citável.
 
 - **Autenticação do painel (D-3):** sessão por cookies **`bmtauth` (HttpOnly) + `bmcsrf`**, TTL de
   14 dias, criados pelo `POST /api/admin/login`. As mutações exigem também o header
