@@ -68,12 +68,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const host = window.location.hostname.replace(/^www\./, '').toLowerCase();
-    const isMenuSubdomain = host === 'menu.bocamaldita.pt' || host.endsWith('.menu.bocamaldita.pt');
-    if (isMenuSubdomain) {
-      window.location.replace('https://www.bocamaldita.pt/#cardapio');
-      return;
-    }
+    // Redirect de menu.bocamaldita.pt REMOVIDO em 2026-10-03. Era código morto:
+    // o subdomínio resolve para 5.253.183.1 (o host antigo do WordPress) e não
+    // é domínio deste projecto na Vercel, portanto este hostname nunca chegava
+    // à app e o window.location.replace nunca executava. Se um dia o
+    // subdomínio passar a ser servido pela Vercel, o redirect tem de ser um 301
+    // no vercel.json — um crawler sem JS não vê um redirect feito em JS.
     if (window.location.hash === '#cardapio') {
       const scrollToMenu = () => {
         document.getElementById('cardapio')?.scrollIntoView({ behavior: 'smooth', block: 'start' });

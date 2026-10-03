@@ -1,4 +1,38 @@
+# Boca Maldita — Vila de Prado
+#
+# NOTA: enquanto o DNS não apontar para a Vercel, o Sitemap e o canonical
+# ficam em bmaldita.vercel.app, que é a verdade actual. Mudar antes do DNS
+# manda o crawler para o WordPress. Ver GUIA-DEPLOY.md, "SEO e domínio".
+
 User-agent: *
 Allow: /
+
+# API: não é conteúdo, não há nada para indexar. Bloquear evita que um
+# crawler gaste crawl budget em /api/menus e /api/diarias.
+Disallow: /api
+
+# Crawlers de IA — explicitamente permitidos. O objectivo é ser citada por
+# estes motores, não escondê-los. Declarar à mão não muda o comportamento
+# (o User-agent: * acima já os cobre); serve para fixar a intenção e para
+# o site não bloquear estes bots por engano num futuro "segurança".
+#
+# NOTA DE EXPECTATIVA: o Google publicou em 2026 que o llms.txt não é factor
+# de ranking. O que faz um motor de resposta citar um site é schema correcto,
+# NAP consistente e conteúdo em blocos curtos e citáveis — não ficheiros de
+# descoberta. O llms.txt é infra-estrutura barata, não alavanca.
+User-agent: GPTBot
+Allow: /
+Disallow: /admin
+Disallow: /api
+
+User-agent: ClaudeBot
+Allow: /
+Disallow: /admin
+Disallow: /api
+
+User-agent: PerplexityBot
+Allow: /
+Disallow: /admin
+Disallow: /api
 
 Sitemap: https://bmaldita.vercel.app/sitemap.xml

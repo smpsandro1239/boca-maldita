@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  NOTA: <loc> em bmaldita.vercel.app até que o DNS aponte para a Vercel.
+  Mudar antes do DNS manda o crawler para o WordPress. Ver GUIA-DEPLOY.md,
+  secção "SEO e domínio".
+
+  Só existe uma URL indexável: as rotas são estado React (App.tsx), não URLs.
+  As páginas legais são <button onClick> e não têm URL — quando lhes for dada
+  uma (/privacidade, /termos), acrescentam-se aqui.
+-->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://bmaldita.vercel.app/</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-10-03</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>

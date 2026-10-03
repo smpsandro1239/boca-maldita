@@ -226,9 +226,39 @@ e o Google aceita.
 
 1. apontar `bocamaldita.pt` (A/CNAME) para a Vercel e aguardar propagação
 2. `www` → **301** para o apex
-3. no **mesmo lote**: `canonical`, `og:url`, JSON-LD `url`/`hasMenu`, `robots.txt` `Sitemap:`,
-   `sitemap.xml` `<loc>`
+3. no **mesmo lote**: `canonical`, `og:url`, JSON-LD `url`/`hasMenu`/`image`, `robots.txt`
+   `Sitemap:`, `sitemap.xml` `<loc>`
 4. verificar com `vercel curl` que o host novo devolve 200 antes de submeter sitemap
+
+**Estado em 2026-10-03:** `bocamaldita.pt` **já está registado na conta Vercel**
+(nameservers Vercel, 5 dias), mas o registo A continua a apontar para `5.253.183.1`
+(WordPress). Falta o passo 1.
+
+### `menu.bocamaldita.pt` — pendente, não é "mudar para 301"
+
+`nslookup menu.bocamaldita.pt 8.8.8.8` → `5.253.183.1`, **o mesmo IP do apex**, e o
+subdomínio não é domínio deste projecto na Vercel. Por isso o redirect client-side que
+estava em `App.tsx` **nunca executou** — o hostname não chega à app. Removido em
+2026-10-03 como código morto.
+
+Quando o DNS mover, decidir explicitamente uma destas duas, e não assumir:
+
+- **não existe produto `menu.`** → nada a fazer. É o caso provável, e é o estado de hoje.
+- **passa a ser necessário** → criar o subdomínio na Vercel e fazer o redirect como **301**
+  no `vercel.json`. Um redirect feito em JavaScript é invisível para quem não executa JS.
+
+### Search Console — verificado por meta tag, não por DNS
+
+Propriedade **URL-prefix** de `https://bmaldita.vercel.app`, verificada pela meta tag
+`google-site-verification` no `<head>` do `index.html`. Não exige tocar em DNS.
+
+A propriedade **Domain** de `bocamaldita.pt` (que agrega subdomínios e dá field data
+consolidado) exige um registo `TXT` — fica para depois do DNS mudar, e é a solução para
+eventual quota excedida do domínio `vercel.app`.
+
+`index.html` tem hoje um **placeholder** no conteúdo da meta tag
+(`PLACEHOLDER_SUBSTITUIR_POR_TOKEN_GSC`). Substituir pelo código real do Search Console e
+fazer um push — o Google só valida a meta tag depois de ela estar servida.
 
 ### Enquanto o DNS não muda
 
@@ -248,3 +278,30 @@ não depende do host: schema, robots, `/admin` em `noindex`, imagens, conteúdo 
   localmente em vez de reimplementar o parsing.
 - `.env` e `.env*` estão excluídos do upload (`.vercelignore` ancorado à raiz). Não commitar
   segredos.
+## 7. Anexo — Google Business Profile (tarefa do dono, não é código)
+
+A ficha **existe** (738 críticas, 3,9 estrelas, Av. do Cávado 4730-460, 253 031 890,
+código Plus `HGXR+6X`), mas mostra **"Adicionar website"** e **"Adicionar informações em
+falta"** — sinal de ficha por reclamar ou abandonada. O site, na altura desta auditoria,
+**não estava indexado** (`site:bmaldita.vercel.app` devolvia 0 resultados).
+
+### Ordem certa
+
+1. **Reclamar a ficha** (Maps → "Reclamar esta empresa"). Sem isto, qualquer pessoa pode
+   sugerir edições ao horário e ao endereço.
+2. **Horário semanal completo** — separador "Horário", os 7 dias, não o "Aberto agora".
+   O print mostrava "Fecha às 00:00" e "Comunicado por 48 pessoas", que sugere horário
+   *user-contributed*. **Não copied o horário do GBP para o schema sem o dono confirmar** —
+   a regra "o GBP é fonte de verdade" só vale se o GBP estiver bem preenchido. Um GBP
+   abandonado é ruído, não autoridade. Confirmado o dono, alinhar `openingHoursSpecification`.
+3. **Preço** — o GBP diz "5-30 € por pessoa" e é a média calculada pelo Google. O
+   `priceRange` do schema ficou em `€€`, que é consistente com essa média. O Pêra-Manca a
+   89 € é outlier, não a experiência típica.
+4. **"Adicionar website"** — deixar em branco até `bocamaldita.pt` responder. Ligar antes
+   seria apontar o perfil para um domínio que ainda serve WordPress.
+5. **Fotos, atributos** (esplanada, vista rio, take-away), **posts**. O site tem 14 imagens;
+   a ficha não tem material recente.
+6. **NAP** — o site tem o telefone e a morada correctos e coincidentes com a ficha
+   (253 031 890 / Av. do Cávado 4730-460 Vila de Prado). A correcção pendente é
+   internal: no código, `SiteContent.address` e `.hours` estão **vazios** enquanto o texto
+   está hardcoded em 5 ficheiros — ver item 10 do plano SEO.

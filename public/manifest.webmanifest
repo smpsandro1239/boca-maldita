@@ -1,0 +1,20 @@
+{
+  "name": "Boca Maldita — Fine Dining & Grill",
+  "short_name": "Boca Maldita",
+  "description": "Teatro culinário com mestria no fogo nobre, carnes maturadas seletas e alta hospitalidade em Vila de Prado.",
+  "lang": "pt-PT",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0C0D0E",
+  "theme_color": "#0C0D0E",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
