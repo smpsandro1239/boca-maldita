@@ -1,0 +1,5 @@
+# O esbuild gera sempre LF. Com core.autocrlf=true (default no Windows), o
+# checkout do api/index.js vinha em CRLF e o proximo `npm run build` marcava-o
+# como modificado sem qualquer mudanca real. Fixar em LF alinha o que o build
+# escreve com o que o git espera -> zero diff espurio.
+api/index.js text eol=lf

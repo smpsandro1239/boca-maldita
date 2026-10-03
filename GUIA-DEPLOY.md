@@ -38,23 +38,27 @@ Parece um artefacto gerado que devia estar no `.gitignore`: `scripts/build-api.m
 | sem `api/index.js` no repo | HTML — fallback da SPA, **sem função** |
 | com `api/index.js` no repo | JSON, 35 itens |
 
-O build do preview correu (`Ready`, 19s) e o `npm run build` **regenerou** o ficheiro na
-máquina da Vercel — e mesmo assim não houve função serverless. Conclusão: **a detecção de
-funções acontece sobre os ficheiros do repo, antes do build**, não sobre o output do build.
-Isto explica também o erro *"No more than 12 Serverless Functions"* quando havia 13
-ficheiros em `api/`: a contagem é feita sobre o que está no repositório.
+Confirmado pelos **logs de build**, não inferido. Em `vercel inspect <url> --logs` do preview:
 
-Portanto, versionado é o que está certo. O bundle é **determinístico**: rebuilds sem
-mexer no servidor dão conteúdo byte a byte igual. Só que no Windows o git pode mostrar
-`api/index.js` como modificado mesmo sem qualquer alteração real, por causa da normalização
-de LF/CRLF. Para distinguir um caso do outro:
-
-```bash
-git diff --ignore-cr-at-eol -- api/index.js   # 0 linhas = só fim de linha
+```
+> node scripts/build-api.mjs && vite build && node scripts/prerender.mjs
+api/index.js  89.6kb
 ```
 
+O esbuild gerou o ficheiro na máquina da Vercel 0,13s depois do `buildCommand` começar — e
+mesmo assim não houve função serverless. Isto fecha a hipótese alternativa (o ficheiro não ter
+sido gerado): **a detecção de funções acontece sobre os ficheiros do repo, antes do build**,
+não sobre o output do build. Explica também o erro *"No more than 12 Serverless Functions"*
+quando havia 13 ficheiros em `api/`: a contagem é feita sobre o que está no repositório.
+
+Portanto, versionado é o que está certo. O bundle é **determinístico**: rebuilds sem
+mexer no servidor dão conteúdo byte a byte igual. Para impedir que o Windows o marque como
+modificado só por causa dos fins de linha, o `api/index.js` está fixado em LF no
+`.gitattributes` — deixa de ser preciso `--ignore-cr-at-eol` para distinguir um diff real
+de ruído.
+
 **Ao mexer em `server/lib/*`: correr `npm run verify` e commitar o `api/index.js`
-resultante no mesmo commit.** Se, ignorando o CRLF, o diff for de zero linhas, o servidor
+resultante no mesmo commit.** Se não aparecer no diff, o servidor
 não mudou e o ficheiro pode ficar como está.
 
 ### ⛔ O CLI constrói o working directory, não o commit
