@@ -165,19 +165,30 @@ As alterações só são visíveis para os visitantes depois de clicar em **Publ
 
 ## Deploy na Vercel
 
-> **Cada push para `main` deixa de fazer deploy.** O `vercel.json` tem
-> `"git": { "deploymentEnabled": false }`, por isso o deploy passa a ser sempre
-> manual e explícito:
+> **O deploy é o push para `main`.** Push para `main` faz deploy de produção;
+> pushes para outros ramos fazem previews. O `vercel.json` **não** deve levar
+> `"git": { "deploymentEnabled": false }` — ver o aviso em baixo.
 >
 > ```bash
-> npm run verify          # gate obrigatório, tem de estar verde
-> npx vercel@59.26.0 --prod --yes
+> npm run verify              # gate obrigatório, tem de estar verde
+> git push origin main        # isto é o deploy
 > ```
 >
-> Um lote de trabalho = um commit = um deploy. O objectivo é poder reverter com
-> um comando e saber exactamente o que foi para produção.
+> O `npm run verify` corre **antes** do push, nunca depois: o build remoto é
+> caro e um push com o gate vermelho só troca um erro local por um build falhado.
+>
+> **Porquê o push e não a CLI:** `vercel --prod` constrói o *working directory*,
+> não o commit. Se o `vercel.json` do disco divergir do `HEAD`, a produção fica
+> órfã de qualquer commit — e os deployments da CLI nem trazem `githubCommitSha`.
+> Com o push, o deployment aponta sempre para um SHA identificável.
 
-O deploy é feito pela CLI, não pelo GitHub. Passos:
+**Armadilha: não voltar a acrescentar `git.deploymentEnabled: false`.** A
+documentação da Vercel diz que a chave só afecta commits do Git, mas na prática
+**também bloqueia o deploy por CLI**, que falha com `Error: Not authorized` —
+o mesmo erro que a v60 dá sem pin. Como o CLI deixou de ser o caminho de
+deploy, a chave só traria transtorno.
+
+Passos:
 
 1. `npm run verify` tem de estar verde (typecheck + testes + smoke + build).
 

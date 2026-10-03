@@ -4,38 +4,56 @@ Documento operacional do deploy, smoke tests e higiene. **Lê antes de fazer qua
 
 ## 1. Regra de ouro: UM deploy por lote
 
-- **O push já não faz deploy.** O `vercel.json` tem `"git": { "deploymentEnabled": false }`,
-  por isso `git push` é apenas sincronização de repositório. O deploy é sempre manual:
-  `npx vercel@59.26.0 --prod --yes`.
-- Um lote = `npm run verify` verde → **UMA** execução de `npx vercel@59.26.0 --prod --yes`
-  → validação → commit/push.
-- **PIN obrigatório:** `npx vercel` (sem versão) instalou a **v60**, que falha com
-  `Error: Not authorized` ao fazer `--prod`. Usar sempre **`vercel@59.26.0`**.
-- **NUNCA** loops de retry: cada execução nova cria um deployment novo (polui o histórico e
-  torna ambíguo qual é o atual). Uma falha de rede ou um 400 do edge **não** justificam
-  repetir sem primeiro confirmar em `vercel ls` o que está actually deployed.
-- **Gate único obrigatório:** `npm run verify` (typecheck + testes + smoke + build).
-  Não vale a pena rodar as peças séparément.
-- **Publicar a carta em produção exige `npm run verify` verde.** É uma escrita real
-  na base de dados e não é reversível por deploy: tem de ser precedida de uma
-  comparação item a item entre a produção e `MENU_ITEMS`, e de **um único `PUT`**
-  (nunca `DELETE` + `PUT`).
+- **O deploy é o push para `main`.** Push para `main` faz deploy de produção; pushes
+  para outros ramos fazem previews.
+- Um lote = `npm run verify` verde → **um commit** → **um `git push origin main`** → validação.
+- **NUNCA** loops de CLI para "tentar outra vez": cada `vercel --prod` cria um deployment
+  novo, polui o histórico e torna ambíguo qual está em produção.
+- **Gate único obrigatório:** `npm run verify` (typecheck + testes + smoke + build),
+  **antes** do push. Não vale a pena rodar as peças separadamente.
+- **Publicar a carta em produção exige `npm run verify` verde.** É uma escrita real na base
+  de dados e não é reversível por deploy: tem de ser precedida de uma comparação item a
+  item entre a produção e `MENU_ITEMS`, e de **um único `PUT`** (nunca `DELETE` + `PUT`).
 
-## 2. Fluxo correto e o "Error: fetch failed"
+### ⛔ NÃO acrescentar `"git": { "deploymentEnabled": false }` ao `vercel.json`
+
+Descoberto em 2026-10-03. A documentação da Vercel diz que a chave "specifies the branches
+that will not trigger an auto-deployment when committing to them", ou seja, só commits do
+Git. **Na prática também bloqueia o deploy por CLI**, que falha com
+`Error: Not authorized` — o mesmo erro que a v60 dá sem pin, e por isso facilmente
+confundido com o problema da versão.
+
+Como o deploy passou a ser o push, a chave só serviria para tornar a CLI inutilizável.
+Fica o auto-deploy activo de propósito.
+
+### ⛔ O CLI constrói o working directory, não o commit
+
+Este é o motivo de o deploy ser o push. `vercel --prod` faz upload do que está em disco,
+não do `HEAD`. Em 2026-10-03 o deployment `i7xi8v49m` foi construído com o `vercel.json`
+**já alterado em disco** e o `HEAD` **sem** essa alteração: a produção ficou órfã de
+qualquer commit, e nenhum deployment de CLI traz `githubCommitSha`. Com o push, o
+deployment corresponde sempre a um SHA verificável.
+
+## 2. Fluxo correcto e o "Error: fetch failed"
 
 ### Sequência
-1. `npm run verify` — tem de estar verde.
-2. `npx vercel@59.26.0 --prod --yes` (o `--yes` usa as env vars do projeto ligado; não há env vars locais
-   a definir para produção). **Nunca** degradar para `npx vercel` sem pin — ver secção 1.
-3. Verificar:
-   - `npx vercel ls --prod bmaldita --limit 3` → o deployment mais recente com `● Ready` +
+1. `npm run verify` — tem de estar verde, **antes** de qualquer push para `main`.
+2. `git add -A && git commit` — um commit por lote.
+3. `git status --porcelain` tem de estar **vazio**. O push é o deploy: não pode apanhar o
+   working directory sujo.
+4. `git push origin main` — **isto é o deploy de produção.**
+5. Verificar:
+   - `npx vercel@59.26.0 ls bmaldita --limit 3` → o deployment mais recente com `● Ready` +
      `Environment Production` é o que está aliased a `bmaldita.vercel.app`.
+   - `npx vercel@59.26.0 inspect <url-do-deploy>` → confirmar que `githubCommitSha` está
+     preenchido e **igual ao `HEAD`**. Se vier vazio, o deployment não veio do push e a
+     rastreabilidade está perdida.
    - `npx vercel@59.26.0 curl -s https://bmaldita.vercel.app/ > body.html` → deve conter o
-     `<title>` do site. **Usar redireccionamento do shell, não `-o`/`-w`**: o
-     `vercel curl` não honra essas opções do `curl` e cria ficheiros chamados `-s`/`-w`
-     no repositório.
-4. Só depois: `git add -A && git commit && git push origin main` (sincroniza o
-   repositório; não volta a fazer deploy).
+     `<title>` do site. **Usar redireccionamento do shell, não `-o`/`-w`**: o `vercel curl`
+     não honra essas opções do `curl` e cria ficheiros chamados `-s`/`-w` no repositório.
+
+> O **pin `vercel@59.26.0`** mantém-se para os comandos de leitura e inspecção (`ls`,
+> `inspect`, `curl`). Sem pin, o `npx vercel` instala a v60.
 
 ### Causa-raiz investigada (2026-09-24)
 - **Sintoma:** o CLI imprime os logs de build remoto e depois falha com `Error: fetch failed`,
