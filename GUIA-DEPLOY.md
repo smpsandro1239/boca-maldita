@@ -26,6 +26,37 @@ confundido com o problema da versão.
 Como o deploy passou a ser o push, a chave só serviria para tornar a CLI inutilizável.
 Fica o auto-deploy activo de propósito.
 
+### ⛔ `api/index.js` TEM de estar committed — é o ficheiro que a Vercel detecta como função
+
+Parece um artefacto gerado que devia estar no `.gitignore`: `scripts/build-api.mjs` produz
+`api/index.js` a partir de `scripts/api-entry.ts` com esbuild, e corre em cada
+`npm run build`. **Não pode ser removido do git.** Testado em 2026-10-03 no ramo
+`teste/sem-bundle-api`, que fazia `git rm --cached api/index.js` + `.gitignore`:
+
+| | `/api/menus` no preview |
+|---|---|
+| sem `api/index.js` no repo | HTML — fallback da SPA, **sem função** |
+| com `api/index.js` no repo | JSON, 35 itens |
+
+O build do preview correu (`Ready`, 19s) e o `npm run build` **regenerou** o ficheiro na
+máquina da Vercel — e mesmo assim não houve função serverless. Conclusão: **a detecção de
+funções acontece sobre os ficheiros do repo, antes do build**, não sobre o output do build.
+Isto explica também o erro *"No more than 12 Serverless Functions"* quando havia 13
+ficheiros em `api/`: a contagem é feita sobre o que está no repositório.
+
+Portanto, versionado é o que está certo. O bundle é **determinístico**: rebuilds sem
+mexer no servidor dão conteúdo byte a byte igual. Só que no Windows o git pode mostrar
+`api/index.js` como modificado mesmo sem qualquer alteração real, por causa da normalização
+de LF/CRLF. Para distinguir um caso do outro:
+
+```bash
+git diff --ignore-cr-at-eol -- api/index.js   # 0 linhas = só fim de linha
+```
+
+**Ao mexer em `server/lib/*`: correr `npm run verify` e commitar o `api/index.js`
+resultante no mesmo commit.** Se, ignorando o CRLF, o diff for de zero linhas, o servidor
+não mudou e o ficheiro pode ficar como está.
+
 ### ⛔ O CLI constrói o working directory, não o commit
 
 Este é o motivo de o deploy ser o push. `vercel --prod` faz upload do que está em disco,
@@ -45,15 +76,47 @@ deployment corresponde sempre a um SHA verificável.
 5. Verificar:
    - `npx vercel@59.26.0 ls bmaldita --limit 3` → o deployment mais recente com `● Ready` +
      `Environment Production` é o que está aliased a `bmaldita.vercel.app`.
-   - `npx vercel@59.26.0 inspect <url-do-deploy>` → confirmar que `githubCommitSha` está
-     preenchido e **igual ao `HEAD`**. Se vier vazio, o deployment não veio do push e a
-     rastreabilidade está perdida.
+   - Confirmar a rastreabilidade com o comando de baixo — **`vercel inspect` não serve**,
+     ver a nota "Rastreabilidade" mais adiante.
    - `npx vercel@59.26.0 curl -s https://bmaldita.vercel.app/ > body.html` → deve conter o
      `<title>` do site. **Usar redireccionamento do shell, não `-o`/`-w`**: o `vercel curl`
      não honra essas opções do `curl` e cria ficheiros chamados `-s`/`-w` no repositório.
 
 > O **pin `vercel@59.26.0`** mantém-se para os comandos de leitura e inspecção (`ls`,
-> `inspect`, `curl`). Sem pin, o `npx vercel` instala a v60.
+> `inspect`, `curl`, `api`). Sem pin, o `npx vercel` instala a v60.
+
+### Rastreabilidade: confirmar que o deployment corresponde ao commit
+
+⚠️ **`vercel inspect --json` NÃO devolve metadados Git.** A estrutura que sai é podada —
+`id, name, url, target, readyState, createdAt, duration, buildMachine, aliases, builds,
+contextName` — e **sem `githubCommitSha`**. O `inspect` em modo texto também não o mostra.
+Procurar por ele aí é perda de tempo.
+
+A única via é a API crua, lendo `meta.githubCommitSha`:
+
+```bash
+# id do deployment: sai de "vercel inspect <url>" (campo "id", ex. dpl_H2dEE4...)
+MSYS_NO_PATHCONV=1 npx vercel@59.26.0 api "/v13/deployments/<id>"
+```
+
+⚠️ **O `MSYS_NO_PATHCONV=1` é obrigatório no Git Bash.** Sem ele, o path `/v13/deployments/...`
+é convertido num caminho Windows e o comando falha com `Error: Invalid arguments. Use an API
+path starting with /` — mensagem que não dá nenhuma pista de que a causa é a conversão de path.
+
+```bash
+# ❌ falha: "Error: Invalid arguments."
+npx vercel@59.26.0 api "/v13/deployments/dpl_H2dEE4GbTGiFi7yuYzL99XyLaA9F"
+
+# ✅ funciona
+MSYS_NO_PATHCONV=1 npx vercel@59.26.0 api "/v13/deployments/dpl_H2dEE4GbTGiFi7yuYzL99XyLaA9F"
+```
+
+No PowerShell ou cmd não é preciso `MSYS_NO_PATHCONV`; a conversão de path é específica do
+Git Bash. Para comparar com o repositório:
+
+```bash
+node -e "const d=require('./insp.json');console.log(d.meta.githubCommitSha)"; git rev-parse HEAD
+```
 
 ### Causa-raiz investigada (2026-09-24)
 - **Sintoma:** o CLI imprime os logs de build remoto e depois falha com `Error: fetch failed`,
