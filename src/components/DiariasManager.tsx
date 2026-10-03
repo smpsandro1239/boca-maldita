@@ -227,7 +227,7 @@ export default function DiariasManager({ busy, run, menus, showToast }: DiariasM
           await reload();
           resetEditor(created.schedule.anchorDate);
         },
-        'Agendamento criado. Já fica visível no Prato do Dia.',
+        'Agendamento criado. Já fica visível no Menu Executivo.',
       );
     }
   };
@@ -289,9 +289,9 @@ export default function DiariasManager({ busy, run, menus, showToast }: DiariasM
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="font-serif text-lg text-[#F7F5F0] mb-1">Diárias · Prato do Dia</h3>
+        <h3 className="font-serif text-lg text-[#F7F5F0] mb-1">Menu Executivo</h3>
         <p className="text-xs text-[#F7F5F0]/60 leading-relaxed">
-          Programe as diárias num calendário: 2 carnes e 2 peixes, com almoço e/ou jantar. Pode repetir todas as semanas, de 15 em 15 dias, todos os meses ou só num dia; validar ao longo de um período ou sem limite até alterar; e copiar a programação de um dia para outro. Sem programação, o site mostra as diárias regulares.
+          Programe o Menu Executivo num calendário: 2 carnes e 2 peixes, com almoço e/ou jantar. Pode repetir todas as semanas, de 15 em 15 dias, todos os meses ou só num dia; validar ao longo de um período ou sem limite até alterar; e copiar a programação de um dia para outro. Sem programação, o site mostra os pratos do Menu Executivo.
         </p>
       </div>
 
@@ -589,7 +589,7 @@ export default function DiariasManager({ busy, run, menus, showToast }: DiariasM
         </div>
         {orderedSchedules.length === 0 ? (
           <div className="bg-[#141518] border border-[#282A30] p-5 text-sm text-[#F7F5F0]/60">
-            Sem agendamentos. Enquanto não programar nada, o site mostra as diárias regulares.
+            Sem agendamentos. Enquanto não programar nada, o site mostra os pratos do Menu Executivo.
           </div>
         ) : (
           orderedSchedules.map((schedule) => (

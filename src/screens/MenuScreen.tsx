@@ -136,15 +136,15 @@ export default function MenuScreen({
 
         </div>
 
-        {/* Prato do Dia service note */}
+        {/* Menu Executivo service note */}
         {selectedCategory === 'diarias' && (
           <div className="bg-[#141518] border border-[#282A30] px-4 py-3 text-xs text-[#A6A8AD] flex flex-wrap items-center gap-x-5 gap-y-1.5">
             <span className="flex items-center gap-2 text-[#D4A373] font-mono uppercase tracking-widest text-[10px]">
               <UtensilsCrossed className="w-3.5 h-3.5" />
-              Prato do Dia
+              Menu Executivo
             </span>
             {todayDiarias && todayDiarias.currentMeal === 'closed' ? (
-              <span>Hoje encerrado{todayDiarias.closedTitle ? ` — ${todayDiarias.closedTitle}` : ''}. A mostrar as diárias disponíveis.</span>
+              <span>Hoje encerrado{todayDiarias.closedTitle ? ` — ${todayDiarias.closedTitle}` : ''}. A mostrar os pratos disponíveis.</span>
             ) : (
               <>
                 <span>
@@ -161,7 +161,7 @@ export default function MenuScreen({
                           : 'Programação do dia sem serviço definido'}
                   </span>
                 )}
-                {!todayDiarias?.hasSchedule && <span>A mostrar as diárias regulares.</span>}
+                {!todayDiarias?.hasSchedule && <span>A mostrar os pratos regulares do Menu Executivo.</span>}
               </>
             )}
           </div>

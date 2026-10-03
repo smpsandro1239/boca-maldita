@@ -6,7 +6,9 @@ export { MENU_CATEGORIES };
 export type { MenuCategory };
 
 export const MENU_CATEGORY_LABELS: Record<MenuCategory, string> = {
-  diarias: 'Prato do Dia',
+  // Rótulo visível. A chave 'diarias' é identificador (está gravada na BD e no
+  // contrato partilhado) e nunca muda — só o texto que o utilizador vê.
+  diarias: 'Menu Executivo',
   carnes: 'Carnes Nobres & Dry-Aged',
   mar: 'Peixe & Mar',
   entradas: 'Entradas de Assinatura',

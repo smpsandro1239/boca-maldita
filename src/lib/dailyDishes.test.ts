@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MENU_ITEMS } from '../data/menuData';
+import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 import type { MenuItem } from '../types';
 import { pickDailyDishes, resolveDailyDishes } from './dailyDishes';
 
@@ -72,5 +73,31 @@ describe('pickDailyDishes', () => {
         expect(() => item.name.toLowerCase()).not.toThrow();
       }
     }
+  });
+});
+
+// O rotulo visivel passou a "Menu Executivo". O identificador 'diarias' NAO pode
+// mudar: esta gravado como category nos 35 itens da BD e no contrato partilhado.
+// Este bloco existe para travar as duas coisas em sentidos opostos.
+describe('Menu Executivo: rotulo visivel e identificador', () => {
+  it('o rotulo visivel da categoria e exactamente "Menu Executivo"', () => {
+    expect(MENU_CATEGORY_LABELS.diarias).toBe('Menu Executivo');
+  });
+
+  it('o rotulo nao volta a usar "Diarias" nem "Prato do Dia"', () => {
+    expect(MENU_CATEGORY_LABELS.diarias).not.toMatch(/diári/i);
+    expect(MENU_CATEGORY_LABELS.diarias).not.toMatch(/prato de dia/i);
+  });
+
+  it('o identificador continua a ser "diarias"', () => {
+    expect(dailyItems.every((i) => i.category === 'diarias')).toBe(true);
+    expect(dailyItems).toHaveLength(4);
+  });
+
+  it('o filtro pela categoria devolve os 4 pratos: 2 carnes e 2 peixes', () => {
+    const shown = MENU_ITEMS.filter((i) => i.category === 'diarias');
+    expect(shown).toHaveLength(4);
+    expect(shown.filter((i) => i.dailyKind === 'carne')).toHaveLength(2);
+    expect(shown.filter((i) => i.dailyKind === 'peixe')).toHaveLength(2);
   });
 });

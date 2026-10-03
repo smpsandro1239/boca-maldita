@@ -71,7 +71,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   carnes: 'Carnes',
   mar: 'Peixe & Mar',
   entradas: 'Entradas',
-  diarias: 'Diárias / Prato do Dia',
+  diarias: 'Menu Executivo',
   mapa: 'Mapa',
   pessoas: 'Pessoas',
 };
@@ -629,7 +629,7 @@ export default function AdminPanel({
     { id: 'geral', label: 'Estado', icon: LayoutDashboard },
     { id: 'imagens', label: 'Imagens & Logótipo', icon: ImageIcon },
     { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
-    { id: 'diarias', label: 'Diárias', icon: Soup },
+    { id: 'diarias', label: 'Menu Executivo', icon: Soup },
     { id: 'reservas', label: 'Reservas', icon: CalendarDays },
     { id: 'dias', label: 'Datas Fechadas', icon: CalendarX },
     { id: 'avaliacoes', label: 'Avaliações', icon: Star },
@@ -2128,11 +2128,11 @@ interface ItemField {
 
 const ITEM_FIELDS: ItemField[] = [
   { key: 'name', label: 'Nome do prato', type: 'text', desc: 'Como aparece no menu do site.' },
-  { key: 'price', label: 'Preço', type: 'number', desc: 'Em euros (ex.: 14.90). Não é usado se este item for um "Menu do Dia" com preço incluído.' },
-  { key: 'badge', label: 'Distintivo (ex.: "Recomendado")', type: 'text', desc: 'Rótulo pequeno sobre a foto. Ex.: "Dry-Aged 60D", "Diária · Carne".' },
+  { key: 'price', label: 'Preço', type: 'number', desc: 'Em euros (ex.: 14.90). Não é usado se este item for do "Menu Executivo" com preço incluído.' },
+  { key: 'badge', label: 'Distintivo (ex.: "Recomendado")', type: 'text', desc: 'Rótulo pequeno sobre a foto. Ex.: "Dry-Aged 60D", "Menu Executivo · Carne".' },
   { key: 'tagline', label: 'Frase curta', type: 'text', desc: 'Slogan de uma linha, usado no modal de detalhes do prato.' },
   { key: 'imageUrl', label: 'Imagem (link)', type: 'text', desc: 'Cole o "Link Direto" de uma imagem gerida no separador Imagens & Logótipo. Pode ficar vazio.' },
-  { key: 'servesCount', label: 'Serve (ex.: "2 pessoas")', type: 'text', desc: 'Quantidade recomendada. Ex.: "1 pessoa", "2 a 3 pessoas", "Menu do Dia".' },
+  { key: 'servesCount', label: 'Serve (ex.: "2 pessoas")', type: 'text', desc: 'Quantidade recomendada. Ex.: "1 pessoa", "2 a 3 pessoas", "Menu Executivo".' },
   { key: 'dryAgedDays', label: 'Dias de maturação (opcional)', type: 'number', desc: 'Só para carne maturada. Mostra "X dias em câmara de sal" no detalhe.' },
   { key: 'origin', label: 'Origem / produtor', type: 'text', desc: 'Proveniência mostrada com um ícone no card do menu.' },
   { key: 'pairingWine', label: 'Sugestão de vinho', type: 'text', desc: 'Vinho recomendado, aparece no card e no detalhe.' },
@@ -2141,7 +2141,7 @@ const ITEM_FIELDS: ItemField[] = [
 function itemFieldsFor(category: MenuItem['category']): ItemField[] {
   if (category === 'diarias') {
     return [
-      { key: 'dailyKind', label: 'É carne ou peixe?', type: 'select', options: [{ value: '', label: '— não definido —' }, { value: 'carne', label: 'Carne' }, { value: 'peixe', label: 'Peixe' }], desc: 'Define em que lista aparece no agendamento das Diárias: "2 Carnes" ou "2 Peixes".' },
+      { key: 'dailyKind', label: 'É carne ou peixe?', type: 'select', options: [{ value: '', label: '— não definido —' }, { value: 'carne', label: 'Carne' }, { value: 'peixe', label: 'Peixe' }], desc: 'Define em que lista aparece no agendamento do Menu Executivo: "2 Carnes" ou "2 Peixes".' },
       ...ITEM_FIELDS,
     ];
   }

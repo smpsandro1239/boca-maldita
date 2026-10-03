@@ -2,7 +2,7 @@ import { MenuItem } from '../types';
 import { getAssetUrl } from './assets';
 
 export const MENU_ITEMS: MenuItem[] = [
-  // Diárias · Prato do Dia (com direito a prato, pão, bebida, sobremesa e café)
+  // Menu Executivo (com direito a prato, pão, bebida, sobremesa e café)
   {
     id: 'diaria-bife-minhota',
     name: 'Bife à Minhota do Dia',
@@ -10,11 +10,11 @@ export const MENU_ITEMS: MenuItem[] = [
     currency: '€',
     category: 'diarias',
     dailyKind: 'carne',
-    badge: 'Diária · Carne',
-    tagline: 'Menu do Dia Completo',
-    description: 'Bife de vaca grelhado na brasa de azinho com molho da casa, arroz de pimentos, batatas fritas e grelos salteados. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    badge: 'Menu Executivo · Carne',
+    tagline: 'Menu Executivo Completo',
+    description: 'Bife de vaca grelhado na brasa de azinho com molho da casa, arroz de pimentos, batatas fritas e grelos salteados. Menu Executivo completo — inclui prato, pão, bebida, sobremesa e café.',
     imageUrl: getAssetUrl('dish-diaria-bife'),
-    servesCount: 'Menu do Dia',
+    servesCount: 'Menu Executivo',
     origin: 'Vaca Minhota',
     pairingWine: 'Copo de Vinho da Casa (incluído)',
     isChefSpecial: true
@@ -26,11 +26,11 @@ export const MENU_ITEMS: MenuItem[] = [
     currency: '€',
     category: 'diarias',
     dailyKind: 'carne',
-    badge: 'Diária · Carne',
+    badge: 'Menu Executivo · Carne',
     tagline: 'Assado Lentamente',
-    description: 'Frango do campo assado no churrasco com pimentão e orégão, acompanhado de batata assada, esparregado e salada fresca. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    description: 'Frango do campo assado no churrasco com pimentão e orégão, acompanhado de batata assada, esparregado e salada fresca. Menu Executivo completo — inclui prato, pão, bebida, sobremesa e café.',
     imageUrl: getAssetUrl('dish-diaria-frango'),
-    servesCount: 'Menu do Dia',
+    servesCount: 'Menu Executivo',
     origin: 'Frango do Campo',
     pairingWine: 'Copo de Vinho da Casa (incluído)'
   },
@@ -41,11 +41,11 @@ export const MENU_ITEMS: MenuItem[] = [
     currency: '€',
     category: 'diarias',
     dailyKind: 'peixe',
-    badge: 'Diária · Peixe',
+    badge: 'Menu Executivo · Peixe',
     tagline: 'Receita de Família',
-    description: 'Pescada fresca do dia cozida com batata às rodelas, ovo escalfado e molho de azeite da horta com coentros. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    description: 'Pescada fresca do dia cozida com batata às rodelas, ovo escalfado e molho de azeite da horta com coentros. Menu Executivo completo — inclui prato, pão, bebida, sobremesa e café.',
     imageUrl: getAssetUrl('dish-diaria-pescada'),
-    servesCount: 'Menu do Dia',
+    servesCount: 'Menu Executivo',
     origin: 'Pescado do Dia',
     pairingWine: 'Copo de Vinho da Casa (incluído)',
     isChefSpecial: true
@@ -57,11 +57,11 @@ export const MENU_ITEMS: MenuItem[] = [
     currency: '€',
     category: 'diarias',
     dailyKind: 'peixe',
-    badge: 'Diária · Peixe',
+    badge: 'Menu Executivo · Peixe',
     tagline: 'Brasa de Azinho',
-    description: 'Sardinhas do Atlântico assadas em brasa de azinho com pimento assado, batata cozida e broa de milho minhota. Menu do dia completo — inclui prato, pão, bebida, sobremesa e café.',
+    description: 'Sardinhas do Atlântico assadas em brasa de azinho com pimento assado, batata cozida e broa de milho minhota. Menu Executivo completo — inclui prato, pão, bebida, sobremesa e café.',
     imageUrl: getAssetUrl('dish-diaria-sardinha'),
-    servesCount: 'Menu do Dia',
+    servesCount: 'Menu Executivo',
     origin: 'Atlântico (Pescado do Dia)',
     pairingWine: 'Copo de Vinho da Casa (incluído)'
   },

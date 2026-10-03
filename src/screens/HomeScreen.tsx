@@ -570,7 +570,7 @@ export default function HomeScreen({
         </div>
       </section>
 
-      {/* ================= DIÁRIAS · PRATO DO DIA ================= */}
+      {/* ================= MENU EXECUTIVO ================= */}
       <section className="w-full py-20 lg:py-24 bg-[#141518] border-b border-[#282A30]" id="diarias">
         <div className="max-w-7xl mx-auto px-5 lg:px-12">
 
@@ -579,7 +579,7 @@ export default function HomeScreen({
             <div className="flex items-center justify-center gap-3">
               <span className="h-[1.5px] w-10 bg-[#D4A373]"></span>
               <span className="text-xs uppercase tracking-[0.25em] text-[#D4A373] font-sans font-semibold">
-                Diárias · Prato do Dia
+                Menu Executivo
               </span>
               <span className="h-[1.5px] w-10 bg-[#D4A373]"></span>
             </div>
@@ -636,7 +636,7 @@ export default function HomeScreen({
                       )}
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <span className="bg-[#D4A373] text-[#0C0D0E] text-[11px] font-sans uppercase tracking-widest px-3 py-1 font-semibold">
-                          Ver Menu do Dia
+                          Ver Menu Executivo
                         </span>
                       </div>
                     </div>
@@ -671,7 +671,7 @@ export default function HomeScreen({
               onClick={() => onNavigate('menu-carnes')}
               className="inline-flex items-center gap-2 text-[#F7F5F0] hover:text-[#D4A373] text-xs uppercase tracking-[0.2em] font-sans font-semibold transition-colors group"
             >
-              <span>Ver todas as Diárias e a Carta Completa</span>
+              <span>Ver todo o Menu Executivo e a Carta Completa</span>
               <ArrowRight className="w-4 h-4 text-[#D4A373] group-hover:translate-x-1.5 transition-transform" />
             </button>
           </div>
