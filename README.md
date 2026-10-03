@@ -70,7 +70,16 @@ Pré-requisitos: Node.js >= 20.
 | `npm start`        | Serve a API (e o `dist/` se existir) em produção     |
 | `npm run lint`     | Verificação de tipos (tsc --noEmit)               |
 | `npm run typecheck`| Alias de `lint`                                    |
+| `npm run test`     | Testes unitários e de render (Vitest)              |
+| `npm run smoke`    | Smoke test da API em base efémera                  |
+| `npm run verify`   | **Gate de pré-deploy**: typecheck + test + smoke + build |
 | `npm run clean`    | Remove artefactos de build (`dist/`, `.vercel/`)    |
+
+> `npm run verify` é obrigatório antes de qualquer deploy e antes de publicar a
+> carta em produção. Como o `tsc` só vale se os tipos existirem, `@types/react` e
+> `@types/react-dom` são `devDependencies` permanentes: sem eles os hooks vêm de
+> JS inferido, `useState`/`useMemo` devolvem `any` e o cliente nunca é
+> verificado a sério.
 
 ## Estrutura
 
@@ -129,6 +138,11 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 
 Acede-se em **https://bmaldita.vercel.app/admin** (em dev: `http://localhost:3001/admin`). O site público **não mostra qualquer botão de acesso** — ao abrir `/admin` é pedido o `ADMIN_TOKEN` num ecrã de login. Ao entrar, a sessão fica guardada em cookies **`bmtauth` (HttpOnly) + `bmcsrf`** durante 14 dias; o token em si não é guardado no navegador.
 
+**Como a autenticação funciona (importante para scripts):**
+
+- **Principal:** cookie `bmtauth` + cabeçalho `X-Csrf-Token` com o valor do cookie `bmcsrf`. É o caminho do browser e o que deve ser usado por qualquer automação com sessão.
+- **Fallback:** cabeçalho `X-Admin-Token` com o valor do `ADMIN_TOKEN`. Só para integração/serviço a servidor; em qualquer caso o token é comparado com o do servidor e nunca deve ser registado em logs, commits ou capturas.
+
 Separa-se em:
 
 - **Estado** — contadores de reservas, contactos, newsletter e pratos, com explicação do fluxo.
@@ -151,15 +165,33 @@ As alterações só são visíveis para os visitantes depois de clicar em **Publ
 
 ## Deploy na Vercel
 
-O projeto está ligado ao repositório GitHub: cada push para `main` é publicado automaticamente.
+> **Cada push para `main` deixa de fazer deploy.** O `vercel.json` tem
+> `"git": { "deploymentEnabled": false }`, por isso o deploy passa a ser sempre
+> manual e explícito:
+>
+> ```bash
+> npm run verify          # gate obrigatório, tem de estar verde
+> npx vercel@59.26.0 --prod --yes
+> ```
+>
+> Um lote de trabalho = um commit = um deploy. O objectivo é poder reverter com
+> um comando e saber exactamente o que foi para produção.
 
-1. Em Settings > Environment Variables do projeto, defina em produção:
+O deploy é feito pela CLI, não pelo GitHub. Passos:
+
+1. `npm run verify` tem de estar verde (typecheck + testes + smoke + build).
+
+2. Em Settings > Environment Variables do projeto, defina em produção:
    - `ADMIN_TOKEN` — token usado pelo painel de administração
    - `TURSO_URL` e `TURSO_AUTH_TOKEN` — base de dados persistente
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — confirmações por email
    - `SITE_CONTACT_EMAIL` — email de contacto global (opcional; por omissão `smpsandro1239@gmail.com`)
    - `APP_URL` — `https://bmaldita.vercel.app`
    - `DB_PATH` — não é preciso em produção (o Turso sobrepõe-se)
+
+   Os valores vão **entre aspas** no `.env` ou nas variáveis da Vercel, sobretudo
+   a `TURSO_AUTH_TOKEN`, que é um JWT com pontos: sem aspas, o shell e o parser
+   da Vercel podem truncá-lo.
 
 2. Criar a base Turso (uma vez):
 

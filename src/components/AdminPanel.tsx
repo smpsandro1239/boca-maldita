@@ -535,7 +535,9 @@ export default function AdminPanel({
     const startPx = asset.px ?? 50;
     const startPy = asset.py ?? 50;
 
-    const onMove = (ev: PointerEvent) => {
+    // Listener de window: recebe o PointerEvent do DOM, nao o sintetico do React
+    // que o import da linha 2 traz. Sem qualificar, o parametro ficava errado.
+    const onMove = (ev: globalThis.PointerEvent) => {
       const dx = ev.clientX - startX;
       const dy = ev.clientY - startY;
       const nextPx = clamp(startPx + (dx / rect.width) * 100, 0, 100);
@@ -887,7 +889,7 @@ export default function AdminPanel({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={openNewItem}
+                  onClick={() => openNewItem()}
                   className="flex items-center gap-2 bg-[#D4A373] hover:bg-[#e0b585] text-[#0C0D0E] px-4 py-2 text-xs uppercase tracking-wider font-semibold shrink-0"
                 >
                   <Plus className="w-4 h-4" />

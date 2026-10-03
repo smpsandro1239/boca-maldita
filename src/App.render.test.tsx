@@ -12,8 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
 import App from './App';
+import LegalScreen from './screens/LegalScreen';
 import { MENU_ITEMS } from './data/menuData';
-import { DEFAULT_SITE_CONTENT } from './context/SiteContext';
+import { DEFAULT_SITE_CONTENT, SiteProvider } from './context/SiteContext';
+import type { LegalDoc } from './types';
 
 const DAILY = MENU_ITEMS.filter((i) => i.category === 'diarias');
 
@@ -97,5 +99,66 @@ describe('app renderiza com o formato real do servidor', () => {
     // Se alguem reintroduzir price.toFixed nas refs, este teste tem de falhar.
     const badRefs = serverDailyResponse.lunch.map((r) => ({ ...r, price: undefined }));
     expect(() => badRefs.map((r) => (r as { price: number }).price.toFixed(2))).toThrow();
+  });
+});
+
+// A LegalScreen recebia a prop `doc` e nao a usava: fazia buildContent(phone),
+// que devolve as TRES paginas num Record, e lia data.sections.map sobre
+// undefined. Privacidade, Termos e Livro de Reclamações davam pagina em
+// branco — e nenhum teste de API apanha isso. O typecheck nao apanhou porque
+// faltavam os @types/react, logo o hook vinha de JS inferido e `data` era any.
+describe('paginas legais', () => {
+  const EXPECTED: Record<LegalDoc, string> = {
+    privacidade: 'Política de Privacidade',
+    termos: 'Termos de Reserva',
+    livro: 'Livro de Reclamações',
+  };
+
+  // Cada documento tem a concordancia certa ("Atualizada" / "Atualizados" /
+  // "Atualizado"), por isso isto distingue o documento escolhido.
+  const UPDATED: Record<LegalDoc, string> = {
+    privacidade: 'Atualizada em outubro de 2026',
+    termos: 'Atualizados em outubro de 2026',
+    livro: 'Atualizado em outubro de 2026',
+  };
+
+  function renderLegal(doc: LegalDoc) {
+    return (
+      <SiteProvider
+        siteContent={DEFAULT_SITE_CONTENT}
+        assets={[]}
+        menuItems={MENU_ITEMS}
+        adminEnabled={false}
+        onRefreshAssets={() => {}}
+        onRefreshMenus={() => {}}
+        onRefreshSiteContent={() => {}}
+      >
+        <LegalScreen doc={doc} onBack={() => {}} />
+      </SiteProvider>
+    );
+  }
+
+  for (const doc of ['privacidade', 'termos', 'livro'] as LegalDoc[]) {
+    it(`a pagina "${doc}" mostra o titulo certo e nao lanca`, async () => {
+      await act(async () => {
+        root.render(renderLegal(doc));
+      });
+
+      // Se o render lancou, o React desmontou a arvore e o container fica vazio.
+      expect(container.children.length).toBeGreaterThan(0);
+      const text = container.textContent ?? '';
+      expect(text).toContain(EXPECTED[doc]);
+      // A data de actualizacao so bate certo se o documento certo foi escolhido.
+      expect(text).toContain(UPDATED[doc]);
+    });
+  }
+
+  it('nao mostra o titulo de outro documento', async () => {
+    await act(async () => {
+      root.render(renderLegal('privacidade'));
+    });
+    const text = container.textContent ?? '';
+    expect(text).not.toContain(EXPECTED.termos);
+    expect(text).not.toContain(EXPECTED.livro);
   });
 });

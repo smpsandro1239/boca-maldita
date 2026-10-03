@@ -4,25 +4,38 @@ Documento operacional do deploy, smoke tests e higiene. **Lê antes de fazer qua
 
 ## 1. Regra de ouro: UM deploy por lote
 
-- Um commit por lote → `git push origin main` → **UMA** execução de `npx vercel@59.26.0 --prod --yes`.
+- **O push já não faz deploy.** O `vercel.json` tem `"git": { "deploymentEnabled": false }`,
+  por isso `git push` é apenas sincronização de repositório. O deploy é sempre manual:
+  `npx vercel@59.26.0 --prod --yes`.
+- Um lote = `npm run verify` verde → **UMA** execução de `npx vercel@59.26.0 --prod --yes`
+  → validação → commit/push.
 - **PIN obrigatório:** `npx vercel` (sem versão) instalou a **v60**, que falha com
   `Error: Not authorized` ao fazer `--prod`. Usar sempre **`vercel@59.26.0`**.
 - **NUNCA** loops de retry: cada execução nova cria um deployment novo (polui o histórico e
-  torna ambíguo qual é o atual).
-- Pré-requisitos antes do deploy: `npm run typecheck`, `npm run build`, `npm test` e, se
-  mexeu em API/DB, `npm run smoke` (vê secção 4).
+  torna ambíguo qual é o atual). Uma falha de rede ou um 400 do edge **não** justificam
+  repetir sem primeiro confirmar em `vercel ls` o que está actually deployed.
+- **Gate único obrigatório:** `npm run verify` (typecheck + testes + smoke + build).
+  Não vale a pena rodar as peças séparément.
+- **Publicar a carta em produção exige `npm run verify` verde.** É uma escrita real
+  na base de dados e não é reversível por deploy: tem de ser precedida de uma
+  comparação item a item entre a produção e `MENU_ITEMS`, e de **um único `PUT`**
+  (nunca `DELETE` + `PUT`).
 
 ## 2. Fluxo correto e o "Error: fetch failed"
 
 ### Sequência
-1. Push do commit para `main`.
+1. `npm run verify` — tem de estar verde.
 2. `npx vercel@59.26.0 --prod --yes` (o `--yes` usa as env vars do projeto ligado; não há env vars locais
    a definir para produção). **Nunca** degradar para `npx vercel` sem pin — ver secção 1.
 3. Verificar:
    - `npx vercel ls --prod bmaldita --limit 3` → o deployment mais recente com `● Ready` +
      `Environment Production` é o que está aliased a `bmaldita.vercel.app`.
-   - `curl -sI https://bmaldita.vercel.app/` → deve responder 200 (o alias aponta sempre ao
-     último Ready).
+   - `npx vercel@59.26.0 curl -s https://bmaldita.vercel.app/ > body.html` → deve conter o
+     `<title>` do site. **Usar redireccionamento do shell, não `-o`/`-w`**: o
+     `vercel curl` não honra essas opções do `curl` e cria ficheiros chamados `-s`/`-w`
+     no repositório.
+4. Só depois: `git add -A && git commit && git push origin main` (sincroniza o
+   repositório; não volta a fazer deploy).
 
 ### Causa-raiz investigada (2026-09-24)
 - **Sintoma:** o CLI imprime os logs de build remoto e depois falha com `Error: fetch failed`,
@@ -50,6 +63,9 @@ Removidos com `npx vercel rm <url> --yes` (deployments de produção não-atuais
 
 - **Produção:** Turso (`TURSO_URL` + `TURSO_AUTH_TOKEN`, injectados pelo Vercel em runtime;
   `.env` local contém os mesmos para desenvolvimento).
+- **Os valores vão sempre entre aspas** no `.env` e nas variáveis da Vercel,
+  sobretudo `TURSO_AUTH_TOKEN`: é um JWT com pontos e, sem aspas, pode ser
+  truncado pelo shell ou pelo parser. O mesmo se aplica ao `ADMIN_TOKEN`.
 - Decisão de ligação em `server/lib/storage.ts`: se `TURSO_URL`+token → Turso; senão, se não `VERCEL`
   → SQLite local (`DB_PATH`, default `data/boca-maldita.db`); senão memória.
 - Devido ao `dotenv/config` no arranque da API: **qualquer smoke que levante a API localmente

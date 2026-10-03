@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactEventHandler } from 'react';
 import { useSite } from '../context/SiteContext';
 
 export interface AssetImageProps {
@@ -10,7 +10,7 @@ export interface AssetImageProps {
   alt?: string;
   className?: string;
   loading?: 'lazy' | 'eager';
-  onError?: (event: { target: HTMLElement; currentTarget: HTMLElement }) => void;
+  onError?: ReactEventHandler<HTMLImageElement>;
 }
 
 export default function AssetImage({

@@ -130,7 +130,9 @@ function buildContent(phone: string): LegalContent {
 export default function LegalScreen({ doc, onBack }: LegalScreenProps) {
   const { siteContent } = useSite();
   const phone = siteContent.phone;
-  const data = useMemo(() => buildContent(phone), [phone]);
+  // buildContent devolve as tres paginas; escolhemos a pedida. Sem o [doc]
+  // ficava o Record inteiro e data.sections era undefined -> pagina em branco.
+  const data = useMemo(() => buildContent(phone)[doc], [phone, doc]);
   return (
     <div className="w-full bg-[#0C0D0E] py-12 lg:py-20">
       <div className="max-w-3xl mx-auto px-5 lg:px-12 space-y-8">
