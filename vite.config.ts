@@ -26,6 +26,12 @@ export default defineConfig(() => {
     test: {
       globals: true,
       environment: 'node',
+      // worktrees/ scratch dentro do projecto trazem as SUAS proprias copias de
+      // test files, e o glob do vitest recolhe-os. O gate passa entao a contar
+      // a mesma suite duas vezes e a validar codigo que nao e o actual.
+      // Ja aconteceu: o "verify verde" reportava 250 testes quando o real
+      // eram 125. worktrees e' a correcao; isto e' a rede de seguranca.
+      exclude: ['**/node_modules/**', '**/dist/**', '**/worktrees/**'],
     },
   };
 });

@@ -1,4 +1,4 @@
-// One-shot — já aplicado em 2026-10-03.
+// One-shot — já aplicado em 2026-10-05.
 //
 // Reescreveu os textos visiveis dos 4 pratos do Menu Executivo em `menu_items`
 // (Turso): badge, servesCount, tagline e description. Só toca em itens com

@@ -300,7 +300,7 @@ O ponto (3) não é formality: `menuItemSchema` é `.strict()`, portanto um camp
 o `PUT` devolver 400 e nada é gravado — a validação local evita o erro e confirma que o nº de
 itens que entra é igual ao que sai. O ponto (1) é o que falhou.
 
-**Aplicado em 2026-10-03**, após um `PUT` em `/api/admin/menus` feito sem autorização
+**Aplicado em 2026-10-05**, após um `PUT` em `/api/admin/menus` feito sem autorização
 específica. O script que o fez está em `scripts/migrations/` e é one-shot.
 
 ## 7. Anexo — Google Business Profile (tarefa do dono, não é código)
