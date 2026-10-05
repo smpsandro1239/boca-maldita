@@ -278,6 +278,31 @@ não depende do host: schema, robots, `/admin` em `noindex`, imagens, conteúdo 
   localmente em vez de reimplementar o parsing.
 - `.env` e `.env*` estão excluídos do upload (`.vercelignore` ancorado à raiz). Não commitar
   segredos.
+
+### ⛔ Escritas de dados em produção exigem autorização explícita
+
+Escritas de dados em produção exigem autorização explícita. Um pedido para "enviar para a
+Vercel" autoriza o deploy do código, **NÃO** um `PUT` em `/api/admin/*` que altera registos.
+
+Motivo: deploy e escrita de dados são operações diferentes, com reversibilidade diferente. Um
+push desfaz-se com outro push; um `PUT` em `menu_items` reescreve o conteúdo publicado e não
+tem undo. Confundir os dois transforma um "publica o código" num "publica e altera a base de
+dados".
+
+**Antes de escrever:**
+
+1. dizer o que muda e quantos registos;
+2. esperar pelo "sim";
+3. validar o payload com o schema antes de enviar;
+4. verificar depois.
+
+O ponto (3) não é formality: `menuItemSchema` é `.strict()`, portanto um campo desconhecido faz
+o `PUT` devolver 400 e nada é gravado — a validação local evita o erro e confirma que o nº de
+itens que entra é igual ao que sai. O ponto (1) é o que falhou.
+
+**Aplicado em 2026-10-03**, após um `PUT` em `/api/admin/menus` feito sem autorização
+específica. O script que o fez está em `scripts/migrations/` e é one-shot.
+
 ## 7. Anexo — Google Business Profile (tarefa do dono, não é código)
 
 A ficha **existe** (738 críticas, 3,9 estrelas, Av. do Cávado 4730-460, 253 031 890,

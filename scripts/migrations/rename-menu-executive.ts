@@ -1,4 +1,17 @@
-import { menuItemsSchema } from '../server/lib/validation';
+// One-shot — já aplicado em 2026-10-03.
+//
+// Reescreveu os textos visiveis dos 4 pratos do Menu Executivo em `menu_items`
+// (Turso): badge, servesCount, tagline e description. Só toca em itens com
+// category 'diarias'. Nomes de pratos, category, dailyKind, precos e imagens
+// ficam como estao.
+//
+// Correr outra vez encontra zero alteracoes e nao escreve nada de novo.
+//
+// Aplicado com um PUT em /api/admin/menus sem autorizacao especifica — ver a
+// regra "Escritas de dados em producao exigem autorizacao explicita" na
+// secção 6 do GUIA-DEPLOY.md.
+
+import { menuItemsSchema } from '../../server/lib/validation';
 
 type Item = Record<string, unknown>;
 
