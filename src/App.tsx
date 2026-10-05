@@ -133,11 +133,6 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 2800);
   };
 
-  const handleCopyImageUrl = (url: string) => {
-    navigator.clipboard.writeText(url);
-    showToast('Link direto copiado para a área de transferência!');
-  };
-
   const handleNavigate = (screen: ScreenType) => {
     setCurrentScreen(screen);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -186,7 +181,6 @@ export default function App() {
               dryAgingUrl={getUrl('dry-aging-locker')}
               mapUrl={getUrl('map-location')}
               contactEmail={siteContent.contactEmail}
-              onCopyImageUrl={handleCopyImageUrl}
             />
           )}
 
@@ -196,7 +190,6 @@ export default function App() {
               diningRoomUrl={getUrl('dining-room')}
               dryAgingUrl={getUrl('dry-aging-locker')}
               heroChefUrl={getUrl('hero-chef')}
-              onCopyImageUrl={handleCopyImageUrl}
             />
           )}
 
@@ -204,7 +197,6 @@ export default function App() {
             <MenuScreen
               onSelectDish={(dish) => setSelectedDish(dish)}
               onBookTable={() => handleNavigate('reservas')}
-              onCopyImageUrl={handleCopyImageUrl}
             />
           )}
 
@@ -224,7 +216,6 @@ export default function App() {
             <ContactScreen
               mapUrl={getUrl('map-location')}
               contactEmail={siteContent.contactEmail}
-              onCopyImageUrl={handleCopyImageUrl}
             />
           )}
 

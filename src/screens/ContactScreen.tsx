@@ -8,10 +8,9 @@ import { GMAPS_URL } from '../data/contact';
 interface ContactScreenProps {
   mapUrl: string;
   contactEmail: string;
-  onCopyImageUrl: (url: string) => void;
 }
 
-export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: ContactScreenProps) {
+export default function ContactScreen({ mapUrl, contactEmail }: ContactScreenProps) {
   const { siteContent } = useSite();
   const phone = siteContent.phone;
   const [formData, setFormData] = useState({
@@ -180,13 +179,6 @@ export default function ContactScreen({ mapUrl, contactEmail, onCopyImageUrl }: 
                   Abrir no Google Maps
                 </a>
               </div>
-
-              <button
-                onClick={() => onCopyImageUrl(mapUrl)}
-                className="absolute top-3 right-3 bg-[#0C0D0E]/90 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] uppercase font-mono px-2 py-1"
-              >
-                Link do Mapa
-              </button>
             </div>
           </div>
 

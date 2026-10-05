@@ -19,7 +19,7 @@ import {
   ArrowRight, 
   Car, 
   Check, 
-  Copy,
+  ExternalLink,
   Navigation,
   AlertCircle
 } from 'lucide-react';
@@ -35,7 +35,6 @@ interface HomeScreenProps {
   dryAgingUrl: string;
   mapUrl: string;
   contactEmail: string;
-  onCopyImageUrl: (url: string) => void;
 }
 
 export default function HomeScreen({
@@ -49,7 +48,6 @@ export default function HomeScreen({
   dryAgingUrl,
   mapUrl,
   contactEmail,
-  onCopyImageUrl
 }: HomeScreenProps) {
   const [activeMenuTab, setActiveMenuTab] = useState<'carnes' | 'mar'>('carnes');
   const [quickBookingSuccess, setQuickBookingSuccess] = useState(false);
@@ -182,15 +180,17 @@ export default function HomeScreen({
                   </span>
                 </div>
 
-                {/* Direct Image Link Button on Media */}
-                <button
-                  onClick={() => onCopyImageUrl(heroChefUrl)}
-                  className="absolute top-4 right-4 bg-[#0C0D0E]/90 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#A6A8AD] text-[10px] uppercase font-mono px-2.5 py-1.5 border border-[#282A30] opacity-90 group-hover:opacity-100 transition-all flex items-center gap-1.5"
-                  title="Copiar URL direta da foto do Chef"
+                {/* Abre a foto em grande, numa tab nova */}
+                <a
+                  href={heroChefUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute top-4 right-4 bg-[#0C0D0E]/90 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#A6A8AD] text-[10px] uppercase font-mono px-2.5 py-1.5 border border-[#282A30] opacity-90 group-hover:opacity-100 focus-visible:opacity-100 transition-all flex items-center gap-1.5"
+                  title="Abrir a foto do Chef em grande"
                 >
-                  <Copy className="w-3 h-3" />
-                  <span className="hidden sm:inline">Link da Imagem</span>
-                </button>
+                  <ExternalLink className="w-3 h-3" />
+                  <span className="hidden sm:inline">Ver em Grande</span>
+                </a>
 
                 {/* Overlaid Review Card (Bottom Right, matching AT Restaurant screenshot) */}
                 <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-6 max-w-[320px] sm:max-w-[340px] bg-[#141518]/95 backdrop-blur-md p-5 border border-[#282A30] shadow-2xl">
@@ -408,13 +408,15 @@ export default function HomeScreen({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : null}
-                  <button
-                    onClick={() => onCopyImageUrl(diningRoomUrl)}
-                    className="absolute bottom-2 right-2 bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] px-2 py-1 uppercase font-mono opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Copiar link da imagem"
+                  <a
+                    href={diningRoomUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 right-2 bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] px-2 py-1 uppercase font-mono opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                    title="Abrir a imagem em grande"
                   >
-                    Copiar URL
-                  </button>
+                    Ver em Grande
+                  </a>
                 </div>
                 <div className="p-4 bg-[#141518] border border-[#282A30]">
                   <div className="font-serif text-lg text-[#D4A373]">Vila de Prado</div>
@@ -441,13 +443,15 @@ export default function HomeScreen({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   ) : null}
-                  <button
-                    onClick={() => onCopyImageUrl(dryAgingUrl)}
-                    className="absolute bottom-2 right-2 bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] px-2 py-1 uppercase font-mono opacity-0 group-hover:opacity-100 transition-opacity"
-                    title="Copiar link da imagem"
+                  <a
+                    href={dryAgingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-2 right-2 bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] px-2 py-1 uppercase font-mono opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                    title="Abrir a imagem em grande"
                   >
-                    Copiar URL
-                  </button>
+                    Ver em Grande
+                  </a>
                 </div>
               </div>
             </div>
@@ -938,14 +942,6 @@ export default function HomeScreen({
                     Abrir no Google Maps
                   </a>
                 </div>
-
-                <button
-                  onClick={() => onCopyImageUrl(mapUrl)}
-                  className="absolute top-3 right-3 bg-[#0C0D0E]/90 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#A6A8AD] text-[10px] px-2 py-1 font-mono uppercase border border-[#282A30] opacity-80 group-hover:opacity-100 transition-opacity"
-                  title="Copiar URL direta da imagem do mapa"
-                >
-                  Link do Mapa
-                </button>
               </div>
             </div>
 

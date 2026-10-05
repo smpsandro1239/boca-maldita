@@ -1,5 +1,5 @@
 import { ScreenType } from '../types';
-import { Flame, Wine, ShieldCheck, Award, Users, ThermometerSnowflake, ArrowRight, Copy } from 'lucide-react';
+import { Flame, Wine, ShieldCheck, Award, Users, ThermometerSnowflake, ArrowRight, ExternalLink } from 'lucide-react';
 import AssetImage from '../components/AssetImage';
 
 interface RestaurantScreenProps {
@@ -7,7 +7,6 @@ interface RestaurantScreenProps {
   diningRoomUrl: string;
   dryAgingUrl: string;
   heroChefUrl: string;
-  onCopyImageUrl: (url: string) => void;
 }
 
 export default function RestaurantScreen({
@@ -15,7 +14,6 @@ export default function RestaurantScreen({
   diningRoomUrl,
   dryAgingUrl,
   heroChefUrl,
-  onCopyImageUrl
 }: RestaurantScreenProps) {
   return (
     <div className="w-full bg-[#0C0D0E] py-12 lg:py-20">
@@ -80,13 +78,16 @@ export default function RestaurantScreen({
                   <span className="text-xs uppercase tracking-widest text-[#D4A373] font-mono">Salão Principal</span>
                   <p className="text-sm text-[#F7F5F0] font-serif">Conforto intimista e vista para a garrafeira</p>
                 </div>
-                <button
-                  onClick={() => onCopyImageUrl(diningRoomUrl)}
+                <a
+                  href={diningRoomUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] uppercase font-mono px-3 py-1.5 border border-[#282A30] flex items-center gap-1.5"
+                  title="Abrir a imagem em grande"
                 >
-                  <Copy className="w-3 h-3" />
-                  <span>Link da Imagem</span>
-                </button>
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Ver em Grande</span>
+                </a>
               </div>
             </div>
           </div>
@@ -109,13 +110,16 @@ export default function RestaurantScreen({
                   <span className="text-xs uppercase tracking-widest text-[#D4A373] font-mono">Câmara com Sal Rosa</span>
                   <p className="text-sm text-[#F7F5F0] font-serif">Processo Dry-Aged controlado até 90 dias</p>
                 </div>
-                <button
-                  onClick={() => onCopyImageUrl(dryAgingUrl)}
+                <a
+                  href={dryAgingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] uppercase font-mono px-3 py-1.5 border border-[#282A30] flex items-center gap-1.5"
+                  title="Abrir a imagem em grande"
                 >
-                  <Copy className="w-3 h-3" />
-                  <span>Link da Imagem</span>
-                </button>
+                  <ExternalLink className="w-3 h-3" />
+                  <span>Ver em Grande</span>
+                </a>
               </div>
             </div>
           </div>
@@ -166,12 +170,15 @@ export default function RestaurantScreen({
                 className="w-full h-full object-cover"
               />
             ) : null}
-            <button
-              onClick={() => onCopyImageUrl(heroChefUrl)}
+            <a
+              href={heroChefUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="absolute top-3 right-3 bg-[#0C0D0E]/80 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#F7F5F0] text-[10px] uppercase font-mono px-2 py-1"
+              title="Abrir a imagem em grande"
             >
-              Link da Imagem
-            </button>
+              Ver em Grande
+            </a>
           </div>
 
           <div className="lg:col-span-8 space-y-4">

@@ -1,7 +1,7 @@
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { MenuItem, PublicDiarias } from '../types';
 import { useSite } from '../context/SiteContext';
-import { Search, Flame, Wine, Clock, Award, ArrowRight, Copy, Check, UtensilsCrossed } from 'lucide-react';
+import { Search, Flame, Wine, Clock, Award, ArrowRight, Check, UtensilsCrossed } from 'lucide-react';
 import { MENU_CATEGORY_LABELS } from '../data/menuCategories';
 import { MENU_ITEMS } from '../data/menuData';
 import { getDiarias, diariaMealLabel } from '../lib/api';
@@ -10,17 +10,14 @@ import { pickDailyDishes } from '../lib/dailyDishes';
 interface MenuScreenProps {
   onSelectDish: (dish: MenuItem) => void;
   onBookTable: () => void;
-  onCopyImageUrl: (url: string) => void;
 }
 
 export default function MenuScreen({
   onSelectDish,
   onBookTable,
-  onCopyImageUrl
 }: MenuScreenProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('todas');
   const [searchQuery, setSearchQuery] = useState('');
-  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [todayDiarias, setTodayDiarias] = useState<PublicDiarias | null>(null);
   const { menuItems } = useSite();
 
@@ -73,13 +70,6 @@ export default function MenuScreen({
       return matchesCat && matchesSearch;
     });
   })();
-
-  const handleCopyLink = (e: MouseEvent, url: string) => {
-    e.stopPropagation();
-    onCopyImageUrl(url);
-    setCopiedUrl(url);
-    setTimeout(() => setCopiedUrl(null), 2000);
-  };
 
   return (
     <div className="w-full bg-[#0C0D0E] py-12 lg:py-20">
@@ -203,25 +193,6 @@ export default function MenuScreen({
                       </span>
                     )}
 
-                    {/* Copy Direct Image Link Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => handleCopyLink(e, item.imageUrl)}
-                      className="absolute bottom-3 left-3 bg-[#0C0D0E]/90 hover:bg-[#D4A373] hover:text-[#0C0D0E] text-[#A6A8AD] text-[10px] uppercase font-mono px-2 py-1 border border-[#282A30] flex items-center gap-1 opacity-90 group-hover:opacity-100 transition-opacity"
-                      title="Copiar URL direta desta imagem do prato"
-                    >
-                      {copiedUrl === item.imageUrl ? (
-                        <>
-                          <Check className="w-3 h-3 text-emerald-400" />
-                          <span>Link Copiado!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Link Direto</span>
-                        </>
-                      )}
-                    </button>
                   </div>
 
                   {/* Content */}
