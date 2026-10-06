@@ -297,7 +297,7 @@ export default function HomeScreen({
                 )}
               </div>
 
-              {/* Quick Badges Metric Strip (45+ Dry-aged, 100% Azinho, 180+ Rótulos) */}
+              {/* Quick Badges Metric Strip (45+ Dry-aged, 180+ Rótulos) */}
               <div className="pt-4 grid grid-cols-3 gap-3 sm:gap-4 bg-[#141518] border border-[#282A30] p-4 sm:p-5 mt-4">
                 <div>
                   <div className="font-serif text-2xl sm:text-3xl text-[#D4A373] font-semibold">45+</div>
@@ -308,7 +308,7 @@ export default function HomeScreen({
                 <div>
                   <div className="font-serif text-2xl sm:text-3xl text-[#F7F5F0] font-semibold">100%</div>
                   <div className="text-[10px] sm:text-xs text-[#A6A8AD] uppercase tracking-wider font-sans mt-0.5">
-                    Carvão de Azinho Nobre
+                    Carvão Nobre
                   </div>
                 </div>
                 <div>
@@ -364,7 +364,7 @@ export default function HomeScreen({
                 </h2>
               </div>
               <p className="text-sm sm:text-base text-[#A6A8AD] leading-relaxed font-sans">
-                O Boca Maldita nasceu para celebrar o ritual atemporal do fogo. Em Vila de Prado, à beira do Cávado, criámos um refúgio onde o calor das brasas de azinho revela a essência mais profunda de cada corte selecionado. Não mascaramos a matéria-prima: enaltecemo-la com paciência, temperatura rigorosa e ciência de maturação.
+                O Boca Maldita nasceu para celebrar o ritual atemporal do fogo. Em Vila de Prado, à beira do Cávado, criámos um refúgio onde o calor das brasas revela a essência mais profunda de cada corte selecionado. Não mascaramos a matéria-prima: enaltecemo-la com paciência, temperatura rigorosa e ciência de maturação.
               </p>
               <p className="text-sm sm:text-base text-[#A6A8AD] leading-relaxed font-sans">
                 A nossa adega complementa esta narrativa telúrica com colheitas raras das melhores quintas do Douro, Dão, Bairrada e referências internacionais de renome mundial, orquestradas pelo nosso sommelier residente.
@@ -600,7 +600,7 @@ export default function HomeScreen({
               Dois de Carne, Dois de Peixe — Todos os Dias
             </h2>
             <p className="text-sm sm:text-base text-[#A6A8AD] leading-relaxed">
-              O conforto da cozinha minhota na brasa de azinho, a um preço justo{servedMealsLabel ? ` para o ${servedMealsLabel}` : ''}.
+              O conforto da cozinha minhota na brasa, a um preço justo{servedMealsLabel ? ` para o ${servedMealsLabel}` : ''}.
             </p>
           </div>
 

@@ -58,7 +58,7 @@ export default function RestaurantScreen({
               </div>
               <div className="p-4 bg-[#141518] border border-[#282A30]">
                 <div className="font-serif text-2xl text-[#F7F5F0]">100%</div>
-                <div className="text-xs text-[#A6A8AD] mt-1">Carvão de azinho puro sem aditivos químicos</div>
+                <div className="text-xs text-[#A6A8AD] mt-1">Carvão vegetal puro sem aditivos químicos</div>
               </div>
             </div>
           </div>
@@ -192,7 +192,7 @@ export default function RestaurantScreen({
               “Grelhar não é queimar: é conduzir o calor com respeito e paciência.”
             </h3>
             <p className="text-sm text-[#A6A8AD] leading-relaxed">
-              O nosso chef executivo e a sua brigada dominam as grelhas basculantes de manivela, desenhadas à medida para permitir um controlo milimétrico da distância entre a carne e o leito incandescente de carvão de azinho. Cada corte recebe a sua curva de calor ideal: selagem rápida a altas temperaturas ou descanso paciente no topo da lareira para distribuição homogénea dos sucos.
+              O nosso chef executivo e a sua brigada dominam as grelhas basculantes de manivela, desenhadas à medida para permitir um controlo milimétrico da distância entre a carne e o leito incandescente de carvão. Cada corte recebe a sua curva de calor ideal: selagem rápida a altas temperaturas ou descanso paciente no topo da lareira para distribuição homogénea dos sucos.
             </p>
             <div className="pt-4 flex flex-wrap gap-4">
               <button

@@ -67,7 +67,7 @@ export const DEFAULT_IMAGE_ASSETS: ImageAsset[] = [
   },
   {
     id: 'dish-polvo',
-    name: 'Polvo no Carvão de Azinho',
+    name: 'Polvo no Carvão',
     category: 'mar',
     url: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFKRP-V7OYFBl9iQ8mDn5acDsWK3Qt51pV_ERA1G4efkpW5P4LqJXiRCQ6z7cH9q89kBnCcN741TA-5yvprd4eK40VrHsP2IwowBiegmYAeb_l1Bree75Tj94AyAO_lDOwyoI7LHyStDUVj2M-MYcKJHpO7cyOjKxigGWHpLaqSn3KA1-K2PdiaMoKztbNXZo41qvmxG1KgZE3nZ1Lhiy2EW8V-wafhzJdfc-Da5bw7fFVqWVaBuuUBQ',
     description: 'Tentáculo crocante por fora e tenro por dentro, batata a murro estalada e grelos',

@@ -94,7 +94,7 @@ export default function VideoModal({ isOpen, onClose, posterUrl, videoUrl }: Vid
 
         {/* Footer */}
         <div className="p-3 bg-[#141518]/95 border-t border-[#282A30] flex items-center justify-between text-xs text-[#A6A8AD]">
-          <span className="text-[11px] uppercase tracking-wider text-[#D4A373]">Carvão de Azinho Alentejano</span>
+          <span className="text-[11px] uppercase tracking-wider text-[#D4A373]">Carvão Alentejano</span>
           <button
             onClick={onClose}
             className="text-xs bg-[#282A30] hover:bg-[#343536] text-[#F7F5F0] px-3 py-1 uppercase tracking-wider"

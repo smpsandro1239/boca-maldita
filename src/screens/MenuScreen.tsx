@@ -88,7 +88,7 @@ export default function MenuScreen({
             Menu &amp; Carnes Nobres
           </h1>
           <p className="text-base sm:text-lg text-[#A6A8AD] leading-relaxed">
-            Cada corte é uma obra de paciência, maturação em câmara de sal dos Himalaias e mestria sobre as brasas de azinho alentejano.
+            Cada corte é uma obra de paciência, maturação em câmara de sal dos Himalaias e mestria sobre as brasas.
           </p>
         </div>
 

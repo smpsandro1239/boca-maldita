@@ -30,8 +30,8 @@ export default function ExperienceScreen({
     },
     {
       step: '03',
-      title: 'A Alquimia da Brasa de Azinho',
-      desc: 'O fogo acende-se duas horas antes de cada serviço com carvão vegetal de azinho nobre, gerando brasas densas e puras sem chama viva direta, permitindo uma selagem estaladiça com centro aveludado.'
+      title: 'A Alquimia da Brasa',
+      desc: 'O fogo acende-se duas horas antes de cada serviço com carvão vegetal nobre, gerando brasas densas e puras sem chama viva direta, permitindo uma selagem estaladiça com centro aveludado.'
     },
     {
       step: '04',
