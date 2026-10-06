@@ -104,6 +104,15 @@ export default function HomeScreen({
     ? scheduledDiarias
     : pickDailyDishes([], menuItems);
 
+  const servedMealsLabel = (() => {
+    if (!todayDiarias?.hasSchedule) return null;
+    const { lunch, dinner } = todayDiarias.servedMeals;
+    if (lunch && dinner) return 'almoço e jantar';
+    if (lunch) return 'almoço';
+    if (dinner) return 'jantar';
+    return null;
+  })();
+
   const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
     if (!bookingFormData.nome || !bookingFormData.email || !bookingFormData.telefone) return;
@@ -591,7 +600,7 @@ export default function HomeScreen({
               Dois de Carne, Dois de Peixe — Todos os Dias
             </h2>
             <p className="text-sm sm:text-base text-[#A6A8AD] leading-relaxed">
-              O conforto da cozinha minhota na brasa de azinho, a um preço justo para o almoço e o jantar.
+              O conforto da cozinha minhota na brasa de azinho, a um preço justo{servedMealsLabel ? ` para o ${servedMealsLabel}` : ''}.
             </p>
           </div>
 
