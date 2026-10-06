@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { MenuItem } from '../types';
-import { X, Wine, Flame, Clock, Award, Copy, Check, ExternalLink } from 'lucide-react';
+import { X, Wine, Clock, Award, ExternalLink } from 'lucide-react';
 import AssetImage from './AssetImage';
 
 interface DishDetailModalProps {
@@ -10,15 +9,7 @@ interface DishDetailModalProps {
 }
 
 export default function DishDetailModal({ item, onClose, onBookTable }: DishDetailModalProps) {
-  const [copied, setCopied] = useState(false);
-
   if (!item) return null;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(item.imageUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
 
   return (
     <div className="fixed inset-0 z-[105] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-6 overflow-y-auto">
@@ -45,16 +36,6 @@ export default function DishDetailModal({ item, onClose, onBookTable }: DishDeta
                 {item.badge}
               </div>
             )}
-            <div className="absolute bottom-4 left-4 right-4 bg-[#141518]/90 backdrop-blur-sm p-2.5 border border-[#282A30] flex items-center justify-between text-xs">
-              <span className="text-[#A6A8AD] truncate max-w-[180px] font-mono">{item.imageUrl}</span>
-              <button
-                onClick={handleCopy}
-                className="flex items-center gap-1 text-[#D4A373] hover:text-[#F7F5F0] font-sans uppercase tracking-wider text-[11px] font-semibold"
-              >
-                {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'Copiado' : 'Link Direto'}</span>
-              </button>
-            </div>
           </div>
 
           {/* Dish Details */}
