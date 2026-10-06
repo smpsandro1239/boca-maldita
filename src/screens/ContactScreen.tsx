@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react';
 import { createContact } from '../lib/api';
 import { useSite, telHref, waHref } from '../context/SiteContext';
-import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Copy, AlertCircle } from 'lucide-react';
+import { MapPin, Phone, Mail, Clock, Send, Check, Navigation, MessageCircle, Compass, AlertCircle } from 'lucide-react';
 import AssetImage from '../components/AssetImage';
-import { GMAPS_URL } from '../data/contact';
+import { GMAPS_URL, WAZE_URL, APPLE_MAPS_URL } from '../data/contact';
 
 interface ContactScreenProps {
   mapUrl: string;
@@ -84,10 +84,37 @@ export default function ContactScreen({ mapUrl, contactEmail }: ContactScreenPro
               Vila de Prado, Vila Verde<br />
               4730-460 Portugal
             </p>
-            <div className="pt-2">
-              <span className="font-mono text-[11px] text-[#D4A373]">
-                GPS: 41.5975° N, 8.4632° W
-              </span>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={GMAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 border border-[#282A30] hover:border-[#D4A373] text-[10px] uppercase font-mono text-[#A6A8AD] hover:text-[#F7F5F0] px-2.5 py-1.5 transition-colors"
+                title="Abrir no Google Maps"
+              >
+                <MapPin className="w-3 h-3" />
+                <span>Abrir no Google Maps</span>
+              </a>
+              <a
+                href={WAZE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 border border-[#282A30] hover:border-[#D4A373] text-[10px] uppercase font-mono text-[#A6A8AD] hover:text-[#F7F5F0] px-2.5 py-1.5 transition-colors"
+                title="Navegar com o Waze"
+              >
+                <Navigation className="w-3 h-3" />
+                <span>Navegar com o Waze</span>
+              </a>
+              <a
+                href={APPLE_MAPS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 border border-[#282A30] hover:border-[#D4A373] text-[10px] uppercase font-mono text-[#A6A8AD] hover:text-[#F7F5F0] px-2.5 py-1.5 transition-colors"
+                title="Abrir no Apple Maps"
+              >
+                <Compass className="w-3 h-3" />
+                <span>Abrir no Apple Maps</span>
+              </a>
             </div>
           </div>
 
