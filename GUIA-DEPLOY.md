@@ -141,8 +141,11 @@ node -e "const d=require('./insp.json');console.log(d.meta.githubCommitSha)"; gi
 Removidos com `npx vercel rm <url> --yes` (deployments de produção não-atuais):
 `pqgla87vo`, `guwkwj57r` (Error) e os duplicados de retry `crla59xdd`, `mohz11fjg`,
 `f9hlr17a8`, `nhafp553p`.
-**Deployment de produção atual:** `bmaldita-b28qqdi5h-smpsandro1239s-projects.vercel.app`
-(commit `81523ed`).
+
+> ⚠️ **O deployment de produção "actual" não se escreve neste ficheiro** — envelhece e
+> passa a mentir (já aconteceu: ficou aqui um hash de Outubro durante semanas).
+> Ver `npx vercel@59.26.0 ls --prod` e confirmar o vínculo pelo comando da secção
+> **Rastreabilidade**.
 
 ## 3. Base de dados: produção vs teste
 
@@ -197,7 +200,39 @@ O script **aborta** se a URL não contiver `test`/`smoke`/`local`, ou se for igu
   `%LOCALAPPDATA%\Temp\opencode\rcheck\`).
 - Conteúdo: se alterou textos/seo, confirmar que o HTML serve o que o painel publicou.
 
-## 6. SEO e domínio — o canónico está acoplado ao DNS
+## 6. SEO, domínio e escritas em produção
+
+Duas coisas independentes que partilham número: a regra de escrita de dados (primeiro) e o
+trabalho de SEO/domínio (depois). **O número não muda** — `scripts/migrations/*.ts` citam
+"secção 6" no código, por isso §1-§7 são estáveis; conteúdo novo entra em §8+.
+
+### ⛔ Escritas de dados em produção exigem autorização explícita
+
+Escritas de dados em produção exigem autorização explícita. Um pedido para "enviar para a
+Vercel" autoriza o deploy do código, **NÃO** um `PUT` em `/api/admin/*` que altera registos.
+
+Motivo: deploy e escrita de dados são operações diferentes, com reversibilidade diferente. Um
+push desfaz-se com outro push; um `PUT` em `menu_items` reescreve o conteúdo publicado e não
+tem undo. Confundir os dois transforma um "publica o código" num "publica e altera a base de
+dados".
+
+**Antes de escrever:**
+
+1. dizer o que muda e quantos registos;
+2. esperar pelo "sim";
+3. validar o payload com o schema antes de enviar;
+4. verificar depois.
+
+O ponto (3) não é formality: `menuItemSchema` é `.strict()`, portanto um campo desconhecido faz
+o `PUT` devolver 400 e nada é gravado — a validação local evita o erro e confirma que o nº de
+itens que entra é igual ao que sai. O ponto (1) é o que falhou.
+
+**Aplicado em 2026-10-05**, após um `PUT` em `/api/admin/menus` feito sem autorização
+específica. O script que o fez está em `scripts/migrations/` e é one-shot.
+
+Ver também [docs/decisions.md](docs/decisions.md), item 6.
+
+### SEO e domínio — o canónico está acoplado ao DNS
 
 **Decisão (2026-10-03):** o domínio final é `https://bocamaldita.pt` (apex, sem `www`).
 O `www.bocamaldita.pt` faz **301** para o apex. Idioma: **PT-only**, sem `hreflang` e sem
@@ -279,31 +314,10 @@ não depende do host: schema, robots, `/admin` em `noindex`, imagens, conteúdo 
 - `.env` e `.env*` estão excluídos do upload (`.vercelignore` ancorado à raiz). Não commitar
   segredos.
 
-### ⛔ Escritas de dados em produção exigem autorização explícita
-
-Escritas de dados em produção exigem autorização explícita. Um pedido para "enviar para a
-Vercel" autoriza o deploy do código, **NÃO** um `PUT` em `/api/admin/*` que altera registos.
-
-Motivo: deploy e escrita de dados são operações diferentes, com reversibilidade diferente. Um
-push desfaz-se com outro push; um `PUT` em `menu_items` reescreve o conteúdo publicado e não
-tem undo. Confundir os dois transforma um "publica o código" num "publica e altera a base de
-dados".
-
-**Antes de escrever:**
-
-1. dizer o que muda e quantos registos;
-2. esperar pelo "sim";
-3. validar o payload com o schema antes de enviar;
-4. verificar depois.
-
-O ponto (3) não é formality: `menuItemSchema` é `.strict()`, portanto um campo desconhecido faz
-o `PUT` devolver 400 e nada é gravado — a validação local evita o erro e confirma que o nº de
-itens que entra é igual ao que sai. O ponto (1) é o que falhou.
-
-**Aplicado em 2026-10-05**, após um `PUT` em `/api/admin/menus` feito sem autorização
-específica. O script que o fez está em `scripts/migrations/` e é one-shot.
-
 ## 7. Anexo — Google Business Profile (tarefa do dono, não é código)
+
+> ⚠️ **Dados de 2026-10-03, por rever.** Números, estado da ficha e o resultado de
+> `site:bmaldita.vercel.app` são dessa data — reconfirmar no Google antes de agir.
 
 A ficha **existe** (738 críticas, 3,9 estrelas, Av. do Cávado 4730-460, 253 031 890,
 código Plus `HGXR+6X`), mas mostra **"Adicionar website"** e **"Adicionar informações em
@@ -328,5 +342,68 @@ falta"** — sinal de ficha por reclamar ou abandonada. O site, na altura desta 
    a ficha não tem material recente.
 6. **NAP** — o site tem o telefone e a morada correctos e coincidentes com a ficha
    (253 031 890 / Av. do Cávado 4730-460 Vila de Prado). A correcção pendente é
-   internal: no código, `SiteContent.address` e `.hours` estão **vazios** enquanto o texto
-   está hardcoded em 5 ficheiros — ver item 10 do plano SEO.
+internal: no código, `SiteContent.address` e `.hours` estão **vazios** enquanto o texto
+está hardcoded em 5 ficheiros — ver item 10 do plano SEO.
+
+## 8. Backups — `scripts/backup-db.mjs`
+
+Backup de segurança da BD de produção. **Só leitura** (apenas `GET`) — nunca escreve.
+
+```bash
+node --env-file=.env scripts/backup-db.mjs
+```
+
+Requer `ADMIN_TOKEN`; sem ele sai com código 1. Grava `backups/<AAAA-MM-DD_HHMM>.json`.
+
+**Fail-closed:** se qualquer endpoint falhar, imprime
+`BACKUP INCOMPLETO — nao foi gravado nada` e sai com 1. **Nunca grava um backup parcial** —
+um ficheiro que parece completo e não é, é pior do que não ter backup.
+
+Cobre **11 endpoints**: 9 admin (`menus`, `reservations`, `contacts`, `newsletter`,
+`reviews`, `closed-days`, `reservation-protection`, `diarias`, `assets`) + 2 públicos
+(`site-content`, `reservations-config`).
+
+**Fica de fora** tudo o que não tem `GET`: nomeadamente o token de admin efectivo
+(`PUT /api/admin/security/token` não tem `GET` correspondente) e as sessões.
+
+`backups/` está no `.gitignore` — material local, **nunca commitar**. A base por omissão é
+`https://bmaldita.vercel.app`, substituível com `BACKUP_BASE_URL`.
+
+## 9. Migrações — `scripts/migrations/`
+
+Scripts **one-shot** para corrigir dados que já estão na base de produção. Não mexem no
+esquema — o esquema não muda.
+
+```bash
+node --env-file=.env --import tsx scripts/migrations/<nome>.ts           # DRY-RUN
+node --env-file=.env --import tsx scripts/migrations/<nome>.ts --write    # aplica
+```
+
+- **Dry-run por omissão** — mostra o que faria e não escreve.
+- **`--write` para aplicar** — só aí faz o `PUT`.
+- **Requer `ADMIN_TOKEN`**; sem ele, o script lança erro antes de qualquer coisa.
+- **Fail-closed** — valida o resultado com o schema *antes* de escrever; se a validação
+  falhar, não grava nada.
+- Apontam sempre a `https://bmaldita.vercel.app`.
+
+**Antes de correr:** a regra da secção 6 — dizer o que muda, esperar pelo "sim", validar.
+Um `PUT` em `/api/admin/menus` reescreve a carta publicada e não tem *undo*.
+
+> ⚠️ **A numeração §1-§7 é estável porque estes scripts citam "secção 6" por número.**
+> Não renumerar. Conteúdo novo entra em §8+.
+
+## 10. Email e leitura de logs
+
+Resumo operacional — o detalhe está em [docs/email.md](docs/email.md).
+
+- O envio é **background**: as rotas públicas respondem `201` de imediato e usam
+  `waitUntil` (`@vercel/functions`). O log de sucesso aparece **depois** da resposta.
+- **Nunca ler logs só com `--query`** — alcança apenas um buffer recente e devolve
+  `No logs found` para linhas que existem. Ir ao deployment específico:
+  `npx vercel@59.26.0 logs <url-do-deployment> -n 1000`.
+- `--level error` mostra os `console.error` — é aí que ficam as falhas de envio.
+- `[email] SMTP não configurado` = `SMTP_HOST` vazio, comportamento esperado em dev.
+- Silêncio absoluto (nem essa linha) = **o envio nunca correu** — suspeitar da rota, não do
+  SMTP.
+- `SMTP_PASS` de produção tem formato fora do esperado mas funciona — **por confirmar no
+  dashboard da Vercel**.

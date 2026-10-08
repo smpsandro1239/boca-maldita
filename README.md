@@ -8,6 +8,10 @@ Website oficial do restaurante **Boca Maldita**, em Vila de Prado, Vila Verde. T
 
 ## Screenshots
 
+> Capturados em **2026-09-19**. A interface evoluiu desde então — a referência da reserva
+> passou a ser mostrada ao cliente nas duas variantes e os botões de imagem foram
+> reformulados. Servem para dar o tom, não para documentar o estado actual.
+
 ### Site público
 
 | | |
@@ -67,10 +71,12 @@ Pré-requisitos: Node.js >= 20.
 | `npm run dev:web`  | Apenas frontend (Vite)                             |
 | `npm run dev:api`  | Apenas API (tsx watch)                             |
 | `npm run build`    | Gera `api/index.js` (API serverless num ficheiro único) e compila o frontend para `dist/` |
+| `npm run preview`  | Serve o `dist/` localmente (Vite)                    |
 | `npm start`        | Serve a API (e o `dist/` se existir) em produção     |
 | `npm run lint`     | Verificação de tipos (tsc --noEmit)               |
 | `npm run typecheck`| Alias de `lint`                                    |
 | `npm run test`     | Testes unitários e de render (Vitest)              |
+| `npm run test:watch`| Testes em modo watch                             |
 | `npm run smoke`    | Smoke test da API em base efémera                  |
 | `npm run verify`   | **Gate de pré-deploy**: typecheck + test + smoke + build |
 | `npm run clean`    | Remove artefactos de build (`dist/`, `.vercel/`)    |
@@ -87,18 +93,49 @@ Pré-requisitos: Node.js >= 20.
 api/index.js   # Função serverless (Vercel) — gerada por scripts/build-api.mjs (não editar)
 server/lib/     # Backend Express + armazenamento (partilhado com o servidor local)
   app.ts       # Fábrica da aplicação (rotas, admin, email) — usada em local e Vercel
-  storage.ts   # Camada de dados: SQLite local ou Turso (automático por variáveis)
-  email.ts     # Envio de confirmações de reserva (SMTP, opcional)
+  storage.ts   # Camada de dados: Turso, SQLite local ou memória (por variáveis de ambiente)
+  email.ts     # Envio de emails (SMTP, opcional) — ver docs/email.md
   validation.ts# Schemas Zod
 server/index.ts# Arranque do servidor Express local
 src/           # Frontend React (screens/, components/, context/, data/, lib/)
-scripts/       # Utilitários (build-api.mjs, clean.mjs, api-entry.ts, smoke-admin.mjs)
+  lib/reservation.ts # Único módulo de reservas — valida, monta e submete (ver "Reservas")
+shared/        # Contratos partilhados entre backend e frontend (contracts.ts)
+scripts/       # build-api.mjs, api-entry.ts, prerender.mjs, smoke-test.mjs,
+               # smoke-admin.mjs, backup-db.mjs, clean.mjs, migrations/
 vercel.json    # Configuração de deploy Vercel
+docs/          # decisions.md (porquê das decisões), email.md (operacional)
 ```
 
 ## Credenciais de produção
 
 Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (palavra-passe de app do Gmail) e `TURSO_URL`/`TURSO_AUTH_TOKEN` (base de dados persistente) e colocá-los na Vercel.
+
+## Reservas
+
+O site público tem duas variantes e **ambas passam pelo mesmo módulo**,
+`src/lib/reservation.ts`. Não existem duas lógicas de reserva.
+
+| | Pré-Reserva Rápida | Reserva Completa |
+| --- | --- | --- |
+| Ecrã | `HomeScreen` | `ReservationScreen` |
+| Campos do cliente | nome, email, telefone, data, convidados | + hora, área, ocasião, notas |
+| Campos que o cliente não vê | vêm de `QUICK_DEFAULTS` (20:00, Salão Nobre da Brasa, "Pré-Reserva Rápida") | preenchidos pelo utilizador |
+
+O módulo expõe três coisas:
+
+- **`validateReservation`** — validação única para as duas. `extras === null` identifica a
+  rápida. Inclui a pausa (`paused`), as datas fechadas (`findBlockedPeriod`) e a
+  verificação anti-robô.
+- **`buildReservationPayload`** — monta o payload; na rápida substitui os extras pelos
+  `QUICK_DEFAULTS`, pelo que o que chega ao servidor é igual nas duas.
+- **`submitReservation`** — ponto único de submissão: valida, envia e devolve a
+  referência. Nenhum ecrã monta um payload por conta própria.
+
+Depois de sucesso, **ambas as variantes mostram a referência `BM-XXXX` ao cliente.**
+
+O resultado é um `SubmitOutcome` plano (`{ reference, error }`) e não uma união
+discriminada — de propósito, por causa do `tsconfig` sem `strict`. Ver
+[docs/decisions.md](docs/decisions.md).
 
 ## API
 
@@ -118,6 +155,7 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 - `POST /api/reviews` — registar avaliação (fica pendente até aprovação do admin)
 - `GET /api/reviews` — avaliações aprovadas (público)
 - `GET /api/menus` — menu publicado (ou `null` se ainda não houver alterações)
+- `GET /api/diarias` — **Menu Executivo** de uma data (parâmetro `date`, por omissão hoje): resolve horários, refeições e pratos para o dia
 - `GET /api/site-content` — conteúdo público (email, contactos, textos, vídeo)
 - `POST /api/admin/login` — iniciar sessão com `{ "token": "<ADMIN_TOKEN>" }`; devolve os cookies `bmtauth` + `bmcsrf`
 - `GET /api/admin/session` — verificar a sessão atual (cookie ou `X-Admin-Token`)
@@ -128,6 +166,7 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 - `GET /api/admin/closed-days`, `POST /api/admin/closed-days`, `DELETE /api/admin/closed-days/:id` — gerir **datas fechadas** (dia único, intervalo com repetição semanal ou anual; admin)
 - `GET /api/admin/assets`, `PUT /api/admin/assets`, `DELETE /api/admin/assets` — ler/publicar/repor imagens e logótipo (admin)
 - `GET /api/admin/menus`, `PUT /api/admin/menus`, `DELETE /api/admin/menus` — ler/publicar/repor a carta (admin)
+- `GET /api/admin/diarias`, `POST /api/admin/diarias`, `PUT /api/admin/diarias/:id`, `DELETE /api/admin/diarias/:id` — gestão do **Menu Executivo**: horários, refeições e repetição (admin)
 - `PUT /api/admin/site-content` — publicar conteúdo/contactos (admin)
 - `GET /api/admin/reservations`, `POST /api/admin/reservations`, `PUT /api/admin/reservations/:id`, `DELETE /api/admin/reservations/:id` — gestão completa de reservas (criar, duplicar, editar, remover; admin)
 - `GET /api/admin/reservation-protection`, `PUT /api/admin/reservation-protection` — consultar/configurar a proteção anti-fraude das reservas (admin)
@@ -136,7 +175,14 @@ Veja [credenciais-config.md](credenciais-config.md) para criar `SMTP_PASS` (pala
 
 ## Painel de administração
 
-Acede-se em **https://bmaldita.vercel.app/admin** (em dev: `http://localhost:3001/admin`). O site público **não mostra qualquer botão de acesso** — ao abrir `/admin` é pedido o `ADMIN_TOKEN` num ecrã de login. Ao entrar, a sessão fica guardada em cookies **`bmtauth` (HttpOnly) + `bmcsrf`** durante 14 dias; o token em si não é guardado no navegador.
+Acede-se em **https://bmaldita.vercel.app/admin** (em dev: `http://localhost:3000/admin` —
+o Vite serve o SPA e faz proxy de `/api`). O site público **não mostra qualquer botão de
+acesso** — ao abrir `/admin` é pedido o `ADMIN_TOKEN` num ecrã de login. Ao entrar, a
+sessão fica guardada em cookies **`bmtauth` (HttpOnly) + `bmcsrf`** durante 14 dias; o
+token em si não é guardado no navegador.
+
+> `http://localhost:3001/admin` também funciona **se `dist/` existir** — o Express serve
+> o SPA só nesse caso (`server/lib/app.ts` testa a pasta). Em dev limpo, usa `:3000`.
 
 **Como a autenticação funciona (importante para scripts):**
 
@@ -165,64 +211,59 @@ As alterações só são visíveis para os visitantes depois de clicar em **Publ
 
 ## Deploy na Vercel
 
-> **O deploy é o push para `main`.** Push para `main` faz deploy de produção;
-> pushes para outros ramos fazem previews. O `vercel.json` **não** deve levar
-> `"git": { "deploymentEnabled": false }` — ver o aviso em baixo.
->
-> ```bash
-> npm run verify              # gate obrigatório, tem de estar verde
-> git push origin main        # isto é o deploy
-> ```
->
-> O `npm run verify` corre **antes** do push, nunca depois: o build remoto é
-> caro e um push com o gate vermelho só troca um erro local por um build falhado.
->
-> **Porquê o push e não a CLI:** `vercel --prod` constrói o *working directory*,
-> não o commit. Se o `vercel.json` do disco divergir do `HEAD`, a produção fica
-> órfã de qualquer commit — e os deployments da CLI nem trazem `githubCommitSha`.
-> Com o push, o deployment aponta sempre para um SHA identificável.
+**O deploy é o push para `main`.** Push para `main` faz deploy automático em produção;
+pushes para outros ramos fazem previews.
 
-**Armadilha: não voltar a acrescentar `git.deploymentEnabled: false`.** A
-documentação da Vercel diz que a chave só afecta commits do Git, mas na prática
-**também bloqueia o deploy por CLI**, que falha com `Error: Not authorized` —
-o mesmo erro que a v60 dá sem pin. Como o CLI deixou de ser o caminho de
-deploy, a chave só traria transtorno.
+```bash
+npm run verify            # gate obrigatório — tem de estar verde, ANTES do push
+git push origin main      # isto é o deploy
+```
 
-Passos:
+**Regra: um push = um deploy.** Não acumular lotes nem repetir pushes "para tentar outra
+vez" — cada um cria um deployment novo e torna ambíguo o que está em produção.
 
-1. `npm run verify` tem de estar verde (typecheck + testes + smoke + build).
+Para confirmar que o que está em produção corresponde ao repositório:
 
-2. Em Settings > Environment Variables do projeto, defina em produção:
-   - `ADMIN_TOKEN` — token usado pelo painel de administração
-   - `TURSO_URL` e `TURSO_AUTH_TOKEN` — base de dados persistente
-   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM` — confirmações por email
-   - `SITE_CONTACT_EMAIL` — email de contacto global (opcional; por omissão `smpsandro1239@gmail.com`)
-   - `APP_URL` — `https://bmaldita.vercel.app`
-   - `DB_PATH` — não é preciso em produção (o Turso sobrepõe-se)
+```bash
+# o id do deployment sai de: npx vercel@59.26.0 inspect <url>
+MSYS_NO_PATHCONV=1 npx vercel@59.26.0 api "/v13/deployments/<id>"   # lê meta.githubCommitSha
+git rev-parse HEAD                                                   # tem de ser igual
+```
 
-   Os valores vão **entre aspas** no `.env` ou nas variáveis da Vercel, sobretudo
-   a `TURSO_AUTH_TOKEN`, que é um JWT com pontos: sem aspas, o shell e o parser
-   da Vercel podem truncá-lo.
+`vercel inspect --json` **não** devolve `githubCommitSha` — é a API crua que o lê.
+`MSYS_NO_PATHCONV=1` é obrigatório em Git Bash.
 
-2. Criar a base Turso (uma vez):
+As variáveis de ambiente vivem no painel da Vercel (o `.env` do repositório não é lido em
+produção): como as criar, em [credenciais-config.md](credenciais-config.md).
 
-   ```bash
-   npm i -g turso
-   turso auth login
-   turso db create boca-maldita
-   turso db show boca-maldita   # copiar URL
-   turso db tokens create boca-maldita  # copiar token
-   ```
-
-   Colar os valores em `TURSO_URL` e `TURSO_AUTH_TOKEN` na Vercel.
-
-3. `npm run build` gera `api/index.js` (API serverless num ficheiro único) e compila o frontend para `dist/`; `vercel.json` reencaminha `/api/*` para essa função e o restante é servido como SPA (`/index.html`).
+**Procedimento completo, armadilhas e checklist pós-deploy:**
+[GUIA-DEPLOY.md](GUIA-DEPLOY.md) §1-§5.
 
 ## Email de confirmação
 
-Sem `SMTP_HOST` não é enviado qualquer email (as reservas continuam a ser gravadas). Com SMTP configurado, cada reserva gera um email HTML com a referência `BM-XXXX`, data, hora e detalhes, e cada subscrição da newsletter gera um email de boas-vindas.
+Sem `SMTP_HOST` não é enviado qualquer email — as reservas continuam a ser gravadas. Com
+SMTP configurado, cada reserva gera um email HTML com a referência `BM-XXXX`, data, hora e
+detalhes, e cada subscrição da newsletter gera um email de boas-vindas.
 
-O rodapé do site inclui **Política de Privacidade**, **Termos de Reserva** e **Livro de Reclamações** — cada um abre a respetiva página legal com o conteúdo em português.
+**O envio é feito em background.** A rota responde `201` de imediato e o email continua
+vivo graças a `waitUntil` (`@vercel/functions`); o log de sucesso aparece **depois** da
+resposta. Detalhes, mensagens de log e troubleshooting em [docs/email.md](docs/email.md).
+
+O rodapé do site inclui **Política de Privacidade**, **Termos de Reserva** e **Livro de
+Reclamações** — cada um abre a respetiva página legal com o conteúdo em português.
+
+## Estado e pendências
+
+| Grupo | Item |
+| --- | --- |
+| **Feito e verificado** | Código em produção; o `githubCommitSha` de cada deploy confirmado igual ao `HEAD` |
+| **Depende de ti** | Token real do Google Search Console em `index.html` — hoje é um placeholder que o Google ignora |
+| **Externos** | Reclamar e completar o Google Business Profile · migrar o DNS de `bocamaldita.pt` · confirmar a `SMTP_PASS` no dashboard da Vercel |
+| **Adiado por decisão de negócio** | CTA WhatsApp no lugar do formulário de pausa (*desenhado, não implementado*) · migração para Cloudflare Pages (*analisado, não decidido*) |
+
+Contexto de cada um: SEO e domínio em [GUIA-DEPLOY.md](GUIA-DEPLOY.md) §6-§7; a
+`SMTP_PASS` em [docs/email.md](docs/email.md); as decisões em
+[docs/decisions.md](docs/decisions.md).
 
 ## Autor
 
