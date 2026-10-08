@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ReservationData, PublicReservationConfig } from '../types';
-import { createReservation, getReservationConfig } from '../lib/api';
+import { getReservationConfig } from '../lib/api';
 import { generateCheckQuestion } from '../lib/checkQuestion';
 import { findBlockedPeriod } from '../lib/closedDays';
+import { submitReservation } from '../lib/reservation';
 import { useSite, telHref } from '../context/SiteContext';
 import { Calendar, Clock, Users, MapPin, Phone, Check, Award, Flame, AlertCircle } from 'lucide-react';
 
@@ -56,41 +57,43 @@ export default function ReservationScreen() {
 
   const occasionOptions = ['Jantar romântico', 'Aniversário', 'Negócios', 'Família', 'Outro'];
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const blocked = findBlockedPeriod(formData.date, config?.closedPeriods ?? []);
-    if (blocked) {
-      setSubmitError(`Não é possível reservar para esta data (${blocked.title}). Escolha outro dia.`);
-      return;
-    }
-    setIsSubmitting(true);
-    setSubmitError(null);
-    try {
-      const created = await createReservation({
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        date: formData.date,
-        time: formData.time,
-        guests: formData.guests,
-        area: formData.area,
-        occasion: formData.occasion,
-        notes: formData.notes,
-        check: config?.requireCheck ? checkValue : '',
-        checkQuestion: config?.requireCheck ? checkQuestion.expression : '',
-        honeypot: config?.requireCheck ? honeypotValue : '',
-      });
+    const handleSubmit = async (e: FormEvent) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      const result = await submitReservation(
+        {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          date: formData.date,
+          guests: formData.guests,
+        },
+        {
+          time: formData.time,
+          area: formData.area,
+          occasion: formData.occasion,
+          notes: formData.notes,
+        },
+        config,
+        { value: checkValue, question: checkQuestion.expression, honeypot: honeypotValue },
+        phone,
+      );
+
+      setIsSubmitting(false);
+
+      if (result.error || !result.reference) {
+        setSubmitError(result.error ?? 'Ocorreu um erro ao enviar a reserva.');
+        return;
+      }
+
       setConfirmedReservation({
-        id: created.reference,
+        id: result.reference,
         data: { ...formData }
       });
       window.scrollTo({ top: 120, behavior: 'smooth' });
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Ocorreu um erro ao enviar a reserva.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    };
 
   const resetForm = () => {
     setConfirmedReservation(null);

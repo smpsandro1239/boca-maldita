@@ -11,3 +11,6 @@ coverage/
 !.env.example
 .vercel/
 .kilo/
+
+# Copias de seguranca locais da BD (nunca commitar)
+backups/

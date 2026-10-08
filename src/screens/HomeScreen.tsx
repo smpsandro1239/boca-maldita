@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ScreenType, MenuItem, PublicReservationConfig, PublicDiarias, ReviewAdminRow } from '../types';
 import { useSite, telHref } from '../context/SiteContext';
 import AssetImage from '../components/AssetImage';
-import { createReservation, createReview, getDiarias, getReservationConfig, getReviews } from '../lib/api';
+import { createReview, getDiarias, getReservationConfig, getReviews } from '../lib/api';
 import { pickDailyDishes } from '../lib/dailyDishes';
 import { generateCheckQuestion } from '../lib/checkQuestion';
+import { submitReservation } from '../lib/reservation';
 import { GMAPS_URL, WAZE_URL, APPLE_MAPS_URL } from '../data/contact';
 import { MENU_ITEMS } from '../data/menuData';
 import { 
@@ -52,20 +53,21 @@ export default function HomeScreen({
 }: HomeScreenProps) {
   const [activeMenuTab, setActiveMenuTab] = useState<'carnes' | 'mar'>('carnes');
   const [quickBookingSuccess, setQuickBookingSuccess] = useState(false);
+  const [quickBookingRef, setQuickBookingRef] = useState<string | null>(null);
   const [isQuickBookingLoading, setIsQuickBookingLoading] = useState(false);
   const [quickBookingError, setQuickBookingError] = useState<string | null>(null);
   const [reservationConfig, setReservationConfig] = useState<PublicReservationConfig | null>(null);
   const [checkQuestion, setCheckQuestion] = useState(() => generateCheckQuestion());
   const [checkValue, setCheckValue] = useState('');
   const [honeypotValue, setHoneypotValue] = useState('');
-  const todayISO = (() => {
-    const now = new Date();
+  const tomorrowISO = (() => {
+    const now = new Date(Date.now() + 86400000);
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   })();
   const [bookingFormData, setBookingFormData] = useState({
     nome: '',
     email: '',
-    data: todayISO,
+    data: tomorrowISO,
     convidados: '2 Pessoas',
     telefone: ''
   });
@@ -116,50 +118,46 @@ export default function HomeScreen({
 
   const handleQuickBooking = async (e: FormEvent) => {
     e.preventDefault();
-    if (!bookingFormData.nome || !bookingFormData.email || !bookingFormData.telefone) return;
-    const requireCheck = reservationConfig?.requireCheck ?? true;
-    if (requireCheck) {
-      if (honeypotValue || checkValue.trim() !== String(checkQuestion.answer)) {
-        setQuickBookingError('Verificação anti-robô incorreta. Tente de novo.');
-        return;
-      }
-    }
     setIsQuickBookingLoading(true);
     setQuickBookingError(null);
-    try {
-      const guests = Number.parseInt(bookingFormData.convidados, 10) || 2;
-      await createReservation({
+
+    const result = await submitReservation(
+      {
         name: bookingFormData.nome,
         email: bookingFormData.email,
         phone: bookingFormData.telefone,
         date: bookingFormData.data,
-        time: '20:00',
-        guests,
-        area: 'Salão Nobre da Brasa',
-        occasion: 'Pré-Reserva Rápida',
-        check: requireCheck ? checkValue : '',
-        checkQuestion: requireCheck ? checkQuestion.expression : '',
-        honeypot: requireCheck ? honeypotValue : '',
-      });
-      setQuickBookingSuccess(true);
-      setTimeout(() => {
-        setQuickBookingSuccess(false);
-        setCheckValue('');
-        setHoneypotValue('');
-        setCheckQuestion(generateCheckQuestion());
-        setBookingFormData({
-          nome: '',
-          email: '',
-          data: '',
-          convidados: '2 Pessoas',
-          telefone: ''
-        });
-      }, 4500);
-    } catch (err) {
-      setQuickBookingError(err instanceof Error ? err.message : 'Ocorreu um erro ao enviar a reserva.');
-    } finally {
-      setIsQuickBookingLoading(false);
+        guests: Number.parseInt(bookingFormData.convidados, 10) || 2,
+      },
+      null,
+      reservationConfig,
+      { value: checkValue, question: checkQuestion.expression, honeypot: honeypotValue },
+      phone,
+    );
+
+    setIsQuickBookingLoading(false);
+
+    if (result.error || !result.reference) {
+      setQuickBookingError(result.error ?? 'Ocorreu um erro ao enviar a reserva.');
+      return;
     }
+
+    setQuickBookingRef(result.reference);
+    setQuickBookingSuccess(true);
+    setTimeout(() => {
+      setQuickBookingSuccess(false);
+      setQuickBookingRef(null);
+      setCheckValue('');
+      setHoneypotValue('');
+      setCheckQuestion(generateCheckQuestion());
+      setBookingFormData({
+        nome: '',
+        email: '',
+        data: tomorrowISO,
+        convidados: '2 Pessoas',
+        telefone: ''
+      });
+    }, 12000);
   };
 
   return (
@@ -857,7 +855,7 @@ export default function HomeScreen({
 
                   <button
                     type="submit"
-                    disabled={isQuickBookingLoading}
+                    disabled={isQuickBookingLoading || quickBookingSuccess}
                     className="w-full bg-[#D4A373] text-[#0C0D0E] hover:bg-[#C59D5F] disabled:opacity-60 disabled:cursor-not-allowed text-xs uppercase font-sans font-semibold py-3 transition-colors tracking-[0.18em]"
                   >
                     {isQuickBookingLoading ? 'A Enviar Pedido…' : 'Solicitar Reserva de Mesa'}
@@ -871,9 +869,24 @@ export default function HomeScreen({
                   )}
 
                   {quickBookingSuccess && (
-                    <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs flex items-center gap-2">
-                      <Check className="w-4 h-4 shrink-0" />
-                      <span>Pedido de reserva recebido com sucesso! A equipa só entrará em contacto caso seja necessário.</span>
+                    <div className="p-3 bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 text-xs space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 shrink-0" />
+                        <span>Pedido de reserva recebido! Guarde a referência:</span>
+                      </div>
+                      {quickBookingRef && (
+                        <div className="flex items-center justify-between gap-3 bg-[#0C0D0E]/70 border border-emerald-500/30 px-3 py-2">
+                          <span className="font-mono text-sm tracking-[0.2em] text-emerald-200">
+                            {quickBookingRef}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-wider text-emerald-400/70">
+                            Referência
+                          </span>
+                        </div>
+                      )}
+                      <p className="text-emerald-300/70 leading-relaxed">
+                        Vai receber a confirmação por email. A equipa só entrará em contacto caso seja necessário.
+                      </p>
                     </div>
                   )}
 
