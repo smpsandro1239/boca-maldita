@@ -12,6 +12,7 @@ import { buildDefaultDiariaSchedules, currentMeal, normalizeDiariaSchedule, reso
 import type { PublicDiarias } from '../../shared/contracts';
 import { createSession, deleteSession, destroyAllSessions, parseCookies, requireAdmin, timingSafeEqualStr, CSRF_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth';
 import type { NextFunction, Request, Response } from 'express';
+import { waitUntil } from '@vercel/functions';
 
 let distDir = '';
 if (!process.env.VERCEL) {
@@ -277,14 +278,16 @@ export async function createApp(): Promise<AppInstance> {
         }
       }
       const { id, reference } = await storage.createReservation(parsed.data, { ip });
-      await Promise.all([
-        sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
-          console.error('[email] Falha no envio de confirmação:', err);
-        }),
-        sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
-          console.error('[email] Falha no envio de notificação de reserva:', err);
-        }),
-      ]);
+      waitUntil(
+        Promise.all([
+          sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
+            console.error('[email] Falha no envio de confirmação:', err);
+          }),
+          sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
+            console.error('[email] Falha no envio de notificação de reserva:', err);
+          }),
+        ]),
+      );
       res.status(201).json({ id, reference });
     } catch (err) {
       next(err);
@@ -301,14 +304,16 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(429).json({ error: 'Demasiados pedidos de contacto. Aguarde alguns minutos.' });
       }
       const { id } = await storage.createContact(parsed.data);
-      await sendContactNotification({
-        nome: parsed.data.nome ?? '',
-        email: parsed.data.email ?? '',
-        assunto: parsed.data.assunto ?? '',
-        mensagem: parsed.data.mensagem ?? '',
-      }).catch((err) => {
-        console.error('[email] Falha no envio de notificação de contacto:', err);
-      });
+      waitUntil(
+        sendContactNotification({
+          nome: parsed.data.nome ?? '',
+          email: parsed.data.email ?? '',
+          assunto: parsed.data.assunto ?? '',
+          mensagem: parsed.data.mensagem ?? '',
+        }).catch((err) => {
+          console.error('[email] Falha no envio de notificação de contacto:', err);
+        }),
+      );
       res.status(201).json({ id });
     } catch (err) {
       next(err);
@@ -328,9 +333,11 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(429).json({ error: 'Demasiadas subscrições. Aguarde alguns minutos.' });
       }
         const { id } = await storage.createNewsletter(parsed.data);
-        await sendNewsletterWelcome(parsed.data.email).catch((err) => {
-          console.error('[email] Falha no envio de boas-vindas do boletim:', err);
-        });
+        waitUntil(
+          sendNewsletterWelcome(parsed.data.email).catch((err) => {
+            console.error('[email] Falha no envio de boas-vindas do boletim:', err);
+          }),
+        );
         res.status(201).json({ id });
     } catch (err) {
       next(err);
