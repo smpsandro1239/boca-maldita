@@ -277,12 +277,14 @@ export async function createApp(): Promise<AppInstance> {
         }
       }
       const { id, reference } = await storage.createReservation(parsed.data, { ip });
-      sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
-        console.error('[email] Falha no envio de confirmação:', err);
-      });
-      sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
-        console.error('[email] Falha no envio de notificação de reserva:', err);
-      });
+      await Promise.all([
+        sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
+          console.error('[email] Falha no envio de confirmação:', err);
+        }),
+        sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
+          console.error('[email] Falha no envio de notificação de reserva:', err);
+        }),
+      ]);
       res.status(201).json({ id, reference });
     } catch (err) {
       next(err);
@@ -299,7 +301,7 @@ export async function createApp(): Promise<AppInstance> {
         return res.status(429).json({ error: 'Demasiados pedidos de contacto. Aguarde alguns minutos.' });
       }
       const { id } = await storage.createContact(parsed.data);
-      sendContactNotification({
+      await sendContactNotification({
         nome: parsed.data.nome ?? '',
         email: parsed.data.email ?? '',
         assunto: parsed.data.assunto ?? '',
@@ -325,11 +327,11 @@ export async function createApp(): Promise<AppInstance> {
       if (!allowIpHit(getClientIp(req))) {
         return res.status(429).json({ error: 'Demasiadas subscrições. Aguarde alguns minutos.' });
       }
-      const { id } = await storage.createNewsletter(parsed.data);
-      sendNewsletterWelcome(parsed.data.email).catch((err) => {
-        console.error('[email] Falha no envio de boas-vindas do boletim:', err);
-      });
-      res.status(201).json({ id });
+        const { id } = await storage.createNewsletter(parsed.data);
+        await sendNewsletterWelcome(parsed.data.email).catch((err) => {
+          console.error('[email] Falha no envio de boas-vindas do boletim:', err);
+        });
+        res.status(201).json({ id });
     } catch (err) {
       next(err);
     }

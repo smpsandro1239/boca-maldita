@@ -796,7 +796,10 @@ function getTransporter() {
         host,
         port: Number(process.env.SMTP_PORT ?? 587),
         secure: (process.env.SMTP_SECURE ?? "").toLowerCase() === "true",
-        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? "" } : void 0
+        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? "" } : void 0,
+        connectionTimeout: 8e3,
+        greetingTimeout: 8e3,
+        socketTimeout: 15e3
       });
     })();
   }
@@ -838,6 +841,7 @@ async function sendReservationConfirmation(payload) {
       subject: `Confirma\xE7\xE3o de reserva ${payload.reference} \u2014 Boca Maldita`,
       html: buildConfirmationHtml(payload)
     });
+    console.log("[email] Confirma\xE7\xE3o enviada", payload.reference, "->", payload.email);
     return true;
   } catch (err) {
     console.error("[email] Erro ao enviar confirma\xE7\xE3o:", err);
@@ -955,6 +959,7 @@ async function sendReservationAdminNotification(payload) {
       subject: `Nova reserva ${payload.reference} \u2014 ${payload.name} \u2014 ${payload.date} ${payload.time}`,
       html: buildReservationAdminHtml(payload)
     });
+    console.log("[email] Notifica\xE7\xE3o de reserva enviada", payload.reference, "->", getAdminInbox());
     return true;
   } catch (err) {
     console.error("[email] Erro ao enviar notifica\xE7\xE3o de reserva:", err);
@@ -1549,12 +1554,14 @@ async function createApp() {
         }
       }
       const { id, reference } = await storage.createReservation(parsed.data, { ip });
-      sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
-        console.error("[email] Falha no envio de confirma\xE7\xE3o:", err);
-      });
-      sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
-        console.error("[email] Falha no envio de notifica\xE7\xE3o de reserva:", err);
-      });
+      await Promise.all([
+        sendReservationConfirmation({ ...parsed.data, reference }).catch((err) => {
+          console.error("[email] Falha no envio de confirma\xE7\xE3o:", err);
+        }),
+        sendReservationAdminNotification({ ...parsed.data, reference }).catch((err) => {
+          console.error("[email] Falha no envio de notifica\xE7\xE3o de reserva:", err);
+        })
+      ]);
       res.status(201).json({ id, reference });
     } catch (err) {
       next(err);
@@ -1570,7 +1577,7 @@ async function createApp() {
         return res.status(429).json({ error: "Demasiados pedidos de contacto. Aguarde alguns minutos." });
       }
       const { id } = await storage.createContact(parsed.data);
-      sendContactNotification({
+      await sendContactNotification({
         nome: parsed.data.nome ?? "",
         email: parsed.data.email ?? "",
         assunto: parsed.data.assunto ?? "",
@@ -1596,7 +1603,7 @@ async function createApp() {
         return res.status(429).json({ error: "Demasiadas subscri\xE7\xF5es. Aguarde alguns minutos." });
       }
       const { id } = await storage.createNewsletter(parsed.data);
-      sendNewsletterWelcome(parsed.data.email).catch((err) => {
+      await sendNewsletterWelcome(parsed.data.email).catch((err) => {
         console.error("[email] Falha no envio de boas-vindas do boletim:", err);
       });
       res.status(201).json({ id });

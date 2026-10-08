@@ -34,6 +34,9 @@ function getTransporter(): Promise<EmailTransporter | null> {
         auth: process.env.SMTP_USER
           ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? '' }
           : undefined,
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 15000,
       }) as EmailTransporter;
     })();
   }
@@ -80,6 +83,7 @@ export async function sendReservationConfirmation(payload: ConfirmationPayload):
       subject: `Confirmação de reserva ${payload.reference} — Boca Maldita`,
       html: buildConfirmationHtml(payload),
     });
+    console.log('[email] Confirmação enviada', payload.reference, '->', payload.email);
     return true;
   } catch (err) {
     console.error('[email] Erro ao enviar confirmação:', err);
@@ -216,6 +220,7 @@ export async function sendReservationAdminNotification(payload: ConfirmationPayl
       subject: `Nova reserva ${payload.reference} — ${payload.name} — ${payload.date} ${payload.time}`,
       html: buildReservationAdminHtml(payload),
     });
+    console.log('[email] Notificação de reserva enviada', payload.reference, '->', getAdminInbox());
     return true;
   } catch (err) {
     console.error('[email] Erro ao enviar notificação de reserva:', err);
