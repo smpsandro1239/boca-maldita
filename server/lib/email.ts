@@ -119,6 +119,7 @@ export async function sendNewsletterWelcome(email: string): Promise<boolean> {
       subject: 'Bem-vindo ao Boletim Exclusivo — Boca Maldita',
       html: buildWelcomeHtml(),
     });
+    console.log('[email] Boas-vindas do boletim enviada ->', email);
     return true;
   } catch (err) {
     console.error('[email] Erro ao enviar boas-vindas do boletim:', err);
@@ -174,6 +175,7 @@ export async function sendContactNotification(payload: ContactNotificationPayloa
       subject: `Nova mensagem de ${payload.nome} — ${payload.assunto}`,
       html: buildContactHtml(payload),
     });
+    console.log('[email] Notificação de contacto enviada ->', getAdminInbox());
     return true;
   } catch (err) {
     console.error('[email] Erro ao enviar notificação de contacto:', err);
@@ -294,6 +296,7 @@ export async function sendClosedDayConflictEmail(payload: ClosedDayConflictEmail
       subject: `⚠ Alerta: ${payload.total} reserva${payload.total === 1 ? '' : 's'} num dia fechado (“${payload.title}”) — Boca Maldita`,
       html: buildClosedDayConflictHtml(payload),
     });
+    console.log('[email] Alerta de conflito enviado', payload.total, 'reserva(s)', payload.title);
     return true;
   } catch (err) {
     console.error('[email] Erro ao enviar alerta de conflito:', err);
