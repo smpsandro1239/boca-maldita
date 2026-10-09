@@ -2,6 +2,9 @@
 
 Razões que **não se vêem no código**. O `git log` diz *o quê*; este ficheiro diz *porquê*.
 
+Se uma mensagem de commit divergir do que aqui está, **este ficheiro é a fonte de verdade** —
+mensagens de commit são história imutável, não contrato.
+
 Não é um changelog e não é um manual de operações. Procedimentos e comandos estão no
 [GUIA-DEPLOY.md](../GUIA-DEPLOY.md). Envio de email e leitura de logs estão em
 [docs/email.md](email.md).
